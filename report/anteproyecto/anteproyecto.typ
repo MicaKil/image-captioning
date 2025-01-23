@@ -37,11 +37,17 @@ El problema se enmarca en la categoría de aprendizaje supervisado @islp[c. ~12]
 Como se describió anteriormente, el objetivo principal de este proyecto es desarrollar un modelo basado en CNNs y RNNs que genere descripciones textuales precisas y coherentes para una imagen dada.
 
 Para lograr este objetivo, se plantean los siguientes objetivos específicos:
+
 - Extraer características visuales de las imágenes utilizando una CNN preentrenada (ResNet50 @resnet@resnet-paper).
+
 - Implementar una RNN (LSTM @deep-learn[p. ~297]) para generar descripciones secuenciales de texto basadas en las características visuales.
+
 - Crear un mecanismo de atención @deep-learn[c. ~11.4] para permitir al modelo enfocar diferentes regiones de la imagen durante la generación de texto.
+
 - Probar los modelos con distintas cantidades de capas y neuronas para evaluar su impacto en el desempeño.
+
 - Evaluar los modelos utilizando métricas de evaluación de lenguaje natural como BLEU @BLEU, METEOR @METEOR y/o CIDEr @CIDEr.
+
 - Comparar los resultados obtenidos con y sin mecanismo de atención para analizar la mejora en la calidad de las descripciones generadas.
 
 Además, se plantean objetivos adicionales: implementar beam search @beam para mejorar la generación de texto y realizar fine-tuning de ResNet @deep-learn[p. ~234] para optimizar la extracción de características visuales según el dominio del conjunto de datos. Dichos objetivos se abordarán en caso de cumplir con los objetivos principales en tiempo y forma.
@@ -51,6 +57,7 @@ Además, se plantean objetivos adicionales: implementar beam search @beam para m
 Los datos de entrada al modelo consistirán en:
 
 - _Imágenes:_ Fotografías en formato RGB, que serán procesadas a través de una CNN para extraer mapas de características.
+
 - _Descripciones textuales:_ Secuencias de palabras en formato texto que describen el contenido visual de cada imagen.
 
 Como posible fuente de datos, se considera el dataset Flickr8K @flickr8k o Flickr30K @flickr30k, que contienen imágenes de _Flickr_ con descripciones en inglés. También, se considera el conjunto de datos MS COCO @mscoco, que contiene imágenes de escenas cotidianas y sus descripciones asociadas.
@@ -60,7 +67,9 @@ Como posible fuente de datos, se considera el dataset Flickr8K @flickr8k o Flick
 El modelo implementará una arquitectura que combina diferentes técnicas:
 
 - _Redes Neuronales Convolucionales (CNNs):_ ResNet50, previamente entrenada, para extraer representaciones de alto nivel de las imágenes.
+
 - _Redes Neuronales Recurrentes (RNNs):_ Una LSTM (Long Short-Term Memory) que tomará como entrada el vector de características de la imagen y generará las palabras de la descripción de forma secuencial.
+
 - _Mecanismo de atención:_ Una capa que calculará pesos de atención para cada región de la imagen, permitiendo que el modelo enfoque diferentes partes del mapa de características mientras genera cada palabra. Este mecanismo será implementado tras evaluar la versión inicial sin atención.
 
 = Descripción del Sistema

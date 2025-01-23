@@ -15,7 +15,7 @@
 		lang: "es",
 		region: "ar",
 		font: "Lora",
-		fallback: false,
+		// fallback: false,
 	)
 
 	// HEADING 
@@ -96,6 +96,8 @@
 			#date
 		]
 	}
+
+	set list(marker: [•], [‣], [◦])
 
 	// CONTENT
 
