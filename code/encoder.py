@@ -13,8 +13,9 @@ class Encoder(nn.Module):
 		super(Encoder, self).__init__()
 		self.model = models.resnet50(pretrained=True)
 		self.model = nn.Sequential(*list(self.model.children())[:-1])  # Remove the last FC layer (Classification layer)
+		self.model.eval()  # Set the model to evaluation mode (don't update weights)
 
-	def forward(self, x):
+	def forward(self, x: torch.Tensor) -> torch.Tensor:
 		"""
 		Forward pass of the encoder
 		:param x: Input image tensor of shape (batch_size, 3, 224, 224)

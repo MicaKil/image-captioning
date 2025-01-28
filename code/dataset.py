@@ -5,8 +5,8 @@ import torchvision.transforms.v2 as v2
 # root_dir = "C:\\Users\\micae\\OneDrive\\image-captioning\\dataset\\flickr8k\\images"  # Directory where images are stored
 # ann_file = "C:\\Users\\micae\\OneDrive\\image-captioning\\dataset\\flickr8k\\Flickr8k.token.txt"  # Annotation file
 
-root_dir = "../../dataset/flickr8k/images"
-ann_file = "../../dataset/flickr8k/Flickr8k.token.txt"
+root_dir = "../dataset/flickr8k/images"
+ann_file = "../dataset/flickr8k/Flickr8k.token.txt"
 
 # Define image transformations
 transform = v2.Compose([
