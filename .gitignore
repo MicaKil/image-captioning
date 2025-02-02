@@ -230,3 +230,5 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 # Project
+datasets/flickr8k/Flickr8k.token.txt
+datasets/flickr8k/images/*
