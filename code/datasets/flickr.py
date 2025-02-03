@@ -1,3 +1,4 @@
+import logging
 import os.path
 from collections import Counter
 
@@ -5,32 +6,68 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 import torchvision.transforms.v2 as v2
-from nltk import word_tokenize
+from nltk import word_tokenize, TreebankWordDetokenizer
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision.io import decode_image, ImageReadMode
+
+import utils
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
 class FlickerDataset(Dataset):
-	def __init__(self, ann_file: str, img_dir: str, vocab_threshold=2, transform=None, target_transform=None):
+	"""
+	Custom Dataset for loading Flickr8k images and captions.
+	"""
+
+	def __init__(self, ann_file: str, img_dir: str, save_captions=False, vocab_threshold=2, vocab_file: str = None,
+				 save_vocab=False, transform=None, target_transform=None):
+		"""
+		:param ann_file: Path to the annotation file with the image IDs and captions
+		:param img_dir: Path to the directory containing the images
+		:param save_captions: If True, save the captions to a CSV file
+		:param vocab_threshold: Minimum frequency of a word to be included in the vocabulary
+		:param vocab_file: Path to the vocabulary file
+		:param save_vocab: If True, save the vocabulary to a file
+		:param transform: Transform to apply to the images
+		:param target_transform: Transform to apply to the target captions
+		"""
+		logger.info("Initializing FlickerDataset.")
 		self.img_dir = img_dir
 		self.transform = transform
 		self.target_transform = target_transform
 
-		df = load_captions(ann_file)
-		self.imgs_ids, self.captions = df["image_id"], df["caption"]
+		df = load_captions(ann_file, save_captions)
+		self.img_ids, self.captions = df["image_id"], df["caption"]
 
-		self.vocab = Vocabulary(vocab_threshold, self.captions)
+		if vocab_file is not None and not save_vocab:
+			logger.info("Loading vocabulary from file.")
+			self.vocab = utils.load(vocab_file)
+		else:
+			self.vocab = Vocabulary(vocab_threshold, self.captions)
+			utils.dump(self.vocab, "vocab.pkl")
 
 	def __len__(self):
+		"""
+		Return the number of samples in the dataset.
+		:return: Number of samples
+		"""
 		return len(self.captions)
 
-	def __getitem__(self, idx: int):
-		img = decode_image(str(os.path.join(self.img_dir, self.imgs_ids[idx])), mode=ImageReadMode.RGB)
+	def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+		"""
+		Get a sample (image and caption) from the dataset.
+		:param idx: Index of the sample to retrieve
+		:return: Tuple containing the image and caption tensors
+		"""
+		img = decode_image(str(os.path.join(self.img_dir, self.img_ids[idx])), mode=ImageReadMode.RGB)
 		if self.transform:
 			img = self.transform(img)
 
-		caption = [self.vocab.to_idx("<SOS>")] + self.vocab.to_idxs(self.captions[idx]) + [self.vocab.to_idx("<EOS>")]
+		caption = [self.vocab.to_idx("<SOS>")] + self.vocab.to_idx_list(self.captions[idx]) + [
+			self.vocab.to_idx("<EOS>")]
 		caption = torch.tensor(caption, dtype=torch.float32)
 		if self.target_transform:
 			caption = self.target_transform(caption)
@@ -47,10 +84,10 @@ def load_captions(path: str, overwrite=False) -> pd.DataFrame:
 	"""
 
 	if os.path.splitext(path)[1] == ".csv" and not overwrite:
-		print("Loading captions from CSV file.")
+		logger.info("Loading captions from CSV file.")
 		return pd.read_csv(path)
 
-	print("Loading captions from text file.")
+	logger.info("Loading captions from annotation file.")
 	df = pd.DataFrame(extract_captions(path))  # Convert to DataFrame
 	df.to_csv("../datasets/flickr8k/captions.csv", index=False)
 	return df
@@ -106,6 +143,7 @@ class Vocabulary:
 		:param text_list: List of texts
 		:return: None
 		"""
+		logger.info("Building vocabulary.")
 		for text in text_list:
 			self.word_counts.update(self.tokenize_eng(text))
 
@@ -116,7 +154,7 @@ class Vocabulary:
 				self._to_str[idx] = word
 				idx += 1
 
-	def to_idxs(self, text: str) -> list[int]:
+	def to_idx_list(self, text: str) -> list[int]:
 		"""
 		Convert a text to a list of word indices.
 		:param text: Input text
@@ -131,6 +169,14 @@ class Vocabulary:
 		:return: Index of the word or the index of "<UNK>" if the word is not in the vocabulary
 		"""
 		return self._to_idx.get(word, self._to_idx["<UNK>"])
+
+	def to_text(self, idxs: list[int]) -> str:
+		"""
+		Convert a list of indices to text.
+		:param idxs: List of indices to convert
+		:return: Text corresponding to the indices
+		"""
+		return TreebankWordDetokenizer().detokenize([self.to_str(int(idx)) for idx in idxs])
 
 	def to_str(self, idx: int) -> str:
 		"""
@@ -149,26 +195,66 @@ class Vocabulary:
 		return word in self._to_idx
 
 	def __str__(self):
+		"""
+		Return a string representation of the vocabulary.
+		:return: String representation of the vocabulary
+		"""
 		return str({word: self.word_counts[word] for _, word in self._to_str.items()})
 
 
 class Collate:
-	def __init__(self, pad_idx: int):
+	"""
+	Collate function to pad sequences and move tensors to the specified device.
+	"""
+	def __init__(self, pad_idx: int, device: torch.device):
+		"""
+		:param pad_idx: Index of the padding token
+		:param device: Device to move the tensors to
+		"""
 		self.pad_idx = pad_idx
+		self.device = device
 
 	def __call__(self, batch):
+		"""
+		Collate function to pad sequences and move tensors to the specified device.
+		:param batch: List of samples to collate
+		:return: Tuple (images, captions) where images is a tensor and captions is a padded tensor
+		"""
 		images, captions = zip(*batch)
-		images = torch.stack(images)
-		captions = pad_sequence(captions, batch_first=True, padding_value=self.pad_idx)
+		images = torch.stack(images).to(self.device, non_blocking=True)
+		captions = pad_sequence(captions, batch_first=True, padding_value=self.pad_idx).to(self.device,
+																						   non_blocking=True)
 		return images, captions
 
 
-def data_loader(ann_file: str, img_dir: str, vocab_threshold=2, transform=None, batch_size=16, num_workers=4,
-				shuffle=True, pin_memory=True):
-	dataset = FlickerDataset(ann_file, img_dir, vocab_threshold, transform)
+def data_loader(ann_file: str, img_dir: str, save_captions=False, vocab_threshold=2, vocab_file: str = None,
+				save_vocab=False, transform=None, batch_size=16, num_workers=4, shuffle=True, pin_memory=True,
+				device=torch.device("cpu")) -> DataLoader:
+	"""
+	Create a DataLoader for the Flickr8k dataset.
+
+	:param ann_file: Path to the annotation file.
+	:param img_dir: Path to the directory containing the images.
+	:param save_captions: Whether to save the captions to a CSV file.
+	:param vocab_threshold: Minimum frequency of a word to be included in the vocabulary.
+	:param vocab_file: Path to the vocabulary file.
+	:param save_vocab: Whether to save the vocabulary to a file.
+	:param transform: Transform to apply to the images.
+	:param batch_size: Number of samples per batch.
+	:param num_workers: Number of subprocesses to use for data loading.
+	:param shuffle: Whether to shuffle the data.
+	:param pin_memory: Whether to pin memory.
+	:param device: Device to move tensors to.
+
+	:return: DataLoader for the Flickr8k dataset.
+	"""
+	dataset = FlickerDataset(ann_file, img_dir, save_captions, vocab_threshold, vocab_file, save_vocab,
+							 transform)
+	logger.info(f"FlickerDataset loaded.")
 	pad_idx = dataset.vocab.to_idx("<PAD>")
-	return torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle,
-									   pin_memory=pin_memory, collate_fn=Collate(pad_idx))
+	logger.info(f"Initializing DataLoader.")
+	return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory,
+					  collate_fn=Collate(pad_idx, device))
 
 
 if __name__ == "__main__":
@@ -187,8 +273,7 @@ if __name__ == "__main__":
 		# v2.Normalize(mean=mean, std=std)  # Normalize image
 	])
 
-	print("Loading data...")
-	dataloader = data_loader(ann_file_, root_dir_, transform=transform_)
+	dataloader = data_loader(ann_file_, root_dir_, transform=transform_, vocab_file="vocab.pkl")
 
 	for i, (images_, captions_) in enumerate(dataloader):
 		print(f"Images shape: {images_.size()}")
@@ -198,14 +283,13 @@ if __name__ == "__main__":
 		print(images_[0].size())
 		print(images_[0])
 
-		img_ = images_[0].permute(1, 2, 0).numpy()
+		img_ = images_[0].permute(1, 2, 0).numpy()  # Permute dimensions to (H, W, C)
 		# img_ = (img_ * std) + mean # Unnormalize the image
 		plt.imshow(img_)
 		plt.show()
 
 		print("Caption:")
 		print(captions_[0])
-		print([dataloader.dataset.vocab.to_str(int(i)) for i in captions_[0]])
+		print("Text of the caption:")
+		print(dataloader.dataset.vocab.to_text(captions_[0]))
 		break
-
-
