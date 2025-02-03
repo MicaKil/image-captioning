@@ -149,11 +149,7 @@ class Vocabulary:
 		return word in self._to_idx
 
 	def __str__(self):
-		s = "{"
-		for _, word in self._to_str.items():
-			s += f"'{word}': {self.word_counts[word]}, "
-		s += "}\n"
-		return s
+		return str({word: self.word_counts[word] for _, word in self._to_str.items()})
 
 
 class Collate:
@@ -182,13 +178,16 @@ if __name__ == "__main__":
 	ann_file_ = "../../datasets/flickr8k/captions.csv"
 
 	# Define image transformations
+	mean = [0.485, 0.456, 0.406]
+	std = [0.229, 0.224, 0.225]
 	transform_ = v2.Compose([
 		v2.ToImage(),
 		v2.Resize((224, 224)),  # Resize for CNN models
 		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
-		v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+		# v2.Normalize(mean=mean, std=std)  # Normalize image
 	])
 
+	print("Loading data...")
 	dataloader = data_loader(ann_file_, root_dir_, transform=transform_)
 
 	for i, (images_, captions_) in enumerate(dataloader):
@@ -196,16 +195,17 @@ if __name__ == "__main__":
 		print(f"Captions shape: {captions_.size()}")
 
 		# Display the first image and caption
-		print("Displaying the first image and caption.")
-		print("-" * 10)
-		print(images_[0].dtype)
 		print(images_[0].size())
 		print(images_[0])
 
 		img_ = images_[0].permute(1, 2, 0).numpy()
+		# img_ = (img_ * std) + mean # Unnormalize the image
 		plt.imshow(img_)
 		plt.show()
 
-		print("-" * 10)
+		print("Caption:")
 		print(captions_[0])
+		print([dataloader.dataset.vocab.to_str(int(i)) for i in captions_[0]])
 		break
+
+
