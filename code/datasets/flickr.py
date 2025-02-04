@@ -206,13 +206,12 @@ class Collate:
 	"""
 	Collate function to pad sequences and move tensors to the specified device.
 	"""
-	def __init__(self, pad_idx: int, device: torch.device):
+
+	def __init__(self, pad_idx: int):
 		"""
 		:param pad_idx: Index of the padding token
-		:param device: Device to move the tensors to
 		"""
 		self.pad_idx = pad_idx
-		self.device = device
 
 	def __call__(self, batch):
 		"""
@@ -221,15 +220,14 @@ class Collate:
 		:return: Tuple (images, captions) where images is a tensor and captions is a padded tensor
 		"""
 		images, captions = zip(*batch)
-		images = torch.stack(images).to(self.device, non_blocking=True)
-		captions = pad_sequence(captions, batch_first=True, padding_value=self.pad_idx).to(self.device,
-																						   non_blocking=True)
+		images = torch.stack(images)
+		captions = pad_sequence(captions, batch_first=True, padding_value=self.pad_idx)
 		return images, captions
 
 
 def data_loader(ann_file: str, img_dir: str, save_captions=False, vocab_threshold=2, vocab_file: str = None,
-				save_vocab=False, transform=None, batch_size=16, num_workers=4, shuffle=True, pin_memory=True,
-				device=torch.device("cpu")) -> DataLoader:
+				save_vocab=False, transform=None, batch_size=32, num_workers=4, shuffle=True,
+				pin_memory=True) -> DataLoader:
 	"""
 	Create a DataLoader for the Flickr8k dataset.
 
@@ -244,7 +242,6 @@ def data_loader(ann_file: str, img_dir: str, save_captions=False, vocab_threshol
 	:param num_workers: Number of subprocesses to use for data loading.
 	:param shuffle: Whether to shuffle the data.
 	:param pin_memory: Whether to pin memory.
-	:param device: Device to move tensors to.
 
 	:return: DataLoader for the Flickr8k dataset.
 	"""
@@ -254,42 +251,35 @@ def data_loader(ann_file: str, img_dir: str, save_captions=False, vocab_threshol
 	pad_idx = dataset.vocab.to_idx("<PAD>")
 	logger.info(f"Initializing DataLoader.")
 	return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory,
-					  collate_fn=Collate(pad_idx, device))
+					  collate_fn=Collate(pad_idx))
 
 
 if __name__ == "__main__":
-	# root_dir = "C:\\Users\\micae\\OneDrive\\image-captioning\\dataset\\flickr8k\\images"
 	root_dir_ = "../../datasets/flickr8k/images"
-	# ann_file = "C:\\Users\\micae\\OneDrive\\image-captioning\\dataset\\flickr8k\\Flickr8k.token.txt"
 	ann_file_ = "../../datasets/flickr8k/captions.csv"
 
-	# Define image transformations
-	mean = [0.485, 0.456, 0.406]
-	std = [0.229, 0.224, 0.225]
 	transform_ = v2.Compose([
 		v2.ToImage(),
 		v2.Resize((224, 224)),  # Resize for CNN models
 		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
-		# v2.Normalize(mean=mean, std=std)  # Normalize image
 	])
 
-	dataloader = data_loader(ann_file_, root_dir_, transform=transform_, vocab_file="vocab.pkl")
+	device_ = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+	logger.info(f"Device: {device_}")
+
+	dataloader = data_loader(ann_file_, root_dir_, transform=transform_, vocab_file="vocab.pkl", pin_memory=True, num_workers=8)
 
 	for i, (images_, captions_) in enumerate(dataloader):
 		print(f"Images shape: {images_.size()}")
 		print(f"Captions shape: {captions_.size()}")
 
 		# Display the first image and caption
-		print(images_[0].size())
-		print(images_[0])
+		print(f"Image from batch:\n {images_[0]}")
 
 		img_ = images_[0].permute(1, 2, 0).numpy()  # Permute dimensions to (H, W, C)
-		# img_ = (img_ * std) + mean # Unnormalize the image
 		plt.imshow(img_)
 		plt.show()
 
-		print("Caption:")
-		print(captions_[0])
-		print("Text of the caption:")
-		print(dataloader.dataset.vocab.to_text(captions_[0]))
+		print(f"Caption: \n{captions_[0]}")
+		print(f"Text of the caption: {dataloader.dataset.vocab.to_text(captions_[0])}")
 		break
