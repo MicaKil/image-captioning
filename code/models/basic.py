@@ -1,29 +1,31 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from torchvision.models import ResNet50_Weights
 
 
-class Encoder(nn.Module):
+class EncoderResnet(nn.Module):
 	"""
 	Encoder class that uses a pretrained ResNet-50 model to extract features from images, i.e., encode images into a
 	fixed-size feature vector suitable for captioning.
 	"""
 
-	def __init__(self):
-		super(Encoder, self).__init__()
-		self.model = models.resnet50(pretrained=True)
-		self.model = nn.Sequential(*list(self.model.children())[:-1])  # Remove the last FC layer (Classification layer)
-		self.model.eval()  # Set the model to evaluation mode (don't update weights)
+	def __init__(self, freeze: bool, embed_size: int) -> None:
+		super(EncoderResnet, self).__init__()
+		self.resnet = models.resnet50(weights= ResNet50_Weights.IMAGENET1K_V2)
+		self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])  # Remove the last FC layer (Classification layer)
+		if freeze:
+			for param in self.resnet.parameters():
+				param.requires_grad = False
 
 	def forward(self, x: torch.Tensor) -> torch.Tensor:
 		"""
 		Forward pass of the encoder
 		:param x: Input image tensor of shape (batch_size, 3, 224, 224)
-		:return: 1D feature vector of shape (batch_size, 2048)
+		:return: 1D feature vector of shape (batch_size, feature_dim)
 		"""
-		with torch.no_grad():  # No need to compute gradients
-			features = self.model(x)
-		return features.view(features.size(0), -1)  # Flatten the feature vector
+		features = self.resnet(x)  # shape (batch_size, feature_size, 1, 1)
+		return features.view(features.size(0), -1)  # Flatten the feature vector to (batch_size, feature_size)
 
 
 class DecoderLSTM(nn.Module):
@@ -44,10 +46,10 @@ class DecoderLSTM(nn.Module):
 		:param num_layers: Number of layers in the LSTM
 		"""
 		super(DecoderLSTM, self).__init__()
-		self.feature_embed = nn.Linear(feature_size, embed_size)  # Linear layer that transforms the input image features into the embedding size (embed_size)
-		self.embed = nn.Embedding(vocab_size, embed_size)  # Embedding layer converts word indices into dense vectors of a specified size (embed_size)
-		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True)  # LSTM network that processes the embedded word vectors
-		self.linear = nn.Linear(hidden_size, vocab_size)  # The fc layer is a fully connected layer that maps the LSTM outputs to the vocabulary size, producing the final word predictions
+		self.feature_embed = nn.Linear(feature_size, embed_size)  # transforms the input image features into the embedding size
+		self.embed = nn.Embedding(vocab_size, embed_size)  # converts word indices into dense vectors of embed_size
+		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True)  # processes the embedded word vectors
+		self.linear = nn.Linear(hidden_size, vocab_size)  # maps the LSTM outputs to the vocabulary scores, producing the final word predictions
 		self.dropout = nn.Dropout(dropout)
 
 	def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
@@ -57,9 +59,16 @@ class DecoderLSTM(nn.Module):
 		:param captions: Caption word indices
 		:return: Predicted word indices
 		"""
-		embeddings = self.dropout(self.embed(captions))  # Captions are embedded using the embed layer
+		features = self.feature_embed(features)
+		features = features.unsqueeze(1)
+		embeddings = self.embed(captions)
 		lstm_out, _ = self.lstm(
-			embeddings)  # The final LSTM outputs are passed through the fc layer to generate the predicted word indices
+			torch.cat((features, embeddings), dim=1)  # concatenate the image features and caption embeddings
+		)
 		outputs = self.linear(lstm_out)
 
 		return outputs
+
+if __name__ == "__main__":
+	m = models.resnet50(weights= ResNet50_Weights.IMAGENET1K_V2)
+	print(m)
