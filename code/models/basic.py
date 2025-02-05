@@ -1,10 +1,13 @@
+import os
+
 import torch
 import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 from torchvision.transforms import v2
 
-from datasets.flickr import data_loader
+from constants import ROOT, FLICKR8K_IMG_DIR, FLICKR8K_ANN_FILE
+from dataset.flickr_dataloader import FlickerDataLoader
 
 
 class EncoderResnet(nn.Module):
@@ -97,6 +100,10 @@ class DecoderLSTM(nn.Module):
 
 
 class ImageCaptioning(nn.Module):
+	"""
+	Image captioning model that combines an Encoder and Decoder.
+	"""
+
 	def __init__(self,
 				 embed_size: int,
 				 hidden_size: int,
@@ -106,19 +113,37 @@ class ImageCaptioning(nn.Module):
 				 padding_idx: int = 0,
 				 freeze_encoder=True
 				 ):
+		"""
+		Constructor for the ImageCaptioning class
+
+		:param embed_size: Size of the embedding vector
+		:param hidden_size: Size of the hidden state of the LSTM
+		:param vocab_size: Size of the vocabulary
+		:param dropout: Dropout probability
+		:param num_layers: Number of layers in the LSTM
+		:param padding_idx: Index of the padding token in the vocabulary
+		:param freeze_encoder: Whether to freeze the weights of the Encoder during training
+		"""
 		super(ImageCaptioning, self).__init__()
 		self.encoder = EncoderResnet(embed_size, freeze_encoder)
 		self.decoder = DecoderLSTM(embed_size, hidden_size, vocab_size, dropout, num_layers, padding_idx)
 
-	def forward(self, images: torch.Tensor, captions: torch.Tensor):
+	def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
+		"""
+		Forward pass of the ImageCaptioning model
+
+		:param images: Input image tensors
+		:param captions: Caption word indices
+		:return: Predicted word indices
+		"""
 		features = self.encoder(images)
 		outputs = self.decoder(features, captions)
 		return outputs
 
 
 if __name__ == "__main__":
-	root_dir_ = "../../datasets/flickr8k/images"
-	ann_file_ = "../../datasets/flickr8k/captions.csv"
+	root_dir_ = os.path.join(ROOT, FLICKR8K_IMG_DIR)
+	ann_file_ = os.path.join(ROOT, FLICKR8K_ANN_FILE)
 
 	transform_ = v2.Compose([
 		v2.ToImage(),
@@ -126,11 +151,10 @@ if __name__ == "__main__":
 		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
 	])
 
-	dataloader = data_loader(ann_file_, root_dir_, transform=transform_,
-							 pin_memory=True, num_workers=8)
+	dataloader = FlickerDataLoader(str(ann_file_), str(root_dir_), transform=transform_, pin_memory=True, num_workers=8)
 	embed_size_ = 256
 	hidden_size_ = 512
-	vocab_size_ = len(dataloader.dataset.vocab)
+	vocab_size_ = len(dataloader.vocab)
 	dropout_ = 0.5
 	num_layers_ = 10
 
@@ -138,3 +162,5 @@ if __name__ == "__main__":
 
 	img_, captions_ = next(iter(dataloader))
 	outputs_ = model(img_, captions_)
+
+	print("Finished running the model.")

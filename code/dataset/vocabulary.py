@@ -3,6 +3,8 @@ from collections import Counter
 
 from nltk import word_tokenize, TreebankWordDetokenizer
 
+from constants import PAD, SOS, EOS, UNK
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
@@ -18,8 +20,8 @@ class Vocabulary:
 		:param text_list: List of texts to build the vocabulary from
 		"""
 		self.freq_threshold = freq_threshold
-		self.str_to_idx = {"<PAD>": 0, "<SOS>": 1, "<EOS>": 2, "<UNK>": 3}
-		self.idx_to_str = {0: "<PAD>", 1: "<SOS>", 2: "<EOS>", 3: "<UNK>"}
+		self.str_to_idx = {PAD: 0, SOS: 1, EOS: 2, UNK: 3}
+		self.idx_to_str = {0: PAD, 1: SOS, 2: EOS, 3: UNK}
 		self.word_counts = Counter()
 
 		if text_list is not None:
@@ -63,9 +65,9 @@ class Vocabulary:
 		"""
 		Convert a string to its index.
 		:param word: Word to convert
-		:return: Index of the word or the index of "<UNK>" if the word is not in the vocabulary
+		:return: Index of the word or the index of UNK if the word is not in the vocabulary
 		"""
-		return self.str_to_idx.get(word, self.str_to_idx["<UNK>"])
+		return self.str_to_idx.get(word, self.str_to_idx[UNK])
 
 	def to_text(self, idxs: list[int]) -> str:
 		"""
@@ -79,9 +81,9 @@ class Vocabulary:
 		"""
 		Convert an index to its word.
 		:param idx: Index to convert
-		:return: Word corresponding to the index or "<UNK>" if the index is not in the vocabulary
+		:return: Word corresponding to the index or UNK if the index is not in the vocabulary
 		"""
-		return self.idx_to_str.get(idx, "<UNK>")
+		return self.idx_to_str.get(idx, UNK)
 
 	def in_vocab(self, string: str) -> bool:
 		"""
