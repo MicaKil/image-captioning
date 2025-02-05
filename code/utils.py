@@ -1,5 +1,6 @@
 import pickle
 
+
 def dump(obj: any, path: str):
 	"""
 	Dump an object to a file.
@@ -9,6 +10,7 @@ def dump(obj: any, path: str):
 	"""
 	with open(path, "wb") as f:
 		pickle.dump(obj, f)
+
 
 def load(path: str) -> any:
 	"""
