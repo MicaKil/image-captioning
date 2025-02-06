@@ -34,7 +34,7 @@ class FlickerDataset(Dataset):
 		:param img_dir: Path to the directory containing the images
 		:param save_captions: If True, save the captions to a CSV file
 		:param vocab_threshold: Minimum frequency of a word to be included in the vocabulary
-		:param vocab: Path to the vocabulary file
+		:param vocab: Vocabulary object to use if provided
 		:param save_vocab: If True, save the vocabulary to a file
 		:param transform: Transform to apply to the images
 		:param target_transform: Transform to apply to the target captions
@@ -47,11 +47,13 @@ class FlickerDataset(Dataset):
 		df = load_captions(ann_file, save_captions)
 		self.img_ids, self.captions = df["image_id"], df["caption"]
 
-		if vocab is not None and not save_vocab:
+		if vocab is not None:
 			logger.info("Using existing vocabulary.")
 			self.vocab = Vocabulary
 		else:
 			self.vocab = Vocabulary(vocab_threshold, self.captions)
+
+		if save_vocab:
 			utils.dump(self.vocab, str(os.path.join(ROOT, VOCAB_FILE)))
 
 	def __len__(self):
@@ -88,13 +90,15 @@ def load_captions(path: str, save_captions=False) -> pd.DataFrame:
 	:return: DataFrame containing the image filenames and corresponding captions
 	"""
 
-	if os.path.splitext(path)[1] == ".csv" and not save_captions:
+	if os.path.splitext(path)[1] == ".csv":
 		logger.info("Loading captions from CSV file.")
-		return pd.read_csv(path)
-
-	logger.info("Loading captions from annotation file.")
-	df = pd.DataFrame(extract_captions(path))  # Convert to DataFrame
-	df.to_csv(str(os.path.join(ROOT, FLICKR8K_CSV_FILE)), header=True, index=False)
+		df = pd.read_csv(path)
+	else:
+		logger.info("Loading captions from annotation file.")
+		df = pd.DataFrame(extract_captions(path))  # Convert to DataFrame
+	if save_captions:
+		logger.info("Saving captions to CSV file.")
+		df.to_csv(str(os.path.join(ROOT, FLICKR8K_CSV_FILE)), header=True, index=False)
 	return df
 
 

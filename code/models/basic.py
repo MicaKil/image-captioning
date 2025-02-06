@@ -8,6 +8,7 @@ from torchvision.transforms import v2
 
 from constants import ROOT, FLICKR8K_IMG_DIR, FLICKR8K_CSV_FILE
 from dataset.flickr_dataloader import FlickerDataLoader
+from dataset.flickr_dataset import FlickerDataset
 
 
 class EncoderResnet(nn.Module):
@@ -151,7 +152,11 @@ if __name__ == "__main__":
 		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
 	])
 
-	dataloader = FlickerDataLoader(str(ann_file_), str(root_dir_), transform=transform_, pin_memory=True, num_workers=8)
+	dataloader = FlickerDataLoader(
+		FlickerDataset(str(ann_file_), str(root_dir_), vocab_threshold=2, transform=transform_),
+		num_workers=8
+	)
+
 	embed_size_ = 256
 	hidden_size_ = 512
 	vocab_size_ = len(dataloader.vocab)
