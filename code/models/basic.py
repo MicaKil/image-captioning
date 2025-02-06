@@ -6,7 +6,7 @@ import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 from torchvision.transforms import v2
 
-from constants import ROOT, FLICKR8K_IMG_DIR, FLICKR8K_ANN_FILE
+from constants import ROOT, FLICKR8K_IMG_DIR, FLICKR8K_CSV_FILE
 from dataset.flickr_dataloader import FlickerDataLoader
 
 
@@ -22,7 +22,7 @@ class EncoderResnet(nn.Module):
 		:param freeze: Whether to freeze the weights of the ResNet-50 model during training
 		:param embed_size: Size of the embedding vector
 		"""
-		super(EncoderResnet, self).__init__()
+		super().__init__()
 		self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
 		in_features = self.resnet.fc.in_features
 		self.resnet = nn.Sequential(
@@ -74,7 +74,7 @@ class DecoderLSTM(nn.Module):
 		:param num_layers: Number of layers in the LSTM
 		:param padding_idx: Index of the padding token in the vocabulary
 		"""
-		super(DecoderLSTM, self).__init__()
+		super().__init__()
 		self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=padding_idx)
 		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True)
 		self.linear = nn.Linear(hidden_size, vocab_size)
@@ -124,7 +124,7 @@ class ImageCaptioning(nn.Module):
 		:param padding_idx: Index of the padding token in the vocabulary
 		:param freeze_encoder: Whether to freeze the weights of the Encoder during training
 		"""
-		super(ImageCaptioning, self).__init__()
+		super().__init__()
 		self.encoder = EncoderResnet(embed_size, freeze_encoder)
 		self.decoder = DecoderLSTM(embed_size, hidden_size, vocab_size, dropout, num_layers, padding_idx)
 
@@ -136,14 +136,14 @@ class ImageCaptioning(nn.Module):
 		:param captions: Caption word indices
 		:return: Predicted word indices
 		"""
-		features = self.encoder(images)
-		outputs = self.decoder(features, captions)
+		features = self.encoder(images)  # Shape: (batch_size, embed_size)
+		outputs = self.decoder(features, captions)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
 		return outputs
 
 
 if __name__ == "__main__":
 	root_dir_ = os.path.join(ROOT, FLICKR8K_IMG_DIR)
-	ann_file_ = os.path.join(ROOT, FLICKR8K_ANN_FILE)
+	ann_file_ = os.path.join(ROOT, FLICKR8K_CSV_FILE)
 
 	transform_ = v2.Compose([
 		v2.ToImage(),
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
 	model = ImageCaptioning(embed_size_, hidden_size_, vocab_size_, dropout_, num_layers_)
 
-	img_, captions_ = next(iter(dataloader))
-	outputs_ = model(img_, captions_)
+	imgs_, captions_ = next(iter(dataloader))
+	outputs_ = model(imgs_, captions_)
 
 	print("Finished running the model.")

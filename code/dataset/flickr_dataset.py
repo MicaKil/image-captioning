@@ -80,15 +80,15 @@ class FlickerDataset(Dataset):
 		return img, caption
 
 
-def load_captions(path: str, overwrite=False) -> pd.DataFrame:
+def load_captions(path: str, save_captions=False) -> pd.DataFrame:
 	"""
 	Load the captions from the annotation file.
 	:param path: Path to the annotation file
-	:param overwrite: If True, overwrite the existing CSV file
+	:param save_captions: If True, save to a CVS file or overwrite the existing CSV file
 	:return: DataFrame containing the image filenames and corresponding captions
 	"""
 
-	if os.path.splitext(path)[1] == ".csv" and not overwrite:
+	if os.path.splitext(path)[1] == ".csv" and not save_captions:
 		logger.info("Loading captions from CSV file.")
 		return pd.read_csv(path)
 

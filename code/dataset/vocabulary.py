@@ -75,7 +75,7 @@ class Vocabulary:
 		:param idxs: List of indices to convert
 		:return: Text corresponding to the indices
 		"""
-		return TreebankWordDetokenizer().detokenize([self.to_word(int(idx)) for idx in idxs])
+		return TreebankWordDetokenizer().detokenize([self.to_word(int(idx)) for idx in idxs if int(idx) != 0])
 
 	def to_word(self, idx: int) -> str:
 		"""

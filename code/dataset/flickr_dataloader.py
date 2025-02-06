@@ -51,8 +51,8 @@ class FlickerDataLoader(DataLoader):
 		logger.info(f"FlickerDataset loaded.")
 		pad_idx = dataset.vocab.to_idx(PAD)
 		logger.info(f"Initializing DataLoader.")
-		super(FlickerDataLoader, self).__init__(dataset, batch_size=batch_size, num_workers=num_workers,
-												shuffle=shuffle, pin_memory=pin_memory, collate_fn=Collate(pad_idx))
+		super().__init__(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle,
+						 pin_memory=pin_memory, collate_fn=Collate(pad_idx))
 		self.vocab = dataset.vocab
 		logger.info(f"FlickerDataLoader initialized.")
 
@@ -100,8 +100,8 @@ if __name__ == "__main__":
 								   )
 
 	images_, captions_ = next(iter(dataloader))
-	print(f"Images shape: {images_.size()}")
-	print(f"Captions shape: {captions_.size()}")
+	print(f"Images shape: {images_.size()}")  # (batch_size, C, H, W)
+	print(f"Captions shape: {captions_.size()}")  # (batch_size, max_seq_len)
 
 	# Display the first image and caption
 	print(f"Image from batch:\n {images_[0]}")
