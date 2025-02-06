@@ -3,6 +3,7 @@ from typing import Optional
 
 import torch
 from PIL import Image
+from matplotlib import pyplot as plt
 from torchvision.transforms import v2
 
 from constants import SOS, EOS, ROOT, FLICKR8K_IMG_DIR, FLICKR8K_CSV_FILE, TEST_IMG, TEST_IMG_CAPTIONS
@@ -81,7 +82,8 @@ if __name__ == "__main__":
 	transform_ = v2.Compose([
 		v2.ToImage(),
 		v2.Resize((224, 224)),  # Resize for CNN models
-		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
+		v2.ToDtype(torch.float32, scale=True),  # Convert image to
+		v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 	])
 
 	img_path_ = os.path.join(ROOT, TEST_IMG)
@@ -104,3 +106,13 @@ if __name__ == "__main__":
 	print("Generating caption for the first image.")
 	caption_ = gen_caption(model_, img_, vocab_)
 	print(caption_)
+
+	# print image
+	mean = [0.485, 0.456, 0.406]
+	std = [0.229, 0.224, 0.225]
+	img_ = img_.squeeze(0).permute(1, 2, 0)
+	img_ = img_ * torch.tensor(std) + torch.tensor(mean)
+	img_ = img_.clamp(0, 1)
+
+	plt.imshow(img_)
+	plt.show()

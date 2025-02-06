@@ -149,7 +149,8 @@ if __name__ == "__main__":
 	transform_ = v2.Compose([
 		v2.ToImage(),
 		v2.Resize((224, 224)),  # Resize for CNN models
-		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
+		v2.ToDtype(torch.float32, scale=True),  # Convert image to
+		v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 	])
 
 	dataloader = FlickerDataLoader(
