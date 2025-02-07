@@ -27,8 +27,7 @@ class FlickerDataset(Dataset):
 				 vocab: Vocabulary = None,
 				 save_vocab=False,
 				 transform=None,
-				 target_transform=None
-				 ):
+				 target_transform=None):
 		"""
 		:param ann_file: Path to the annotation file with the image IDs and captions
 		:param img_dir: Path to the directory containing the images

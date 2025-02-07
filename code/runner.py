@@ -7,6 +7,8 @@ from torchvision.transforms import v2
 from constants import *
 from dataset.flickr_dataloader import FlickerDataLoader
 from dataset.flickr_dataset import FlickerDataset
+from models.basic import ImageCaptioning
+from train import train
 
 # logger
 logger = logging.getLogger(__name__)
@@ -30,8 +32,8 @@ VOCAB_THRESHOLD = 2
 
 # split dataset
 
-TRAIN_SIZE = 0.70
-VAL_SIZE = 0.15
+TRAIN_SIZE = 0.80
+VAL_SIZE = 0.10
 TEST_SIZE = 1 - TRAIN_SIZE - VAL_SIZE
 
 # dataloaders
@@ -41,8 +43,24 @@ NUM_WORKERS = 2
 SHUFFLE = True
 PIN_MEMORY = True
 
+# model param
+EMBED_SIZE = 256
+HIDDEN_SIZE = 512
+NUM_LAYERS = 10
+DROPOUT = 0.25
+FREEZE_ENCODER = True
+
+# training params
+ENCODER_LR = 1e-4
+DECODER_LR = 4e-4
+MAX_EPOCHS = 2
+PATIENCE = None
+MAX_CAPTION_LEN = 30
+
 if __name__ == "__main__":
 	full_dataset = FlickerDataset(ann_file, img_dir, vocab_threshold=VOCAB_THRESHOLD, transform=transform)
+	vocab = full_dataset.vocab
+	pad_idx = vocab.to_idx(PAD)
 
 	total_size = len(full_dataset)
 	train_size = int(TRAIN_SIZE * total_size)
@@ -52,22 +70,33 @@ if __name__ == "__main__":
 	train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
 
 	logger.info(f"Split dataset sizes {{Train: {train_size}, Validation: {val_size}, Test: {test_size}}}")
-	print(len(train_dataset))
 	train_dataloader = FlickerDataLoader(train_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 	test_dataloader = FlickerDataLoader(test_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 	val_dataloader = FlickerDataLoader(val_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
-	imgs, captions, imgs_id = next(iter(train_dataloader))
+	model = ImageCaptioning(EMBED_SIZE,
+							HIDDEN_SIZE,
+							len(vocab),
+							DROPOUT,
+							NUM_LAYERS,
+							pad_idx,
+							FREEZE_ENCODER)
 
-	df = full_dataset.df
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx)
+	optimizer = torch.optim.Adam([
+		{"params": model.encoder.parameters(), "lr": ENCODER_LR},
+		{"params": model.decoder.parameters(), "lr": DECODER_LR},
+	])
 
-	print(f"Id: {imgs_id[0]}")
-	print(f"Caption: {train_dataloader.vocab.to_text(captions[0])}")
-
-	print(f"Captions: {df[df['image_id'] == imgs_id[0]]['caption'].values}")
-
-	# print(f"Image:")
-	#
-	# # get image name
-	# # print image
-	# utils.show_img(imgs[0], mean=MEAN, std=STD)
+	train(model,
+		  train_dataloader,
+		  val_dataloader,
+		  criterion,
+		  optimizer,
+		  device,
+		  vocab,
+		  MAX_EPOCHS,
+		  PATIENCE,
+		  CHECKPOINT_DIR,
+		  MAX_CAPTION_LEN)

@@ -43,6 +43,7 @@ def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = Non
 	plt.imshow(img)
 	plt.show()
 
+
 def time_str() -> str:
 	"""
 	Return the current time as a string.

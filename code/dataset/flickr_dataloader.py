@@ -17,7 +17,11 @@ class FlickerDataLoader(DataLoader):
 	Custom DataLoader for the Flickr8k dataset.
 	"""
 
-	def __init__(self, dataset: Union[FlickerDataset | Subset], batch_size=32, num_workers=4, shuffle=True,
+	def __init__(self,
+				 dataset: Union[FlickerDataset | Subset],
+				 batch_size=32,
+				 num_workers=4,
+				 shuffle=True,
 				 pin_memory=True):
 		"""
 		Initialize the DataLoader for the Flickr8k dataset.

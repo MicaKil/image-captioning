@@ -12,10 +12,9 @@ from dataset.vocabulary import Vocabulary
 def gen_caption(model: nn.Module,
 				image: torch.Tensor,
 				vocab: Vocabulary,
-				max_length: int = 50,
+				max_length: int = 30,
 				device: torch.device = torch.device("cpu"),
-				temperature: Optional[float] = None
-				) -> str:
+				temperature: Optional[float] = None) -> str:
 	"""
 	Generate a caption for an image using greedy search or temperature-based sampling.
 
