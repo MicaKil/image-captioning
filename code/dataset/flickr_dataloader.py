@@ -1,13 +1,11 @@
 import logging
-import os
+from typing import Union
 
 import torch
-from matplotlib import pyplot as plt
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader
-from torchvision.transforms import v2
+from torch.utils.data import DataLoader, Subset
 
-from constants import PAD, ROOT, FLICKR8K_ANN_FILE, FLICKR8K_IMG_DIR
+from constants import PAD
 from dataset.flickr_dataset import FlickerDataset
 
 logger = logging.getLogger(__name__)
@@ -19,20 +17,27 @@ class FlickerDataLoader(DataLoader):
 	Custom DataLoader for the Flickr8k dataset.
 	"""
 
-	def __init__(self, dataset: FlickerDataset, batch_size=32, num_workers=4, shuffle=True, pin_memory=True):
+	def __init__(self, dataset: Union[FlickerDataset | Subset], batch_size=32, num_workers=4, shuffle=True,
+				 pin_memory=True):
 		"""
 		Initialize the DataLoader for the Flickr8k dataset.
 
-		:param dataset:
+		:param dataset: Dataset object to load
 		:param batch_size: Number of samples per batch.
 		:param num_workers: Number of subprocesses to use for data loading.
 		:param shuffle: Whether to shuffle the data.
 		:param pin_memory: Whether to pin memory.
 		"""
 		logger.info(f"Initializing DataLoader.")
-		super().__init__(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle,
-						 pin_memory=pin_memory, collate_fn=Collate(dataset.vocab.to_idx(PAD)))
-		self.vocab = dataset.vocab
+		super().__init__(dataset,
+						 batch_size=batch_size,
+						 num_workers=num_workers,
+						 shuffle=shuffle,
+						 pin_memory=pin_memory,
+						 collate_fn=Collate(dataset.vocab.to_idx(PAD) if isinstance(dataset, FlickerDataset)
+											else dataset.dataset.vocab.to_idx(PAD))
+						 )
+		self.vocab = dataset.vocab if isinstance(dataset, FlickerDataset) else dataset.dataset.vocab
 		logger.info(f"FlickerDataLoader initialized.")
 
 
@@ -53,37 +58,7 @@ class Collate:
 		:param batch: List of samples to collate
 		:return: Tuple (images, captions) where images is a tensor and captions is a padded tensor
 		"""
-		images, captions = zip(*batch)
+		images, captions, image_ids = zip(*batch)
 		images = torch.stack(images)
 		captions = pad_sequence(captions, batch_first=True, padding_value=self.pad_idx)
-		return images, captions
-
-
-if __name__ == "__main__":
-	root_dir_ = os.path.join(ROOT, FLICKR8K_IMG_DIR)
-	ann_file_ = os.path.join(ROOT, FLICKR8K_ANN_FILE)
-
-	transform_ = v2.Compose([
-		v2.ToImage(),
-		v2.Resize((224, 224)),  # Resize for CNN models
-		v2.ToDtype(torch.float32, scale=True),  # Convert image to tensor
-	])
-
-	dataloader = FlickerDataLoader(
-		FlickerDataset(str(ann_file_), str(root_dir_), vocab_threshold=2, transform=transform_),
-		num_workers=8
-	)
-
-	images_, captions_ = next(iter(dataloader))
-	print(f"Images shape: {images_.size()}")  # (batch_size, C, H, W)
-	print(f"Captions shape: {captions_.size()}")  # (batch_size, max_seq_len)
-
-	# Display the first image and caption
-	print(f"Image from batch:\n {images_[0]}")
-
-	img_ = images_[0].permute(1, 2, 0).numpy()  # Permute dimensions to (H, W, C)
-	plt.imshow(img_)
-	plt.show()
-
-	print(f"Caption: \n{captions_[0]}")
-	print(f"Text of the caption: {dataloader.vocab.to_text(captions_[0])}")
+		return images, captions, image_ids

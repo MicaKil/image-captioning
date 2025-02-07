@@ -44,8 +44,8 @@ class FlickerDataset(Dataset):
 		self.transform = transform
 		self.target_transform = target_transform
 
-		df = load_captions(ann_file, save_captions)
-		self.img_ids, self.captions = df["image_id"], df["caption"]
+		self.df = load_captions(ann_file, save_captions)
+		self.img_ids, self.captions = self.df["image_id"], self.df["caption"]
 
 		if vocab is not None:
 			logger.info("Using existing vocabulary.")
@@ -63,11 +63,11 @@ class FlickerDataset(Dataset):
 		"""
 		return len(self.captions)
 
-	def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+	def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, str]:
 		"""
-		Get a sample (image and caption) from the dataset.
+		Get a sample (image, caption, image ID) from the dataset.
 		:param idx: Index of the sample to retrieve
-		:return: Tuple containing the image and caption tensors
+		:return: Tuple containing the image tensor, caption tensor, and image ID
 		"""
 		img = decode_image(str(os.path.join(self.img_dir, self.img_ids[idx])), mode=ImageReadMode.RGB)
 		if self.transform:
@@ -79,7 +79,7 @@ class FlickerDataset(Dataset):
 		if self.target_transform:
 			caption = self.target_transform(caption)
 
-		return img, caption
+		return img, caption, self.img_ids[idx]
 
 
 def load_captions(path: str, save_captions=False) -> pd.DataFrame:
