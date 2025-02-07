@@ -1,4 +1,8 @@
 import pickle
+from datetime import datetime
+
+import torch
+from matplotlib import pyplot as plt
 
 
 def dump(obj: any, path: str):
@@ -20,3 +24,28 @@ def load(path: str) -> any:
 	"""
 	with open(path, "rb") as f:
 		return pickle.load(f)
+
+
+def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = None) -> None:
+	"""
+	Display an image.
+	:param img: Image tensor
+	:param mean: Mean values for normalization
+	:param std: Standard deviation values for normalization
+	:return: None
+	"""
+	img = img.squeeze(0).permute(1, 2, 0)
+	if std is not None:
+		img = img * torch.tensor(std)
+	if mean is not None:
+		img = img + torch.tensor(mean)
+	img = img.clamp(0, 1)
+	plt.imshow(img)
+	plt.show()
+
+def time_str() -> str:
+	"""
+	Return the current time as a string.
+	:return: Current time as a string
+	"""
+	return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

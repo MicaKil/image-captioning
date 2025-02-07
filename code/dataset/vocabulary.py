@@ -75,7 +75,7 @@ class Vocabulary:
 		:param idxs: List of indices to convert
 		:return: Text corresponding to the indices
 		"""
-		return TreebankWordDetokenizer().detokenize([self.to_word(int(idx)) for idx in idxs if int(idx) != 0])
+		return TreebankWordDetokenizer().detokenize([self.to_word(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
 
 	def to_word(self, idx: int) -> str:
 		"""
@@ -84,14 +84,6 @@ class Vocabulary:
 		:return: Word corresponding to the index or UNK if the index is not in the vocabulary
 		"""
 		return self.idx_to_str.get(idx, UNK)
-
-	def in_vocab(self, string: str) -> bool:
-		"""
-		Check if a word is in the vocabulary.
-		:param string: Word to check
-		:return: True if the word is in the vocabulary, False otherwise
-		"""
-		return string in self.str_to_idx
 
 	def __str__(self):
 		"""
