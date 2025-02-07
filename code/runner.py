@@ -89,14 +89,5 @@ if __name__ == "__main__":
 		{"params": model.decoder.parameters(), "lr": DECODER_LR},
 	])
 
-	train(model,
-		  train_dataloader,
-		  val_dataloader,
-		  criterion,
-		  optimizer,
-		  device,
-		  vocab,
-		  MAX_EPOCHS,
-		  PATIENCE,
-		  CHECKPOINT_DIR,
-		  MAX_CAPTION_LEN)
+	train(model, train_dataloader, val_dataloader, criterion, optimizer, device, vocab, MAX_EPOCHS, PATIENCE,
+		  CHECKPOINT_DIR, MAX_CAPTION_LEN)
