@@ -112,8 +112,14 @@ def train_load(criterion: nn.Module,
 		# Backward pass
 		optimizer.zero_grad()
 		loss.backward()
-		torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
+		nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
 		optimizer.step()
+		# After optimizer.step():
+		for name, param in model.named_parameters():
+			if param.grad is not None:
+				print(f"{name} gradient norm: {param.grad.norm()}")
+			else:
+				print(f"{name} has no gradients!")
 
 		train_loss += loss.item() * images.size(0)
 		batch_progress.set_postfix({"loss": loss.item()})
@@ -176,11 +182,38 @@ def forward_pass(captions, criterion, images, model):
 	:param model: The model to perform the forward pass.
 	:return: Loss value.
 	"""
-	outputs = model(images, captions[:, :-1])  # Exclude last token
+	# Image size: (batch_size, 3, 224, 224) Captions size: (batch_size, max_caption_length)
+	# print(f"\nImages size: {images.size()}")
+	# print(f"Captions size: {captions.size()} || {captions[:, :-1].size()}")
+
+	# Teacher forcing
+	# captions[:, :-1] slices the captions tensor along the time (sequence) dimension to remove the last token from each caption.
+	# Why? In many sequence-to-sequence tasks, you feed the model the caption without its final token so that the model learns to predict the next word at every time step.
+	outputs = model(images, captions[:, :-1])  # Output size: (batch_size, max_caption_length, vocab_size)
+	# print(f"Outputs size: {outputs.size()}")
+	# During evaluation:
+	generated = model(images, captions[:, :-1])
+	print("Model output example:", generated[0].argmax(dim=-1))
+	print("Target example:", captions[0, 1:])
+	print("Output min/max:", outputs.min(), outputs.max())
+	print("Target min/max:", captions[:, 1:].min(), captions[:, 1:].max())
+
+	# This line removes the first time step from the outputs tensor by taking all elements starting from index 1 along the time dimension.
+	# Why?
+	# - The model may output an initial prediction (often corresponding to an artificial or default starting state) that doesn’t correspond to a target token.
+	# - This adjustment aligns the output sequence with the target sequence, which starts at the first true word (excluding the start-of-sequence token).
+	# Now, outputs is modified so that its time dimension matches the target tokens, typically of shape (batch_size, sequence_length - 1, vocab_size).
 	outputs = outputs[:, 1:, :]
+	# print(f"Outputs size: {outputs.size()}")
+
 	loss = criterion(
-		outputs.reshape(-1, outputs.size(-1)),
-		captions[:, 1:].reshape(-1)  # Exclude first token (SOS token)
+		# The outputs tensor is reshaped from a 3D tensor (batch_size, sequence_length - 1, vocab_size) to a 2D tensor (batch_size * (sequence_length - 1), vocab_size).
+		# This flattening is required because loss functions like cross-entropy expect a 2D input
+		outputs.reshape(-1, outputs.size(-1)), # (B * seq_len, vocab_size)
+		# captions[:, 1:] slices the original captions tensor to remove the first token, which is usually the Start-Of-Sequence (SOS) token.
+		# This ensures that the target tokens are the ones the model is expected to predict.
+		# captions[:, 1:].reshape(-1): The target tokens are reshaped from (batch_size, sequence_length - 1) to a 1D tensor of size (batch_size * (sequence_length - 1)).
+		captions[:, 1:].reshape(-1)  # Exclude first token (SOS token) # (B * seq_len, vocab_size)
 	)
 	return loss
 
