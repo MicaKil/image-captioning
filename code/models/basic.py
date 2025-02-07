@@ -1,14 +1,7 @@
-import os
-
 import torch
 import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
-from torchvision.transforms import v2
-
-from constants import ROOT, FLICKR8K_IMG_DIR, FLICKR8K_CSV_FILE
-from dataset.flickr_dataloader import FlickerDataLoader
-from dataset.flickr_dataset import FlickerDataset
 
 
 class EncoderResnet(nn.Module):
@@ -140,33 +133,3 @@ class ImageCaptioning(nn.Module):
 		features = self.encoder(images)  # Shape: (batch_size, embed_size)
 		outputs = self.decoder(features, captions)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
 		return outputs
-
-
-if __name__ == "__main__":
-	root_dir_ = os.path.join(ROOT, FLICKR8K_IMG_DIR)
-	ann_file_ = os.path.join(ROOT, FLICKR8K_CSV_FILE)
-
-	transform_ = v2.Compose([
-		v2.ToImage(),
-		v2.Resize((224, 224)),  # Resize for CNN models
-		v2.ToDtype(torch.float32, scale=True),  # Convert image to
-		v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-	])
-
-	dataloader = FlickerDataLoader(
-		FlickerDataset(str(ann_file_), str(root_dir_), vocab_threshold=2, transform=transform_),
-		num_workers=8
-	)
-
-	embed_size_ = 256
-	hidden_size_ = 512
-	vocab_size_ = len(dataloader.vocab)
-	dropout_ = 0.5
-	num_layers_ = 10
-
-	model = ImageCaptioning(embed_size_, hidden_size_, vocab_size_, dropout_, num_layers_)
-
-	imgs_, captions_ = next(iter(dataloader))
-	outputs_ = model(imgs_, captions_)
-
-	print("Finished running the model.")
