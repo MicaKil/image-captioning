@@ -1,13 +1,11 @@
 import logging
 
 import torch
-from torch.utils.data import random_split
 from torchvision.transforms import v2
 
 from caption import preprocess_image, gen_caption
 from constants import *
 from dataset.flickr_dataloader import FlickerDataLoader
-from dataset.flickr_dataset import FlickerDataset
 from models.basic import ImageCaptioning
 from train import train
 from utils import show_img
@@ -15,10 +13,6 @@ from utils import show_img
 # logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
-
-# full dataset
-ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
-img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
@@ -63,44 +57,53 @@ MAX_CAPTION_LEN = 30
 CLIP_GRAD = False
 GRAD_MAX_NORM = 5.0
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 if __name__ == "__main__":
-	full_dataset = FlickerDataset(ann_file, img_dir, vocab_threshold=VOCAB_THRESHOLD, transform=TRANSFORM)
+	# ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
+	# img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
+
+	# full_dataset = FlickerDataset(ann_file, img_dir, vocab_threshold=VOCAB_THRESHOLD, transform=TRANSFORM)
+	# torch.save(full_dataset, os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date_str()}.pt"))
+	full_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/full_dataset_2025-02-07.pt"), weights_only=False)
 	vocab = full_dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 
-	total_size = len(full_dataset)
-	train_size = int(TRAIN_SIZE * total_size)
-	val_size = int(VAL_SIZE * total_size)
-	test_size = total_size - train_size - val_size
+	# total_size = len(full_dataset)
+	# train_size = int(TRAIN_SIZE * total_size)
+	# val_size = int(VAL_SIZE * total_size)
+	# test_size = total_size - train_size - val_size
+	#
+	# train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
+	#
+	# torch.save(train_dataset, os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{int(TRAIN_SIZE*100)}_{date_str()}.pt"))
+	# torch.save(val_dataset, os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{int(VAL_SIZE*100)}_{date_str()}.pt"))
+	# torch.save(test_dataset, os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{int(TEST_SIZE*100)}_{date_str()}.pt"))
 
-	train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
+	train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-07.pt"),
+							   weights_only=False)
+	val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-07.pt"), weights_only=False)
+	test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-07.pt"),
+							  weights_only=False)
 
-	logger.info(f"Split dataset sizes {{Train: {train_size}, Validation: {val_size}, Test: {test_size}}}")
 	train_dataloader = FlickerDataLoader(train_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-	test_dataloader = FlickerDataLoader(test_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 	val_dataloader = FlickerDataLoader(val_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+	test_dataloader = FlickerDataLoader(test_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
-	model = ImageCaptioning(EMBED_SIZE,
-							HIDDEN_SIZE,
-							len(vocab),
-							DROPOUT,
-							NUM_LAYERS,
-							pad_idx,
-							FREEZE_ENCODER)
+	model = ImageCaptioning(EMBED_SIZE, HIDDEN_SIZE, len(vocab), DROPOUT, NUM_LAYERS, pad_idx, FREEZE_ENCODER)
 
-	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx)
 	optimizer = torch.optim.Adam([
 		{"params": model.encoder.parameters(), "lr": ENCODER_LR},
 		{"params": model.decoder.parameters(), "lr": DECODER_LR},
 	])
 
-	train(model, train_dataloader, val_dataloader, device, vocab, MAX_EPOCHS, criterion, optimizer, CHECKPOINT_DIR,
+	train(model, train_dataloader, val_dataloader, DEVICE, vocab, MAX_EPOCHS, criterion, optimizer, CHECKPOINT_DIR,
 		  CLIP_GRAD, GRAD_MAX_NORM, PATIENCE, CALC_BLEU, MAX_CAPTION_LEN)
 
 	img_path = os.path.join(ROOT, TEST_IMG)
 	img = preprocess_image(str(img_path), TRANSFORM)
 
 	print("Generating image caption.")
-	print(gen_caption(model, img, vocab, max_length=MAX_CAPTION_LEN, device=device, temperature=None))
+	print(gen_caption(model, img, vocab, max_length=MAX_CAPTION_LEN, device=DEVICE, temperature=None))
 	show_img(img, MEAN, STD)

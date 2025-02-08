@@ -50,3 +50,10 @@ def time_str() -> str:
 	:return: Current time as a string
 	"""
 	return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+def date_str() -> str:
+	"""
+	Return the current date as a string.
+	:return: Current date as a string
+	"""
+	return datetime.now().strftime("%Y-%m-%d")

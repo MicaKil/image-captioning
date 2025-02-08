@@ -27,6 +27,7 @@ def gen_caption(model: nn.Module,
 
 	:return: Generated caption string
 	"""
+	model = model.to(device)
 	model.eval()
 	image = image.to(device)
 	features = model.encoder(image)  # Encode the image
