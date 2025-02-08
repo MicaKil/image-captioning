@@ -3,12 +3,10 @@ import logging
 import torch
 from torchvision.transforms import v2
 
-from caption import preprocess_image, gen_caption
 from constants import *
 from dataset.flickr_dataloader import FlickerDataLoader
 from models.basic import ImageCaptioning
 from train import train
-from utils import show_img
 
 # logger
 logger = logging.getLogger(__name__)
@@ -82,9 +80,12 @@ if __name__ == "__main__":
 
 	train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-07.pt"),
 							   weights_only=False)
-	val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-07.pt"), weights_only=False)
+	val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-07.pt"),
+							 weights_only=False)
 	test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-07.pt"),
 							  weights_only=False)
+
+	print(test_dataset.indices)
 
 	train_dataloader = FlickerDataLoader(train_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 	val_dataloader = FlickerDataLoader(val_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
@@ -92,7 +93,7 @@ if __name__ == "__main__":
 
 	model = ImageCaptioning(EMBED_SIZE, HIDDEN_SIZE, len(vocab), DROPOUT, NUM_LAYERS, pad_idx, FREEZE_ENCODER)
 
-	criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx)
+	criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
 	optimizer = torch.optim.Adam([
 		{"params": model.encoder.parameters(), "lr": ENCODER_LR},
 		{"params": model.decoder.parameters(), "lr": DECODER_LR},
@@ -100,10 +101,3 @@ if __name__ == "__main__":
 
 	train(model, train_dataloader, val_dataloader, DEVICE, vocab, MAX_EPOCHS, criterion, optimizer, CHECKPOINT_DIR,
 		  CLIP_GRAD, GRAD_MAX_NORM, PATIENCE, CALC_BLEU, MAX_CAPTION_LEN)
-
-	img_path = os.path.join(ROOT, TEST_IMG)
-	img = preprocess_image(str(img_path), TRANSFORM)
-
-	print("Generating image caption.")
-	print(gen_caption(model, img, vocab, max_length=MAX_CAPTION_LEN, device=DEVICE, temperature=None))
-	show_img(img, MEAN, STD)
