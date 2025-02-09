@@ -1,4 +1,5 @@
 import logging
+import time
 
 import pandas as pd
 import torch
@@ -7,6 +8,7 @@ from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from pycocoevalcap.cider.cider import Cider
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from wandb.sdk.wandb_run import Run
 
 from caption import gen_caption
 from dataset.flickr_dataset import FlickerDataset
@@ -16,19 +18,20 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
-def test(model: nn.Module, test_loader: DataLoader, vocab: Vocabulary, device: torch.device,
-		 max_caption_len: int) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, vocab: Vocabulary, device: torch.device, max_caption_len: int,
+		 wandb_run: Run) -> tuple:
 	"""
 	Evaluate model on test set and log results in a wandb table
+	:param wandb_run:
 	"""
 	logger.info("Start testing model")
-
 	model.eval()
 	results = []
 	all_hypotheses = []
 	all_references = []
 	df = test_loader.dataset.df if isinstance(test_loader.dataset, FlickerDataset) else test_loader.dataset.dataset.df
 	smoothing = SmoothingFunction().method1
+	start_time = time.time()
 
 	with torch.no_grad():
 		for batch_idx, (images, _, image_ids) in enumerate(tqdm(test_loader)):
@@ -75,14 +78,17 @@ def test(model: nn.Module, test_loader: DataLoader, vocab: Vocabulary, device: t
 		cider_scorer = Cider()
 		cider_score, _ = cider_scorer.compute_score(ref_dict, hyp_dict)
 
+		# Log time
+		test_time = time.time() - start_time
+		logger.info(f"Testing took {test_time:.2f} seconds")
+		wandb_run.log({"test_time": test_time})
+
+		# Log metrics
 		metrics = {
-			"BLEU-1": bleu_1,
-			"BLEU-2": bleu_2,
-			"BLEU-4": bleu_4,
-			"CIDEr": cider_score
+			"test_BLEU-1": bleu_1,
+			"test_BLEU-2": bleu_2,
+			"test_BLEU-4": bleu_4,
+			"test_CIDEr": cider_score
 		}
-
-		logger.info("Testing finished")
 		logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
-
 		return pd.DataFrame(results), metrics

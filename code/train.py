@@ -1,5 +1,6 @@
 import logging
 import os.path
+import time
 from typing import Optional, Any
 
 import numpy as np
@@ -9,6 +10,7 @@ import torch.nn as nn
 from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from wandb.sdk.wandb_run import Run
 
 from caption import gen_caption
 from constants import ROOT, PAD
@@ -22,9 +24,9 @@ logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, vocab: Vocabulary,
-		  max_epochs: int, criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str],
-		  clip_grad: bool = False, grad_max_norm: float = None, patience: int = None, calc_bleu: bool = False,
-		  max_caption_len: int = None) -> None:
+		  max_epochs: int, criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str], wandb_run: Run,
+		  grad_max_norm: float = None, patience: int = None, calc_bleu: bool = False,
+		  max_caption_len: int = None) -> str:
 	"""
 	Training loop for the model.
 
@@ -37,43 +39,50 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
 	:param checkpoint_dir: Directory to save the best model
-	:param clip_grad: Whether to clip gradients
+	:param wandb_run: Wandb run object
 	:param grad_max_norm: Maximum norm for gradient clipping
 	:param patience: Number of epochs to wait for improvement before early stopping
 	:param calc_bleu: Whether to calculate BLEU score
 	:param max_caption_len: Maximum length of the generated captions
-	:return:
+	:return: Path to the best model
 	"""
-
 	logger.info(
 		f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {max_epochs} epochs"
 	)
-
+	wandb_run.watch(model, criterion=criterion, log="all", log_freq=100, log_graph=True)
 	model = model.to(device)
 	best_bleu_score = -np.inf
 	best_val_loss = np.inf
+	best_model = None
 	epochs_no_improve = 0
-
+	start_time = time.time()
 	for epoch in range(max_epochs):
 		avg_train_loss = train_load(model, train_loader, vocab, device, epoch, max_epochs, criterion, optimizer,
-									clip_grad, grad_max_norm)
+									grad_max_norm)
 		avg_val_loss, blue_score = eval_load(model, val_loader, vocab, device, epoch, max_epochs, criterion, calc_bleu,
 											 max_caption_len, SmoothingFunction().method1)
 
 		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
-
+		wandb_run.log({
+			"epoch": epoch + 1,
+			"train_loss": avg_train_loss,
+			"val_loss": avg_val_loss
+		})
 		# Early stopping and checkpointing
 		if calc_bleu:
+			wandb_run.log({"val_bleu-4": blue_score})
 			if blue_score > best_bleu_score:
 				best_bleu_score = blue_score
 				if checkpoint_dir is not None:
-					torch.save(model.state_dict(), os.path.join(ROOT, f"{checkpoint_dir}/best_bleu_{time_str()}.pt"))
+					best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_bleu_{time_str()}.pt")
+					torch.save(model.state_dict(), best_model)
 				logger.info(f"New best BLEU score: {best_bleu_score:.4f}")
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
 			if checkpoint_dir is not None:
-				torch.save(model.state_dict(), os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}.pt"))
+				best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}.pt")
+				torch.save(model.state_dict(), best_model)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if patience is not None:
@@ -81,11 +90,18 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 				if epochs_no_improve >= patience:
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
+	# Log training time
+	train_time = time.time() - start_time
+	logger.info(f"Training completed in {train_time:.2f} seconds")
+	wandb_run.log({"train_time": train_time})
+	# Log best model
+	if best_model is not None:
+		wandb_run.log_model(path=best_model)
+	return best_model
 
 
 def train_load(model: nn.Module, train_loader: DataLoader, vocab: Vocabulary, device: torch.device, epoch: int,
-			   max_epochs: int, criterion: nn.Module, optimizer: torch.optim, clip_grad: bool,
-			   grad_max_norm: Optional[int]) -> float:
+			   max_epochs: int, criterion: nn.Module, optimizer: torch.optim, grad_max_norm: Optional[int]) -> float:
 	"""
 	Trains the model on the training set for one epoch
 
@@ -97,7 +113,6 @@ def train_load(model: nn.Module, train_loader: DataLoader, vocab: Vocabulary, de
 	:param max_epochs: Maximum number of epochs to train
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
-	:param clip_grad: Whether to clip gradients
 	:param grad_max_norm: Maximum norm for gradient clipping
 	:return: Total training loss for the epoch
 	"""
@@ -115,7 +130,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, vocab: Vocabulary, de
 		# Backward pass
 		optimizer.zero_grad()
 		loss.backward()
-		if clip_grad:
+		if grad_max_norm is not None:
 			nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_max_norm)  # Gradient clipping
 		optimizer.step()
 

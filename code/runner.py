@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import random_split
 from torchvision.transforms import v2
 
+import wandb
 from constants import *
 from dataset.flickr_dataloader import FlickerDataLoader
 from dataset.flickr_dataset import FlickerDataset
@@ -17,6 +18,9 @@ from utils import date_str
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
+# RUN CONFIG -----------------------------------------------------------------------------------------------------------
+
+# transforms
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
 
@@ -36,7 +40,7 @@ TEST_SIZE = 1 - TRAIN_SIZE - VAL_SIZE
 
 # dataloaders
 BATCH_SIZE = 32
-NUM_WORKERS = 2
+NUM_WORKERS = 8
 SHUFFLE = True
 PIN_MEMORY = True
 
@@ -50,19 +54,23 @@ FREEZE_ENCODER = True
 # training params
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
-MAX_EPOCHS = 10
+MAX_EPOCHS = 1
 PATIENCE = None
 CALC_BLEU = False
 MAX_CAPTION_LEN = 30
 
-CLIP_GRAD = False
 GRAD_MAX_NORM = 5.0
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # run params
-MODEL_PATH = "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"
+# MODEL_PATH = "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"
+MODEL_PATH = None
 
+# wandb
+PROJECT = "image-captioning"
+
+# ----------------------------------------------------------------------------------------------------------------------
 
 def run(crete_dataset=False, train_model=True, test_model=True, model_path: str = None, save_results=True):
 	if crete_dataset:
@@ -109,6 +117,32 @@ def run(crete_dataset=False, train_model=True, test_model=True, model_path: str 
 	if model_path is not None:
 		model.load_state_dict(torch.load(os.path.join(ROOT, model_path), weights_only=True))
 
+	wandb_run = wandb.init(
+		project=PROJECT,
+		tags=["basic", "flickr8k", "config-test"],
+		config={
+			"encoder": "resnet50",
+			"decoder": "LSTM",
+			"batch_size": BATCH_SIZE,
+			"embed_size": EMBED_SIZE,
+			"hidden_size": HIDDEN_SIZE,
+			"num_layers": NUM_LAYERS,
+			"dropout": DROPOUT,
+			"freeze_encoder": FREEZE_ENCODER,
+			"encoder_learning_rate": ENCODER_LR,
+			"decoder_learning_rate": DECODER_LR,
+			"criterion": "CrossEntropyLoss",
+			"optimizer": "Adam",
+			"max_epochs": MAX_EPOCHS,
+			"patience": PATIENCE,
+			"gradient_clip": GRAD_MAX_NORM,
+			"dataset": "flickr8k",
+			"dataset_version": "2025-02-07",
+			"vocab_threshold": VOCAB_THRESHOLD,
+			"vocab_size": len(vocab),
+		}
+	)
+
 	if train_model:
 		criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
 		optimizer = torch.optim.Adam([
@@ -116,15 +150,26 @@ def run(crete_dataset=False, train_model=True, test_model=True, model_path: str 
 			{"params": model.decoder.parameters(), "lr": DECODER_LR},
 		])
 		train(model, train_dataloader, val_dataloader, DEVICE, vocab, MAX_EPOCHS, criterion, optimizer, CHECKPOINT_DIR,
-			  CLIP_GRAD, GRAD_MAX_NORM, PATIENCE, CALC_BLEU, MAX_CAPTION_LEN)
+			  wandb_run, GRAD_MAX_NORM, PATIENCE, CALC_BLEU, MAX_CAPTION_LEN)
 
 	if test_model:
-		results, metrics = test(model, test_dataloader, vocab, DEVICE, MAX_CAPTION_LEN)
+		results, metrics = test(model, test_dataloader, vocab, DEVICE, MAX_CAPTION_LEN, wandb_run)
 		if save_results:
-			results.to_csv(os.path.join(ROOT, f"results/results_{date_str()}.csv"), index=False)
-			with open(os.path.join(ROOT, f"results/metrics_{date_str()}.txt"), "w") as f:
+			results_path = os.path.join(ROOT, f"{BASIC_RESULTS}/results_{date_str()}.csv")
+			results.to_csv(results_path, index=False)
+			with open(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{date_str()}.txt"), "w") as f:
 				f.write(str(metrics))
+		# log results to wandb
+		wandb_run.log(metrics)
+		results_table = wandb.Table(dataframe=results)
+		results_artifact = wandb.Artifact("test_results", type="evaluation", metadata={"metrics": metrics})
+		results_artifact.add(results_table, "results")
+		if save_results:
+			results_artifact.add_file(results_path)
+		wandb_run.log({"test_results": results_table})
+		wandb_run.log_artifact(results_artifact)
+	wandb_run.finish()
 
 
 if __name__ == "__main__":
-	run(crete_dataset=False, train_model=False, test_model=True, model_path=MODEL_PATH)
+	run(crete_dataset=False, train_model=True, test_model=True, model_path=MODEL_PATH, save_results=True)
