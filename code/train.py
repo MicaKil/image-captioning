@@ -46,16 +46,18 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param max_caption_len: Maximum length of the generated captions
 	:return: Path to the best model
 	"""
-	logger.info(
-		f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {max_epochs} epochs"
-	)
+	logger.info(f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {max_epochs} epochs")
+
+	# Watch model with wandb
 	wandb_run.watch(model, criterion=criterion, log="all", log_freq=100, log_graph=True)
-	model = model.to(device)
+
+	start_time = time.time()
+	# set up variables
 	best_bleu_score = -np.inf
 	best_val_loss = np.inf
 	best_model = None
 	epochs_no_improve = 0
-	start_time = time.time()
+	model = model.to(device)
 	for epoch in range(max_epochs):
 		avg_train_loss = train_load(model, train_loader, vocab, device, epoch, max_epochs, criterion, optimizer,
 									grad_max_norm)

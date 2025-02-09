@@ -31,6 +31,7 @@ TRANSFORM = v2.Compose([
 	v2.Normalize(mean=MEAN, std=STD),
 ])
 
+# vocab
 VOCAB_THRESHOLD = 2
 
 # split dataset
@@ -48,22 +49,21 @@ PIN_MEMORY = True
 EMBED_SIZE = 256
 HIDDEN_SIZE = 512
 NUM_LAYERS = 1
-DROPOUT = 0.1
+DROPOUT = 0.3
 FREEZE_ENCODER = True
 
 # training params
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
-MAX_EPOCHS = 1
-PATIENCE = None
+MAX_EPOCHS = 100
+PATIENCE = 10
 CALC_BLEU = False
 MAX_CAPTION_LEN = 30
 
 GRAD_MAX_NORM = 5.0
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 # run params
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # MODEL_PATH = "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"
 MODEL_PATH = None
 
@@ -133,7 +133,7 @@ def run(crete_dataset=False, train_model=True, test_model=True, model_path: str 
 		# init wandb run if not already done
 		if wandb_run is None:
 			wandb_run = init_wandb_run(vocab)
-		test(model, test_dataloader, vocab, DEVICE, MAX_CAPTION_LEN, wandb_run, True)
+		test(model, test_dataloader, vocab, DEVICE, MAX_CAPTION_LEN, wandb_run, save_results)
 
 	if wandb_run is not None:
 		wandb_run.finish()
