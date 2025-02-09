@@ -1,17 +1,28 @@
+import logging
+
 import pandas as pd
 import torch
+import torch.nn as nn
 from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from pycocoevalcap.cider.cider import Cider
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from caption import gen_caption
 from dataset.flickr_dataset import FlickerDataset
+from dataset.vocabulary import Vocabulary
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
-def test_model(model, test_loader, vocab, device, max_caption_len):
+def test(model: nn.Module, test_loader: DataLoader, vocab: Vocabulary, device: torch.device,
+		 max_caption_len: int) -> tuple:
 	"""
 	Evaluate model on test set and log results in a wandb table
 	"""
+	logger.info("Start testing model")
+
 	model.eval()
 	results = []
 	all_hypotheses = []
@@ -31,14 +42,14 @@ def test_model(model, test_loader, vocab, device, max_caption_len):
 			# Get references
 			references = []
 			for img_id in image_ids:
-				refs = df[df["image_id"] == img_id.item()]["caption"].values
+				refs = df[df["image_id"] == img_id]["caption"].values
 				references.append([ref for ref in refs])
 			all_references.extend(references)
 
 			# Log results
 			for img_id, ref, gen in zip(image_ids, references, generated):
 				results.append({
-					"image_id": img_id.item(),
+					"image_id": img_id,
 					"references": ref,
 					"generated": gen
 				})
@@ -70,5 +81,8 @@ def test_model(model, test_loader, vocab, device, max_caption_len):
 			"BLEU-4": bleu_4,
 			"CIDEr": cider_score
 		}
+
+		logger.info("Testing finished")
+		logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
 
 		return pd.DataFrame(results), metrics

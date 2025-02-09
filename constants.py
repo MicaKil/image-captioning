@@ -10,6 +10,7 @@ FLICKR8K_IMG_DIR = "datasets/flickr8k/images"
 VOCAB_FILE = "code/dataset/vocab.pkl"
 # checkpoints
 CHECKPOINT_DIR = "checkpoints/basic"
+BASIC_RESULTS = "results/basic"
 
 # VOCABULARY -----------------------------------------------------------------------------------------------------------
 # Special tokens

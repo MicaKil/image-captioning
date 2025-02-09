@@ -3,6 +3,7 @@ import os.path
 from typing import Optional, Any
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
@@ -201,8 +202,8 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 	return loss, num_tokens
 
 
-def captions_for_bleu(device: torch.device, model: nn.Module, vocab: Vocabulary, df, images: torch.Tensor, images_id,
-					  max_caption_len: int) -> tuple:
+def captions_for_bleu(device: torch.device, model: nn.Module, vocab: Vocabulary, df: pd.DataFrame, images: torch.Tensor,
+					  images_id: list, max_caption_len: int) -> tuple:
 	"""
 	Generates captions for BLEU score calculation in a batch.
 
@@ -223,6 +224,6 @@ def captions_for_bleu(device: torch.device, model: nn.Module, vocab: Vocabulary,
 	# Process ground truth captions
 	references = []
 	for image_id in images_id:
-		captions = df[df["image_id"] == image_id.item()]["caption"].values
+		captions = df[df["image_id"] == image_id]["caption"].values
 		references.append([caption.split() for caption in captions])
 	return generated, references
