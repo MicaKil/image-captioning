@@ -49,15 +49,15 @@ def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = Non
 
 def time_str() -> str:
 	"""
-	Return the current time as a string.
+	Return the current time as a string in the format "YYYY-MM-DD_HH-MM".
 	:return: Current time as a string
 	"""
-	return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+	return datetime.now().strftime("%Y-%m-%d_%H-%M")
 
 
 def date_str() -> str:
 	"""
-	Return the current date as a string.
+	Return the current date as a string in the format "YYYY-MM-DD".
 	:return: Current date as a string
 	"""
 	return datetime.now().strftime("%Y-%m-%d")

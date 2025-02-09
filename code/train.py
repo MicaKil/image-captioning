@@ -70,13 +70,13 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		})
 		# Early stopping and checkpointing
 		if calc_bleu:
-			wandb_run.log({"val_bleu-4": blue_score})
+			wandb_run.log({"val_BLEU-4": blue_score})
 			if blue_score > best_bleu_score:
 				best_bleu_score = blue_score
 				if checkpoint_dir is not None:
-					best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_bleu_{time_str()}.pt")
+					best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_bleu4_{time_str()}.pt")
 					torch.save(model.state_dict(), best_model)
-				logger.info(f"New best BLEU score: {best_bleu_score:.4f}")
+				logger.info(f"New best BLEU-4 score: {best_bleu_score:.4f}")
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
@@ -164,9 +164,8 @@ def eval_load(model: nn.Module, val_loader: DataLoader, vocab: Vocabulary, devic
 	val_loss = 0.0
 	total_tokens = 0
 	df = val_loader.dataset.df if isinstance(val_loader.dataset, FlickerDataset) else val_loader.dataset.dataset.df
-	if calc_bleu:
-		all_references = []  # List of lists of reference captions
-		all_hypothesis = []  # List of generated captions (hypotheses)
+	all_references = []  # List of lists of reference captions
+	all_hypothesis = []  # List of generated captions (hypotheses)
 
 	with torch.no_grad():
 		batch_progress = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{max_epochs} [Val]")
@@ -179,17 +178,52 @@ def eval_load(model: nn.Module, val_loader: DataLoader, vocab: Vocabulary, devic
 			val_loss += loss.item()
 			total_tokens += num_tokens
 			batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
-			# Generate captions for BLEU
+
 			if calc_bleu:
-				generated, ref = captions_for_bleu(device, model, vocab, df, images, images_id, max_caption_len)
+				# Generate captions
+				generated = gen_captions(model, vocab, device, images, max_caption_len)
 				all_hypothesis.extend(generated)
-				all_references.extend(ref)
+				# Process ground truth captions
+				references = get_references(df, images_id)
+				all_references.extend(references)
 
 	avg_loss = val_loss / total_tokens if total_tokens > 0 else 0
 	if not calc_bleu:
 		return avg_loss, None
 
 	return avg_loss, corpus_bleu(all_references, all_hypothesis, smoothing_function=smoothing)
+
+
+def get_references(df: pd.DataFrame, image_ids: list) -> list:
+	"""
+	Get references for a list of image ids
+	:param df: DataFrame containing image ids and its captions
+	:param image_ids: List of image ids to get references for
+	:return: List of references for each image id
+	"""
+	references = []
+	for image_id in image_ids:
+		captions = df[df["image_id"] == image_id]["caption"].values
+		references.append([caption.split() for caption in captions])
+	return references
+
+
+def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, max_caption_len: int) -> list:
+	"""
+	Generate captions for a list of images
+	:param model: Model to use for caption generation
+	:param device: Device to use
+	:param images: List of images to generate captions for
+	:param max_caption_len: Maximum length of generated captions
+	:param vocab: Vocabulary of the dataset
+	:return: List of generated captions
+	"""
+	generated = []
+	for image in images:
+		image = image.unsqueeze(0).to(device)
+		caption = gen_caption(model, image, vocab, max_caption_len, device)
+		generated.append(caption.split())
+	return generated
 
 
 def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module,
@@ -215,30 +249,3 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 		targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
 	)
 	return loss, num_tokens
-
-
-def captions_for_bleu(device: torch.device, model: nn.Module, vocab: Vocabulary, df: pd.DataFrame, images: torch.Tensor,
-					  images_id: list, max_caption_len: int) -> tuple:
-	"""
-	Generates captions for BLEU score calculation in a batch.
-
-	:param device: Device to run the generation on (CPU or GPU).
-	:param model: The model to generate captions.
-	:param df: DataFrame containing image IDs and captions.
-	:param images: Batch of images.
-	:param images_id: List of image IDs.
-	:param max_caption_len: Maximum length of the generated captions.
-	:param vocab: Vocabulary object.
-	:return: List of generated captions and list of reference captions.
-	"""
-	generated = []
-	for image in images:
-		image = image.unsqueeze(0).to(device)
-		caption = gen_caption(model, image, vocab, max_caption_len, device)
-		generated.append(caption.split())
-	# Process ground truth captions
-	references = []
-	for image_id in images_id:
-		captions = df[df["image_id"] == image_id]["caption"].values
-		references.append([caption.split() for caption in captions])
-	return generated, references
