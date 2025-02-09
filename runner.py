@@ -4,6 +4,7 @@ import os.path
 import torch
 from torch.utils.data import random_split
 from torchvision.transforms import v2
+from wandb.sdk.wandb_run import Run
 
 import wandb
 from constants import *
@@ -32,12 +33,15 @@ TRANSFORM = v2.Compose([
 ])
 
 # vocab
-VOCAB_THRESHOLD = 2
+VOCAB_THRESHOLD = 3
 
-# split dataset
-TRAIN_SIZE = 0.80
-VAL_SIZE = 0.10
-TEST_SIZE = 1 - TRAIN_SIZE - VAL_SIZE
+# dataset
+DATASET = "flickr8k"
+DATASET_VERSION = "2025-02-09"
+
+TRAIN_SIZE = 80
+VAL_SIZE = 10
+TEST_SIZE = 100 - TRAIN_SIZE - VAL_SIZE
 
 # dataloaders
 BATCH_SIZE = 32
@@ -55,8 +59,8 @@ FREEZE_ENCODER = True
 # training params
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
-MAX_EPOCHS = 100
-PATIENCE = 10
+MAX_EPOCHS = 10
+PATIENCE = None
 CALC_BLEU = False
 MAX_CAPTION_LEN = 30
 
@@ -64,8 +68,7 @@ GRAD_MAX_NORM = 5.0
 
 # run params
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# MODEL_PATH = "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"
-MODEL_PATH = None
+MODEL_PATH = "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"
 
 # wandb
 PROJECT = "image-captioning"
@@ -73,36 +76,37 @@ PROJECT = "image-captioning"
 # ----------------------------------------------------------------------------------------------------------------------
 
 def run(crete_dataset=False, train_model=True, test_model=True, model_path: str = None, save_results=True):
+	date = date_str()
 	# create or load dataset
 	if crete_dataset:
 		ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
 		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 
 		full_dataset = FlickerDataset(ann_file, img_dir, vocab_threshold=VOCAB_THRESHOLD, transform=TRANSFORM)
-		torch.save(full_dataset, os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date_str()}.pt"))
+		torch.save(full_dataset, os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
 
 		total_size = len(full_dataset)
-		train_size = int(TRAIN_SIZE * total_size)
-		val_size = int(VAL_SIZE * total_size)
+		train_size = int((TRAIN_SIZE/100) * total_size)
+		val_size = int((VAL_SIZE/100) * total_size)
 		test_size = total_size - train_size - val_size
 
 		train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
 
 		# save new datasets
 		torch.save(train_dataset,
-				   os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{int(TRAIN_SIZE * 100)}_{date_str()}.pt"))
+				   os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{TRAIN_SIZE}_{date}.pt"))
 		torch.save(val_dataset,
-				   os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{int(VAL_SIZE * 100)}_{date_str()}.pt"))
+				   os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{VAL_SIZE}_{date}.pt"))
 		torch.save(test_dataset,
-				   os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{int(TEST_SIZE * 100)}_{date_str()}.pt"))
+				   os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"))
 	else:
-		full_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/full_dataset_2025-02-07.pt"),
+		full_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/full_dataset_2025-02-09.pt"),
 								  weights_only=False)
-		train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-07.pt"),
+		train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-09.pt"),
 								   weights_only=False)
-		val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-07.pt"),
+		val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-09.pt"),
 								 weights_only=False)
-		test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-07.pt"),
+		test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-09.pt"),
 								  weights_only=False)
 
 	# create or load model
@@ -136,10 +140,23 @@ def run(crete_dataset=False, train_model=True, test_model=True, model_path: str 
 		test(model, test_dataloader, vocab, DEVICE, MAX_CAPTION_LEN, wandb_run, save_results)
 
 	if wandb_run is not None:
+		if crete_dataset:
+			log_dataset(wandb_run,
+						wandb.Artifact(f"{DATASET}_full_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
+						os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
+			log_dataset(wandb_run,
+						wandb.Artifact(f"{DATASET}_train_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
+						os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{TRAIN_SIZE}_{date}.pt"))
+			log_dataset(wandb_run,
+						wandb.Artifact(f"{DATASET}_val_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
+						os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{VAL_SIZE}_{date}.pt"))
+			log_dataset(wandb_run,
+						wandb.Artifact(f"{DATASET}_test_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
+						os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"))
 		wandb_run.finish()
 
 
-def init_wandb_run(vocab):
+def init_wandb_run(vocab: VOCAB_THRESHOLD) -> Run:
 	"""
 	Initialize wandb run
 	:param vocab: Vocabulary of the dataset
@@ -164,8 +181,8 @@ def init_wandb_run(vocab):
 			"max_epochs": MAX_EPOCHS,
 			"patience": PATIENCE,
 			"gradient_clip": GRAD_MAX_NORM,
-			"dataset": "flickr8k",
-			"dataset_version": "2025-02-07",
+			"dataset": DATASET,
+			"dataset_version": DATASET_VERSION,
 			"vocab_threshold": VOCAB_THRESHOLD,
 			"vocab_size": len(vocab),
 		}
@@ -180,5 +197,16 @@ def init_wandb_run(vocab):
 	return wandb_run
 
 
+def log_dataset(wandb_run: Run, wandb_artifact: wandb.Artifact, dataset_path: str):
+	"""
+	Log dataset to wandb
+	:param wandb_run: Wandb run
+	:param wandb_artifact: Wandb artifact
+	:param dataset_path: Path to the dataset
+	"""
+	wandb_artifact.add_file(dataset_path)
+	wandb_run.log_artifact(wandb_artifact)
+
+
 if __name__ == "__main__":
-	run(crete_dataset=False, train_model=True, test_model=True, model_path=MODEL_PATH, save_results=True)
+	run(crete_dataset=False, train_model=True, test_model=True, model_path=None, save_results=True)

@@ -169,12 +169,13 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, wandb
 	"""
 	results_path = None
 	if save_results:
+		time_ = time_str()
 		# Save results
-		results_path = os.path.join(ROOT, f"{BASIC_RESULTS}/results_{time_str()}.csv")
+		results_path = os.path.join(ROOT, f"{BASIC_RESULTS}/results_{time_}.csv")
 		results.to_csv(results_path, index=False, header=True)
 		# Save metrics
 		metrics_pd = pd.DataFrame(metrics, index=[0])
-		metrics_pd.to_csv(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{time_str()}.csv"), index=False,
+		metrics_pd.to_csv(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{time_}.csv"), index=False,
 						  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
 	wandb_run.log(metrics)

@@ -71,19 +71,20 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 			"val_loss": avg_val_loss
 		})
 		# Early stopping and checkpointing
+		time_ = time_str()
 		if calc_bleu:
 			wandb_run.log({"val_BLEU-4": blue_score})
 			if blue_score > best_bleu_score:
 				best_bleu_score = blue_score
 				if checkpoint_dir is not None:
-					best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_bleu4_{time_str()}.pt")
+					best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_bleu4_{time_}.pt")
 					torch.save(model.state_dict(), best_model)
 				logger.info(f"New best BLEU-4 score: {best_bleu_score:.4f}")
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
 			if checkpoint_dir is not None:
-				best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}.pt")
+				best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_}.pt")
 				torch.save(model.state_dict(), best_model)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
