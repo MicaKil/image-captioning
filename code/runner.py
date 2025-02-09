@@ -57,7 +57,8 @@ GRAD_MAX_NORM = 5.0
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if __name__ == "__main__":
+
+def run():
 	# ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
 	# img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 
@@ -77,15 +78,12 @@ if __name__ == "__main__":
 	# torch.save(train_dataset, os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{int(TRAIN_SIZE*100)}_{date_str()}.pt"))
 	# torch.save(val_dataset, os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{int(VAL_SIZE*100)}_{date_str()}.pt"))
 	# torch.save(test_dataset, os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{int(TEST_SIZE*100)}_{date_str()}.pt"))
-
 	train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-07.pt"),
 							   weights_only=False)
 	val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-07.pt"),
 							 weights_only=False)
 	test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-07.pt"),
 							  weights_only=False)
-
-	print(test_dataset.indices)
 
 	train_dataloader = FlickerDataLoader(train_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 	val_dataloader = FlickerDataLoader(val_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
@@ -101,3 +99,7 @@ if __name__ == "__main__":
 
 	train(model, train_dataloader, val_dataloader, DEVICE, vocab, MAX_EPOCHS, criterion, optimizer, CHECKPOINT_DIR,
 		  CLIP_GRAD, GRAD_MAX_NORM, PATIENCE, CALC_BLEU, MAX_CAPTION_LEN)
+
+
+if __name__ == "__main__":
+	run()

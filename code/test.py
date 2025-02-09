@@ -1,32 +1,74 @@
-# 44856031_0d82c2c7d1.jpg
-import os.path
-
+import pandas as pd
 import torch
+from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
+from pycocoevalcap.cider.cider import Cider
+from tqdm import tqdm
 
-from caption import preprocess_image, gen_caption
-from constants import ROOT, PAD, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, TEST_IMG
+from caption import gen_caption
 from dataset.flickr_dataset import FlickerDataset
-from models.basic import ImageCaptioning
-from runner import EMBED_SIZE, HIDDEN_SIZE, DROPOUT, NUM_LAYERS, FREEZE_ENCODER, VOCAB_THRESHOLD, TRANSFORM, MEAN, STD, \
-	MAX_CAPTION_LEN, DEVICE
-from utils import show_img
 
-if __name__ == "__main__":
-	ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
-	img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 
-	full_dataset = FlickerDataset(ann_file, img_dir, vocab_threshold=VOCAB_THRESHOLD, transform=TRANSFORM)
-	vocab = full_dataset.vocab
-	pad_idx = vocab.to_idx(PAD)
-
-	model = ImageCaptioning(EMBED_SIZE, HIDDEN_SIZE, len(vocab), DROPOUT, NUM_LAYERS, pad_idx, FREEZE_ENCODER)
-	model.load_state_dict(torch.load(os.path.join(ROOT, "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"),
-									 weights_only=True))
+def test_model(model, test_loader, vocab, device, max_caption_len):
+	"""
+	Evaluate model on test set and log results in a wandb table
+	"""
 	model.eval()
+	results = []
+	all_hypotheses = []
+	all_references = []
+	df = test_loader.dataset.df if isinstance(test_loader.dataset, FlickerDataset) else test_loader.dataset.dataset.df
+	smoothing = SmoothingFunction().method1
 
-	img_path = os.path.join(ROOT, "datasets/flickr8k/images/44856031_0d82c2c7d1.jpg")
-	img = preprocess_image(str(img_path), TRANSFORM)
+	with torch.no_grad():
+		for batch_idx, (images, _, image_ids) in enumerate(tqdm(test_loader)):
+			# Generate captions
+			generated = []
+			for img in images:
+				img = img.unsqueeze(0).to(device)
+				caption = gen_caption(model, img, vocab, max_caption_len, device)
+				generated.append(caption)
+			all_hypotheses.extend(generated)
+			# Get references
+			references = []
+			for img_id in image_ids:
+				refs = df[df["image_id"] == img_id.item()]["caption"].values
+				references.append([ref for ref in refs])
+			all_references.extend(references)
 
-	print("Generating image caption.")
-	print(gen_caption(model, img, vocab, max_length=MAX_CAPTION_LEN, device=DEVICE, temperature=None))
-	show_img(img, MEAN, STD)
+			# Log results
+			for img_id, ref, gen in zip(image_ids, references, generated):
+				results.append({
+					"image_id": img_id.item(),
+					"references": ref,
+					"generated": gen
+				})
+
+		# BLEU scores
+		tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
+		tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
+		bleu_1 = corpus_bleu(tokenized_references,
+							 tokenized_hypotheses,
+							 weights=(1, 0, 0, 0),
+							 smoothing_function=smoothing)
+		bleu_2 = corpus_bleu(tokenized_references,
+							 tokenized_hypotheses,
+							 weights=(0.5, 0.5, 0, 0),
+							 smoothing_function=smoothing)
+		bleu_4 = corpus_bleu(tokenized_references,
+							 tokenized_hypotheses,
+							 smoothing_function=smoothing)
+
+		# CIDEr score
+		hyp_dict = {i: [hyp] for i, hyp in enumerate(all_hypotheses)}
+		ref_dict = {i: refs for i, refs in enumerate(all_references)}
+		cider_scorer = Cider()
+		cider_score, _ = cider_scorer.compute_score(ref_dict, hyp_dict)
+
+		metrics = {
+			"BLEU-1": bleu_1,
+			"BLEU-2": bleu_2,
+			"BLEU-4": bleu_4,
+			"CIDEr": cider_score
+		}
+
+		return pd.DataFrame(results), metrics
