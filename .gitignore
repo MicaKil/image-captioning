@@ -232,3 +232,6 @@ fabric.properties
 # Project
 datasets/*
 *.pkl
+/wandb/
+/checkpoints/
+/results/
