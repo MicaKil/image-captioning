@@ -1,0 +1,36 @@
+method: bayes
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  # Architecture
+  hidden_size:
+    values: [256, 512, 768]
+  num_layers:
+    values: [1, 2, 3]
+  embed_size:
+    values: [128, 256, 512]
+
+  # Regularization
+  dropout:
+    values: [0.2, 0.3, 0.4]
+
+  # Optimization
+  decoder_lr:
+    distribution: log_uniform
+    min: 1e-5
+    max: 1e-3
+  batch_size:
+    values: [16, 32, 64]
+  gradient_clip:
+    values: [0.5, 1.0, 2.0]
+
+  # Encoder Tuning
+  freeze_encoder:
+    values: [True, False]
+  encoder_lr:
+    distribution: log_uniform
+    min: 1e-6
+    max: 1e-4
+    conditions:
+      freeze_encoder: False
