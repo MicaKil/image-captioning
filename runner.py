@@ -14,7 +14,7 @@ from code.models.basic import ImageCaptioning
 from code.test import test
 from code.train import train
 from code.utils import date_str
-from constants import *
+from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PROJECT, PAD
 
 # logger
 logger = logging.getLogger(__name__)
@@ -70,9 +70,6 @@ GRAD_MAX_NORM = 5.0
 # run params
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = "checkpoints/basic/best_val_2025-02-09_23-07.pt"
-
-# wandb
-PROJECT = "image-captioning"
 
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -1,5 +1,8 @@
 import os
 
+# wandb
+PROJECT = "image-captioning"
+
 # PATHS ----------------------------------------------------------------------------------------------------------------
 ROOT = os.path.dirname(os.path.abspath(__file__))
 # dataset
