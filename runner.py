@@ -7,7 +7,7 @@ from torchvision.transforms import v2
 from wandb.sdk.wandb_run import Run
 
 import wandb
-from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PROJECT, PAD
+from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PROJECT, PAD, FLICKR8K_DIR
 from scripts.dataset.flickr_dataloader import FlickerDataLoader
 from scripts.dataset.flickr_dataset import FlickerDataset
 from scripts.dataset.vocabulary import Vocabulary
@@ -51,14 +51,14 @@ PIN_MEMORY = True
 EMBED_SIZE = 256
 HIDDEN_SIZE = 512
 NUM_LAYERS = 1
-DROPOUT = 0.3
+DROPOUT = 0.2
 FREEZE_ENCODER = True
 
 # training params
 ENCODER_LR = 1e-4
-DECODER_LR = 1e-4
-MAX_EPOCHS = 1
-PATIENCE = None
+DECODER_LR = 4e-4
+MAX_EPOCHS = 100
+PATIENCE = 10
 CALC_BLEU = False
 MAX_CAPTION_LEN = 30
 
@@ -66,7 +66,6 @@ GRAD_MAX_NORM = 5.0
 
 # run params
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_PATH = "checkpoints/basic/best_val_2025-02-09_23-07.pt"
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -80,7 +79,7 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 
 		full_dataset = FlickerDataset(ann_file, img_dir, vocab_threshold=VOCAB_THRESHOLD, transform=TRANSFORM)
-		torch.save(full_dataset, os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
+		torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
 
 		total_size = len(full_dataset)
 		train_size = int((DATASET_SPLIT["train"] / 100) * total_size)
@@ -91,11 +90,11 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 
 		# save new datasets
 		torch.save(train_dataset,
-				   os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s{DATASET_SPLIT["train"]}_{date}.pt"))
+				   os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_s{DATASET_SPLIT["train"]}_{date}.pt"))
 		torch.save(val_dataset,
-				   os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s{DATASET_SPLIT["val"]}_{date}.pt"))
+				   os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_s{DATASET_SPLIT["val"]}_{date}.pt"))
 		torch.save(test_dataset,
-				   os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s{DATASET_SPLIT["test"]}_{date}.pt"))
+				   os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s{DATASET_SPLIT["test"]}_{date}.pt"))
 	else:
 		full_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/full_dataset_2025-02-10.pt"),
 								  weights_only=False)
@@ -112,12 +111,14 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 	wandb_run = init_wandb_run(vocab)
 	config = wandb_run.config
 
-	model = ImageCaptioning(config["embed_size"], config["hidden_size"], config["vocab_size"],
-							config["dropout"], config["num_layers"], pad_idx,
-							config["freeze_encoder"])
+	model = ImageCaptioning(config["embed_size"], config["hidden_size"], config["vocab_size"], config["dropout"],
+							config["num_layers"], pad_idx, config["freeze_encoder"])
 	if model_path is not None:
 		logger.info(f"Loading model from {model_path}")
 		model.load_state_dict(torch.load(os.path.join(ROOT, model_path), weights_only=True))
+
+	print(f"Model:\n{model}")
+	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
 
 	if train_model:
 		train_dataloader = FlickerDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
@@ -133,18 +134,18 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 		test_dataloader = FlickerDataLoader(test_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		test(model, test_dataloader, DEVICE, save_results)
 
-	if create_dataset: # log created datasets
+	if create_dataset:  # log created datasets
 		log_dataset(wandb.Artifact(f"{DATASET}_full_dataset", type="dataset",
 								   metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"), wandb_run)
+					os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
 		log_dataset(wandb.Artifact(f"{DATASET}_train_dataset", type="dataset",
 								   metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s{DATASET_SPLIT["train"]}_{date}.pt"), wandb_run)
+					os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_s{DATASET_SPLIT["train"]}_{date}.pt"))
 		log_dataset(wandb.Artifact(f"{DATASET}_val_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s{DATASET_SPLIT["val"]}_{date}.pt"), wandb_run)
+					os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_s{DATASET_SPLIT["val"]}_{date}.pt"))
 		log_dataset(wandb.Artifact(f"{DATASET}_test_dataset", type="dataset",
 								   metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s{DATASET_SPLIT["test"]}_{date}.pt"), wandb_run)
+					os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s{DATASET_SPLIT["test"]}_{date}.pt"))
 
 	wandb_run.finish()
 
@@ -192,17 +193,18 @@ def init_wandb_run(vocab: Vocabulary) -> Run:
 	return wandb_run
 
 
-def log_dataset(wandb_artifact: wandb.Artifact, dataset_path: str, wandb_run: Run):
+def log_dataset(wandb_artifact: wandb.Artifact, dataset_path: str):
 	"""
 	Log dataset to wandb
 	:param wandb_artifact: Wandb artifact
 	:param dataset_path: Path to the dataset
-	:param wandb_run:
 	"""
 	wandb_artifact.add_file(dataset_path)
-	wandb_run.log_artifact(wandb_artifact)
+	wandb.log_artifact(wandb_artifact)
 
 
 if __name__ == "__main__":
+	model_path_ = os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-09_23-07.pt")
+
 	wandb.teardown()
-	run(create_dataset=False, train_model=False, test_model=True, model_path=MODEL_PATH, save_results=False)
+	run(create_dataset=False, train_model=True, test_model=True, model_path=None, save_results=True)

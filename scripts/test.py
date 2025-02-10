@@ -20,7 +20,6 @@ from scripts.utils import time_str
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
-config = wandb.config
 
 def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool) -> tuple:
 	"""
@@ -110,6 +109,8 @@ def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, imag
 	:param vocab: Vocabulary of the dataset
 	:return: List of generated captions
 	"""
+	config = wandb.config
+
 	generated = []
 	for img in images:
 		img = img.unsqueeze(0).to(device)

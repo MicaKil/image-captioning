@@ -3,7 +3,7 @@ import os.path
 import torch
 
 import wandb
-from constants import ROOT, PAD, CHECKPOINT_DIR, PROJECT
+from constants import ROOT, PAD, CHECKPOINT_DIR, PROJECT, FLICKR8K_DIR
 from scripts.dataset.flickr_dataloader import FlickerDataLoader
 from scripts.dataset.flickr_dataset import FlickerDataset
 from scripts.models.basic import ImageCaptioning
@@ -15,9 +15,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 default_config = {
 	"encoder": "resnet50",
 	"decoder": "LSTM",
-	"batch_size": 16,
-	"embed_size": 128,
-	"hidden_size": 256,
+	"batch_size": 32,
+	"embed_size": 256,
+	"hidden_size": 512,
 	"num_layers": 1,
 	"dropout": 0.2,
 	"freeze_encoder": True,
@@ -25,8 +25,8 @@ default_config = {
 	"decoder_lr": 1e-4,
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
-	"max_epochs": 1,
-	"patience": None,
+	"max_epochs": 100,
+	"patience": 10,
 	"gradient_clip": None,
 	"dataset": "flickr8k",
 	"dataset_version": "2025-02-10",
@@ -62,7 +62,6 @@ sweep_config = {
 }
 
 
-
 def run_sweep():
 	num_workers = 4
 	shuffle = True
@@ -77,11 +76,11 @@ def run_sweep():
 	config = wandb_run.config
 
 	# Load datasets
-	train_dataset: FlickerDataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-10.pt"),
+	train_dataset: FlickerDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_s-80_2025-02-10.pt"),
 											   weights_only=False)
-	val_dataset: FlickerDataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-10.pt"),
+	val_dataset: FlickerDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_s-10_2025-02-10.pt"),
 											 weights_only=False)
-	test_dataset: FlickerDataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-10.pt"),
+	test_dataset: FlickerDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s-10_2025-02-10.pt"),
 											  weights_only=False)
 	vocab = train_dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)

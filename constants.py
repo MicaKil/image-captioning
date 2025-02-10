@@ -6,6 +6,7 @@ PROJECT = "image-captioning-v1"
 # PATHS ----------------------------------------------------------------------------------------------------------------
 ROOT = os.path.dirname(os.path.abspath(__file__))
 # dataset
+FLICKR8K_DIR = "datasets/flickr8k"
 FLICKR8K_ANN_FILE = "datasets/flickr8k/Flickr8k.token.txt"
 FLICKR8K_CSV_FILE = "datasets/flickr8k/captions.csv"
 FLICKR8K_IMG_DIR = "datasets/flickr8k/images"

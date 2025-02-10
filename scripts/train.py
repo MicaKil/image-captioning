@@ -21,7 +21,6 @@ from scripts.utils import time_str
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
-config = wandb.config
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
 		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str]) -> str:
@@ -37,10 +36,12 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param checkpoint_dir: Directory to save the best model
 	:return: Path to the best model
 	"""
+	config = wandb.config
 	wandb.watch(model, criterion=criterion, log="all", log_freq=100)
 
 	logger.info(
-		f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {config["max_epochs"]} epochs")
+		f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}"
+	)
 	start_time = time.time()
 
 	best_bleu_score = -np.inf
@@ -59,6 +60,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 			"train_loss": avg_train_loss,
 			"val_loss": avg_val_loss
 		})
+
 		# Early stopping and checkpointing
 		time_ = time_str()
 		if config["max_caption_len"] is not None:
@@ -81,7 +83,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 				epochs_no_improve += 1
 				if epochs_no_improve >= config["patience"]:
 					logger.info(f"Early stopping after {epoch + 1} epochs")
+					wandb.log({"early_stopping": True})
 					break
+
 	# Log training time
 	train_time = time.time() - start_time
 	logger.info(f"Training completed in {train_time:.2f} seconds")
@@ -105,6 +109,8 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	:param optimizer: Optimizer for training
 	:return: Total training loss for the epoch
 	"""
+	config = wandb.config
+
 	train_loss = 0.
 	total_tokens = 0
 	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
@@ -147,6 +153,8 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	:param smoothing: Smoothing function for BLEU score
 	:return: Average validation loss and BLEU score (if calc_bleu is True)
 	"""
+	config = wandb.config
+
 	val_loss = 0.0
 	total_tokens = 0
 	df = val_loader.dataset.df if isinstance(val_loader.dataset, FlickerDataset) else val_loader.dataset.dataset.df
@@ -207,6 +215,8 @@ def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, imag
 	:param vocab: Vocabulary of the dataset
 	:return: List of generated captions
 	"""
+	config = wandb.config
+
 	generated = []
 	for image in images:
 		image = image.unsqueeze(0).to(device)
