@@ -7,10 +7,10 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import wandb
 from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from wandb.sdk.wandb_run import Run
 
 from constants import ROOT, PAD
 from scripts.caption import gen_caption
@@ -23,7 +23,7 @@ logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
-		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str], wandb_run: Run,
+		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str],
 		  max_caption_len: int = None) -> str:
 	"""
 	Training loop for the model.
@@ -35,12 +35,11 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
 	:param checkpoint_dir: Directory to save the best model
-	:param wandb_run: Wandb run object
 	:param max_caption_len: Maximum length of the generated captions
 	:return: Path to the best model
 	"""
-	config = wandb_run.config
-	wandb_run.watch(model, criterion=criterion, log="all", log_freq=100)
+	config = wandb.config
+	wandb.watch(model, criterion=criterion, log="all", log_freq=100)
 
 	logger.info(
 		f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {config["max_epochs"]} epochs")
@@ -53,12 +52,12 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
-		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer, wandb_run)
+		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
 		avg_val_loss, blue_score = eval_load(model, val_loader, device, epoch, criterion, max_caption_len,
-											 SmoothingFunction().method1, wandb_run)
+											 SmoothingFunction().method1)
 
 		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
-		wandb_run.log({
+		wandb.log({
 			"epoch": epoch + 1,
 			"train_loss": avg_train_loss,
 			"val_loss": avg_val_loss
@@ -66,7 +65,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		# Early stopping and checkpointing
 		time_ = time_str()
 		if max_caption_len is not None:
-			wandb_run.log({"val_BLEU-4": blue_score})
+			wandb.log({"val_BLEU-4": blue_score})
 			if blue_score > best_bleu_score:
 				best_bleu_score = blue_score
 				if checkpoint_dir is not None:
@@ -89,15 +88,15 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	# Log training time
 	train_time = time.time() - start_time
 	logger.info(f"Training completed in {train_time:.2f} seconds")
-	wandb_run.log({"train_time": train_time})
+	wandb.log({"train_time": train_time})
 	# Log best model
 	if best_model is not None:
-		wandb_run.log_model(path=best_model)
+		wandb.log_model(path=best_model)
 	return best_model
 
 
 def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
-			   optimizer: torch.optim, wandb_run: Run) -> float:
+			   optimizer: torch.optim) -> float:
 	"""
 	Trains the model on the training set for one epoch
 
@@ -107,7 +106,6 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	:param epoch: Current epoch
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
-	:param wandb_run: Wandb run object
 	:return: Total training loss for the epoch
 	"""
 	train_loss = 0.
@@ -115,7 +113,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
 													 FlickerDataset) else train_loader.dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
-	config = wandb_run.config
+	config = wandb.config
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
@@ -141,7 +139,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
-			  max_caption_len: Optional[int], smoothing: Any, wandb_run) -> tuple:
+			  max_caption_len: Optional[int], smoothing: Any) -> tuple:
 	"""
 	Evaluates the model on the validation set for one epoch
 
@@ -152,7 +150,6 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	:param criterion: Loss function
 	:param max_caption_len: Maximum length of the generated captions
 	:param smoothing: Smoothing function for BLEU score
-	:param wandb_run: Wandb run object
 	:return: Average validation loss and BLEU score (if calc_bleu is True)
 	"""
 	val_loss = 0.0
@@ -163,7 +160,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	pad_idx = vocab.to_idx(PAD)
 	all_references = []  # List of lists of reference captions
 	all_hypothesis = []  # List of generated captions (hypotheses)
-	config = wandb_run.config
+	config = wandb.config
 
 	model.eval()
 	with torch.no_grad():

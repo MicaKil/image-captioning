@@ -38,7 +38,7 @@ VOCAB_THRESHOLD = 3
 
 # dataset
 DATASET = "flickr8k"
-DATASET_VERSION = "2025-02-09"
+DATASET_VERSION = "2025-02-10"
 
 TRAIN_SIZE = 80
 VAL_SIZE = 10
@@ -100,13 +100,13 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 		torch.save(test_dataset,
 				   os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"))
 	else:
-		full_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/full_dataset_2025-02-09.pt"),
+		full_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/full_dataset_2025-02-10.pt"),
 								  weights_only=False)
-		train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-09.pt"),
+		train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s-80_2025-02-10.pt"),
 								   weights_only=False)
-		val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-09.pt"),
+		val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s-10_2025-02-10.pt"),
 								 weights_only=False)
-		test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-09.pt"),
+		test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s-10_2025-02-10.pt"),
 								  weights_only=False)
 
 	# create or load model
@@ -131,8 +131,7 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
 			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 		])
-		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, CHECKPOINT_DIR, wandb_run,
-			  MAX_CAPTION_LEN)
+		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, CHECKPOINT_DIR, MAX_CAPTION_LEN)
 
 	if test_model:
 		# create test dataloader
@@ -208,4 +207,5 @@ def log_dataset(wandb_artifact: wandb.Artifact, dataset_path: str, wandb_run: Ru
 
 
 if __name__ == "__main__":
+	wandb.teardown()
 	run(create_dataset=False, train_model=False, test_model=True, model_path=MODEL_PATH, save_results=True)
