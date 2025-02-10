@@ -127,7 +127,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int,
-			  criterion: nn.Module) -> tuple:
+			  criterion: nn.Module) -> float:
 	"""
 	Evaluates the model on the validation set for one epoch
 
