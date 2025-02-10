@@ -43,7 +43,7 @@ DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
 
 # dataloaders
 BATCH_SIZE = 32
-NUM_WORKERS = 4
+NUM_WORKERS = 2
 SHUFFLE = True
 PIN_MEMORY = True
 

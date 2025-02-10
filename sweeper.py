@@ -100,6 +100,9 @@ def run_sweep():
 		{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 	])
 
+	print(f"Model:\n{model}")
+	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
+
 	train(model, train_dataloader, val_dataloader, device, criterion, optimizer, CHECKPOINT_DIR)
 	test(model, test_dataloader, device, save_results)
 
