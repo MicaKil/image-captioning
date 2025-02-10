@@ -8,6 +8,7 @@ from torchvision.io import decode_image, ImageReadMode
 
 from constants import ROOT, EOS, SOS, VOCAB_FILE, FLICKR8K_CSV_FILE
 from scripts.dataset.vocabulary import Vocabulary
+from scripts.utils import dump
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
@@ -52,7 +53,7 @@ class FlickerDataset(Dataset):
 			self.vocab = Vocabulary(vocab_threshold, self.captions)
 
 		if save_vocab:
-			utils.dump(self.vocab, str(os.path.join(ROOT, VOCAB_FILE)))
+			dump(self.vocab, str(os.path.join(ROOT, VOCAB_FILE)))
 
 	def __len__(self):
 		"""

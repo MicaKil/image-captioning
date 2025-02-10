@@ -10,7 +10,6 @@ from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from pycocoevalcap.cider.cider import Cider
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from wandb.sdk.wandb_run import Run
 
 from constants import BASIC_RESULTS, ROOT
 from scripts.caption import gen_caption
@@ -21,17 +20,15 @@ from scripts.utils import time_str
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
+config = wandb.config
 
-def test(model: nn.Module, test_loader: DataLoader, device: torch.device, max_caption_len: int, save_results: bool,
-		 wandb_run: Run) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool) -> tuple:
 	"""
 	Evaluate model on test set and log results
 	:param model: Model to evaluate
 	:param test_loader: Test data loader to use
 	:param device: Device to use (cpu or cuda)
-	:param max_caption_len: Maximum length of generated captions
 	:param save_results: Whether to save results to disk
-	:param wandb_run: Wandb run object
 	:return:
 	"""
 
@@ -50,7 +47,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, max_ca
 	with torch.no_grad():
 		for batch_idx, (images, _, image_ids) in enumerate(tqdm(test_loader)):
 			# Generate captions
-			generated = gen_captions(model, vocab, device, images, max_caption_len)
+			generated = gen_captions(model, vocab, device, images)
 			all_hypotheses.extend(generated)
 			# Get references
 			references = get_references(df, image_ids)
@@ -72,7 +69,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, max_ca
 
 		# Log time
 		test_time = time.time() - start_time
-		wandb_run.log({"test_time": test_time})
+		wandb.log({"test_time": test_time})
 
 		logger.info(f"Testing took {test_time:.2f} seconds")
 		logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
@@ -86,7 +83,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, max_ca
 		}
 		results = pd.DataFrame(results)
 
-		log_and_save(metrics, results, save_results, wandb_run)
+		log_and_save(metrics, results, save_results)
 		return results, metrics
 
 
@@ -104,20 +101,19 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
 	return references
 
 
-def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, max_caption_len: int) -> list:
+def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list) -> list:
 	"""
 	Generate captions for a list of images
 	:param model: Model to use for caption generation
 	:param device: Device to use
 	:param images: List of images to generate captions for
-	:param max_caption_len: Maximum length of generated captions
 	:param vocab: Vocabulary of the dataset
 	:return: List of generated captions
 	"""
 	generated = []
 	for img in images:
 		img = img.unsqueeze(0).to(device)
-		caption = gen_caption(model, img, vocab, max_caption_len, device)
+		caption = gen_caption(model, img, vocab, config["max_caption_len"], device)
 		generated.append(caption)
 	return generated
 
@@ -153,13 +149,12 @@ def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tu
 	return bleu_1, bleu_2, bleu_4
 
 
-def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, wandb_run):
+def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool):
 	"""
 	Log results and metrics to wandb and save them to disk
 	:param metrics: Metrics to log and save
 	:param results: Results to log and save
 	:param save_results: Whether to save results to disk
-	:param wandb_run: Wandb run object
 	:return:
 	"""
 	results_path = None
@@ -173,11 +168,11 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, wandb
 		metrics_pd.to_csv(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{time_}.csv"), index=False,
 						  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
-	wandb_run.log(metrics)
+	wandb.log(metrics)
 	results_table = wandb.Table(dataframe=results)
 	results_artifact = wandb.Artifact("test_results", type="evaluation", metadata={"metrics": metrics})
 	results_artifact.add(results_table, "results")
 	if save_results:
 		results_artifact.add_file(results_path)
-	wandb_run.log({"test_results": results_table})
-	wandb_run.log_artifact(results_artifact)
+	wandb.log({"test_results": results_table})
+	wandb.log_artifact(results_artifact)

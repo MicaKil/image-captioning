@@ -1,7 +1,7 @@
 import os
 
 # wandb
-PROJECT = "image-captioning"
+PROJECT = "image-captioning-v1"
 
 # PATHS ----------------------------------------------------------------------------------------------------------------
 ROOT = os.path.dirname(os.path.abspath(__file__))

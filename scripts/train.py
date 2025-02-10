@@ -21,10 +21,10 @@ from scripts.utils import time_str
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
+config = wandb.config
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
-		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str],
-		  max_caption_len: int = None) -> str:
+		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str]) -> str:
 	"""
 	Training loop for the model.
 
@@ -35,10 +35,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
 	:param checkpoint_dir: Directory to save the best model
-	:param max_caption_len: Maximum length of the generated captions
 	:return: Path to the best model
 	"""
-	config = wandb.config
 	wandb.watch(model, criterion=criterion, log="all", log_freq=100)
 
 	logger.info(
@@ -53,8 +51,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
-		avg_val_loss, blue_score = eval_load(model, val_loader, device, epoch, criterion, max_caption_len,
-											 SmoothingFunction().method1)
+		avg_val_loss, blue_score = eval_load(model, val_loader, device, epoch, criterion, SmoothingFunction().method1)
 
 		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 		wandb.log({
@@ -64,7 +61,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		})
 		# Early stopping and checkpointing
 		time_ = time_str()
-		if max_caption_len is not None:
+		if config["max_caption_len"] is not None:
 			wandb.log({"val_BLEU-4": blue_score})
 			if blue_score > best_bleu_score:
 				best_bleu_score = blue_score
@@ -113,7 +110,6 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
 													 FlickerDataset) else train_loader.dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
-	config = wandb.config
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
@@ -139,7 +135,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
-			  max_caption_len: Optional[int], smoothing: Any) -> tuple:
+			  smoothing: Any) -> tuple:
 	"""
 	Evaluates the model on the validation set for one epoch
 
@@ -148,7 +144,6 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	:param device: Device to run the evaluation on
 	:param epoch: Current epoch
 	:param criterion: Loss function
-	:param max_caption_len: Maximum length of the generated captions
 	:param smoothing: Smoothing function for BLEU score
 	:return: Average validation loss and BLEU score (if calc_bleu is True)
 	"""
@@ -160,7 +155,6 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	pad_idx = vocab.to_idx(PAD)
 	all_references = []  # List of lists of reference captions
 	all_hypothesis = []  # List of generated captions (hypotheses)
-	config = wandb.config
 
 	model.eval()
 	with torch.no_grad():
@@ -175,16 +169,16 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 			total_tokens += num_tokens
 			batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
-			if max_caption_len is not None:
+			if config["max_caption_len"] is not None:
 				# Generate captions
-				generated = gen_captions(model, vocab, device, images, max_caption_len)
+				generated = gen_captions(model, vocab, device, images)
 				all_hypothesis.extend(generated)
 				# Process ground truth captions
 				references = get_references(df, images_id)
 				all_references.extend(references)
 
 	avg_loss = val_loss / total_tokens if total_tokens > 0 else 0
-	if max_caption_len is None:
+	if config["max_caption_len"] is None:
 		return avg_loss, None
 
 	return avg_loss, corpus_bleu(all_references, all_hypothesis, smoothing_function=smoothing)
@@ -204,20 +198,19 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
 	return references
 
 
-def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, max_caption_len: int) -> list:
+def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list) -> list:
 	"""
 	Generate captions for a list of images
 	:param model: Model to use for caption generation
 	:param device: Device to use
 	:param images: List of images to generate captions for
-	:param max_caption_len: Maximum length of generated captions
 	:param vocab: Vocabulary of the dataset
 	:return: List of generated captions
 	"""
 	generated = []
 	for image in images:
 		image = image.unsqueeze(0).to(device)
-		caption = gen_caption(model, image, vocab, max_caption_len, device)
+		caption = gen_caption(model, image, vocab, config["max_caption_len"], device)
 		generated.append(caption.split())
 	return generated
 
