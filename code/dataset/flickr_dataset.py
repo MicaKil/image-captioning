@@ -6,9 +6,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
 
-import utils
+from code.dataset.vocabulary import Vocabulary
 from constants import ROOT, EOS, SOS, VOCAB_FILE, FLICKR8K_CSV_FILE
-from dataset.vocabulary import Vocabulary
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)

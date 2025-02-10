@@ -7,14 +7,14 @@ from torchvision.transforms import v2
 from wandb.sdk.wandb_run import Run
 
 import wandb
+from code.dataset.flickr_dataloader import FlickerDataLoader
+from code.dataset.flickr_dataset import FlickerDataset
+from code.dataset.vocabulary import Vocabulary
+from code.models.basic import ImageCaptioning
+from code.test import test
+from code.train import train
+from code.utils import date_str
 from constants import *
-from dataset.flickr_dataloader import FlickerDataLoader
-from dataset.flickr_dataset import FlickerDataset
-from dataset.vocabulary import Vocabulary
-from models.basic import ImageCaptioning
-from test import test
-from train import train
-from utils import date_str
 
 # logger
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 	vocab = full_dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 	wandb_run = init_wandb_run(vocab)
-	config = wandb.config
+	config = wandb_run.config
 
 	model = ImageCaptioning(config["embed_size"], config["hidden_size"], config["vocab_size"],
 							config["dropout"], config["num_layers"], pad_idx,
@@ -130,8 +130,8 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 		val_dataloader = FlickerDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
 		optimizer = torch.optim.Adam([
-			{"params": model.encoder.parameters(), "lr": config["encoder_learning_rate"]},
-			{"params": model.decoder.parameters(), "lr": config["decoder_learning_rate"]}
+			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
+			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 		])
 		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, CHECKPOINT_DIR, wandb_run,
 			  MAX_CAPTION_LEN)
@@ -145,16 +145,16 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 	if create_dataset:
 		log_dataset(wandb.Artifact(f"{DATASET}_full_dataset", type="dataset",
 								   metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
+					os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"), wandb_run)
 		log_dataset(wandb.Artifact(f"{DATASET}_train_dataset", type="dataset",
 								   metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{TRAIN_SIZE}_{date}.pt"))
+					os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{TRAIN_SIZE}_{date}.pt"), wandb_run)
 		log_dataset(wandb.Artifact(f"{DATASET}_val_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{VAL_SIZE}_{date}.pt"))
+					os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{VAL_SIZE}_{date}.pt"), wandb_run)
 		log_dataset(wandb.Artifact(f"{DATASET}_test_dataset", type="dataset",
 								   metadata={"version": DATASET_VERSION}),
-					os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"))
-	wandb.finish()
+					os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"), wandb_run)
+	wandb_run.finish()
 
 
 def init_wandb_run(vocab: Vocabulary) -> Run:
@@ -175,8 +175,8 @@ def init_wandb_run(vocab: Vocabulary) -> Run:
 			"num_layers": NUM_LAYERS,
 			"dropout": DROPOUT,
 			"freeze_encoder": FREEZE_ENCODER,
-			"encoder_learning_rate": ENCODER_LR,
-			"decoder_learning_rate": DECODER_LR,
+			"encoder_lr": ENCODER_LR,
+			"decoder_lr": DECODER_LR,
 			"criterion": "CrossEntropyLoss",
 			"optimizer": "Adam",
 			"max_epochs": MAX_EPOCHS,
@@ -198,14 +198,15 @@ def init_wandb_run(vocab: Vocabulary) -> Run:
 	return wandb_run
 
 
-def log_dataset(wandb_artifact: wandb.Artifact, dataset_path: str):
+def log_dataset(wandb_artifact: wandb.Artifact, dataset_path: str, wandb_run: Run):
 	"""
 	Log dataset to wandb
 	:param wandb_artifact: Wandb artifact
 	:param dataset_path: Path to the dataset
+	:param wandb_run:
 	"""
 	wandb_artifact.add_file(dataset_path)
-	wandb.log_artifact(wandb_artifact)
+	wandb_run.log_artifact(wandb_artifact)
 
 
 if __name__ == "__main__":
