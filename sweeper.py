@@ -3,13 +3,12 @@ import os.path
 import torch
 
 import wandb
-from code.dataset.flickr_dataloader import FlickerDataLoader
-from code.models.basic import ImageCaptioning
-from code.train import train
-from constants import ROOT, PAD, CHECKPOINT_DIR
-from runner import DATASET, DATASET_VERSION, VOCAB_THRESHOLD, MAX_CAPTION_LEN, PROJECT
+from constants import ROOT, PAD, CHECKPOINT_DIR, PROJECT
+from scripts.dataset.flickr_dataloader import FlickerDataLoader
+from scripts.models.basic import ImageCaptioning
+from scripts.train import train
 
-device = torch.device("cuda" if torch. cuda. is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 default_config = {
 	"encoder": "resnet50",
@@ -27,9 +26,9 @@ default_config = {
 	"max_epochs": 1,
 	"patience": None,
 	"gradient_clip": None,
-	"dataset": DATASET,
-	"dataset_version": DATASET_VERSION,
-	"vocab_threshold": VOCAB_THRESHOLD,
+	"dataset": "flickr8k",
+	"dataset_version": "2025-02-09",
+	"vocab_threshold": 3,
 	"vocab_size": 4107,
 }
 
@@ -43,42 +42,23 @@ sweep_config = {
 	"parameters": {
 		# architecture
 		"hidden_size": {
-			"values": [256, 512, 768]
-		},
-		"num_layers": {
-			"values": [1, 2, 3]
+			"value": 512
 		},
 		"embed_size": {
-			"values": [128, 256, 512]
+			"value": 256
 		},
 		# regularisation
 		"dropout": {
-			"values": [0.2, 0.3, 0.4]
-		},
-		# optimization
-		"decoder_lr": {
-			"distribution": "log_uniform",
-			"min": 1e-5,
-			"max": 1e-3
+			"value": 0.4
 		},
 		"batch_size": {
-			"values": [16, 32, 64]
-		},
-		# encoder tuning
-		"freeze_encoder": {
-			"values": [True, False]
-		},
-		"encoder_lr": {
-			"distribution": "log_uniform",
-			"min": 1e-6,
-			"max": 1e-4,
-			"conditions": {
-				"freeze_encoder": False
-			}
+			"value": 32
 		}
 	}
 }
-wandb_run = wandb.init(project=PROJECT, config=default_config, job_type="train", tags=["basic", "flickr8k", "config-test"])
+
+wandb_run = wandb.init(project=PROJECT, config=default_config, job_type="train",
+					   tags=["basic", "flickr8k", "config-test"])
 wandb_run.define_metric("train_loss", summary="min")
 wandb_run.define_metric("val_loss", summary="min")
 config = wandb_run.config
@@ -105,10 +85,11 @@ def run_sweep():
 	])
 
 	train(model, train_dataloader, val_dataloader, device, criterion, optimizer, CHECKPOINT_DIR, wandb_run,
-		  MAX_CAPTION_LEN)
+		  30)
 
 
 if __name__ == "__main__":
+	wandb.teardown()
 	sweep_id = wandb.sweep(sweep=sweep_config, project=PROJECT)
 	print(f"Sweep id: {sweep_id}")
 	wandb.agent(sweep_id=sweep_id, function=run_sweep, count=2)

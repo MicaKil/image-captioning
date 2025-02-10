@@ -12,11 +12,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from wandb.sdk.wandb_run import Run
 
-from caption import gen_caption
 from constants import BASIC_RESULTS, ROOT
-from dataset.flickr_dataset import FlickerDataset
-from dataset.vocabulary import Vocabulary
-from utils import time_str
+from scripts.caption import gen_caption
+from scripts.dataset.flickr_dataset import FlickerDataset
+from scripts.dataset.vocabulary import Vocabulary
+from scripts.utils import time_str
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
@@ -42,7 +42,8 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, max_ca
 	all_hypotheses = []
 	all_references = []
 	df = test_loader.dataset.df if isinstance(test_loader.dataset, FlickerDataset) else test_loader.dataset.dataset.df
-	vocab = test_loader.dataset.vocab if isinstance(test_loader.dataset, FlickerDataset) else test_loader.dataset.dataset.vocab
+	vocab = test_loader.dataset.vocab if isinstance(test_loader.dataset,
+													FlickerDataset) else test_loader.dataset.dataset.vocab
 	smoothing = SmoothingFunction().method1
 
 	model.eval()

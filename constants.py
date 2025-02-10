@@ -10,7 +10,7 @@ FLICKR8K_ANN_FILE = "datasets/flickr8k/Flickr8k.token.txt"
 FLICKR8K_CSV_FILE = "datasets/flickr8k/captions.csv"
 FLICKR8K_IMG_DIR = "datasets/flickr8k/images"
 # code
-VOCAB_FILE = "code/dataset/vocab.pkl"
+VOCAB_FILE = "scripts/dataset/vocab.pkl"
 # checkpoints
 CHECKPOINT_DIR = "checkpoints/basic"
 BASIC_RESULTS = "results/basic"

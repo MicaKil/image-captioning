@@ -6,7 +6,7 @@ from torch import nn
 from torchvision.transforms import v2
 
 from constants import SOS, EOS
-from dataset.vocabulary import Vocabulary
+from scripts.dataset.vocabulary import Vocabulary
 
 
 def gen_caption(model: nn.Module,

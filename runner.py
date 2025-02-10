@@ -7,14 +7,14 @@ from torchvision.transforms import v2
 from wandb.sdk.wandb_run import Run
 
 import wandb
-from code.dataset.flickr_dataloader import FlickerDataLoader
-from code.dataset.flickr_dataset import FlickerDataset
-from code.dataset.vocabulary import Vocabulary
-from code.models.basic import ImageCaptioning
-from code.test import test
-from code.train import train
-from code.utils import date_str
 from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PROJECT, PAD
+from scripts.dataset.flickr_dataloader import FlickerDataLoader
+from scripts.dataset.flickr_dataset import FlickerDataset
+from scripts.dataset.vocabulary import Vocabulary
+from scripts.models.basic import ImageCaptioning
+from scripts.test import test
+from scripts.train import train
+from scripts.utils import date_str
 
 # logger
 logger = logging.getLogger(__name__)
@@ -112,6 +112,7 @@ def run(create_dataset=False, train_model=True, test_model=True, model_path: str
 	# create or load model
 	vocab = full_dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
+	wandb.teardown()
 	wandb_run = init_wandb_run(vocab)
 	config = wandb_run.config
 

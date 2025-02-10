@@ -12,14 +12,15 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from wandb.sdk.wandb_run import Run
 
-from caption import gen_caption
 from constants import ROOT, PAD
-from dataset.flickr_dataset import FlickerDataset
-from dataset.vocabulary import Vocabulary
-from utils import time_str
+from scripts.caption import gen_caption
+from scripts.dataset.flickr_dataset import FlickerDataset
+from scripts.dataset.vocabulary import Vocabulary
+from scripts.utils import time_str
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
+
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
 		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str], wandb_run: Run,
@@ -41,7 +42,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	config = wandb_run.config
 	wandb_run.watch(model, criterion=criterion, log="all", log_freq=100)
 
-	logger.info(f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {config["max_epochs"]} epochs")
+	logger.info(
+		f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {config["max_epochs"]} epochs")
 	start_time = time.time()
 
 	best_bleu_score = -np.inf
@@ -110,7 +112,8 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	"""
 	train_loss = 0.
 	total_tokens = 0
-	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset, FlickerDataset) else train_loader.dataset.dataset.vocab
+	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
+													 FlickerDataset) else train_loader.dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 	config = wandb_run.config
 
@@ -155,7 +158,8 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	val_loss = 0.0
 	total_tokens = 0
 	df = val_loader.dataset.df if isinstance(val_loader.dataset, FlickerDataset) else val_loader.dataset.dataset.df
-	vocab = val_loader.dataset.vocab if isinstance(val_loader.dataset, FlickerDataset) else val_loader.dataset.dataset.vocab
+	vocab = val_loader.dataset.vocab if isinstance(val_loader.dataset,
+												   FlickerDataset) else val_loader.dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 	all_references = []  # List of lists of reference captions
 	all_hypothesis = []  # List of generated captions (hypotheses)

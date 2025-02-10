@@ -5,8 +5,8 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Subset
 
-from code.dataset.flickr_dataset import FlickerDataset
 from constants import PAD
+from scripts.dataset.flickr_dataset import FlickerDataset
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
