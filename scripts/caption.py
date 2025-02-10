@@ -29,11 +29,11 @@ def gen_caption(model: nn.Module,
 	"""
 	model = model.to(device)
 	model.eval()
-	image = image.to(device)
-	features = model.encoder(image)  # Encode the image
-	caption = [vocab.str_to_idx[SOS]]  # Initialize caption with start token
 
 	with torch.no_grad():
+		image = image.to(device)
+		features = model.encoder(image)  # Encode the image
+		caption = [vocab.str_to_idx[SOS]]  # Initialize caption with start token
 		for _ in range(max_length):
 			caption_tensor = torch.tensor(caption, dtype=torch.long).unsqueeze(0).to(device)
 			outputs = model.decoder(features, caption_tensor)  # Get predictions (batch_size, seq_len+1, vocab_size)
