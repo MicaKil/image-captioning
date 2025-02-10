@@ -18,14 +18,11 @@ from dataset.flickr_dataset import FlickerDataset
 from dataset.vocabulary import Vocabulary
 from utils import time_str
 
-# logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
-
-def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, vocab: Vocabulary,
-		  max_epochs: int, criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str], wandb_run: Run,
-		  grad_max_norm: float = None, patience: int = None, calc_bleu: bool = False,
+def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
+		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str], wandb_run: Run,
 		  max_caption_len: int = None) -> str:
 	"""
 	Training loop for the model.
@@ -34,35 +31,29 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param train_loader: DataLoader for the training set
 	:param val_loader: DataLoader for the validation set
 	:param device: Device to run the training on
-	:param vocab: Vocabulary of the dataset
-	:param max_epochs: Maximum number of epochs to train
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
 	:param checkpoint_dir: Directory to save the best model
 	:param wandb_run: Wandb run object
-	:param grad_max_norm: Maximum norm for gradient clipping
-	:param patience: Number of epochs to wait for improvement before early stopping
-	:param calc_bleu: Whether to calculate BLEU score
 	:param max_caption_len: Maximum length of the generated captions
 	:return: Path to the best model
 	"""
-	logger.info(f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {max_epochs} epochs")
+	config = wandb_run.config
+	wandb_run.watch(model, criterion=criterion, log="all", log_freq=100)
 
-	# Watch model with wandb
-	wandb_run.watch(model, criterion=criterion, log="all", log_freq=100, log_graph=True)
-
+	logger.info(f"Start training model {model.__class__.__name__} (Parameters: {sum(p.numel() for p in model.parameters())}) for {config["max_epochs"]} epochs")
 	start_time = time.time()
-	# set up variables
+
 	best_bleu_score = -np.inf
 	best_val_loss = np.inf
 	best_model = None
 	epochs_no_improve = 0
+
 	model = model.to(device)
-	for epoch in range(max_epochs):
-		avg_train_loss = train_load(model, train_loader, vocab, device, epoch, max_epochs, criterion, optimizer,
-									grad_max_norm)
-		avg_val_loss, blue_score = eval_load(model, val_loader, vocab, device, epoch, max_epochs, criterion, calc_bleu,
-											 max_caption_len, SmoothingFunction().method1)
+	for epoch in range(config["max_epochs"]):
+		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer, wandb_run)
+		avg_val_loss, blue_score = eval_load(model, val_loader, device, epoch, criterion, max_caption_len,
+											 SmoothingFunction().method1, wandb_run)
 
 		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 		wandb_run.log({
@@ -72,7 +63,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		})
 		# Early stopping and checkpointing
 		time_ = time_str()
-		if calc_bleu:
+		if max_caption_len is not None:
 			wandb_run.log({"val_BLEU-4": blue_score})
 			if blue_score > best_bleu_score:
 				best_bleu_score = blue_score
@@ -88,9 +79,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 				torch.save(model.state_dict(), best_model)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
-			if patience is not None:
+			if config["patience"] is not None:
 				epochs_no_improve += 1
-				if epochs_no_improve >= patience:
+				if epochs_no_improve >= config["patience"]:
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
 	# Log training time
@@ -103,38 +94,39 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	return best_model
 
 
-def train_load(model: nn.Module, train_loader: DataLoader, vocab: Vocabulary, device: torch.device, epoch: int,
-			   max_epochs: int, criterion: nn.Module, optimizer: torch.optim, grad_max_norm: Optional[int]) -> float:
+def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
+			   optimizer: torch.optim, wandb_run: Run) -> float:
 	"""
 	Trains the model on the training set for one epoch
 
 	:param model: Model to train
-	:param vocab: Vocabulary of the dataset
 	:param train_loader: DataLoader for the training set
 	:param device: Device to run the training on
 	:param epoch: Current epoch
-	:param max_epochs: Maximum number of epochs to train
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
-	:param grad_max_norm: Maximum norm for gradient clipping
+	:param wandb_run: Wandb run object
 	:return: Total training loss for the epoch
 	"""
-	model.train()
 	train_loss = 0.
 	total_tokens = 0
+	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset, FlickerDataset) else train_loader.dataset.dataset.vocab
+	pad_idx = vocab.to_idx(PAD)
+	config = wandb_run.config
 
-	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{max_epochs} [Train]")
+	model.train()
+	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
 	for images, captions, images_id in batch_progress:
 		images = images.to(device)
 		captions = captions.to(device)
 
 		# Forward pass
-		loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))
+		loss, num_tokens = forward_pass(model, images, captions, criterion, pad_idx)
 		# Backward pass
 		optimizer.zero_grad()
 		loss.backward()
-		if grad_max_norm is not None:
-			nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_max_norm)  # Gradient clipping
+		if config["gradient_clip"] is not None:
+			nn.utils.clip_grad_norm_(model.parameters(), max_norm=config["gradient_clip"])  # Gradient clipping
 		optimizer.step()
 
 		train_loss += loss.item()
@@ -145,44 +137,44 @@ def train_load(model: nn.Module, train_loader: DataLoader, vocab: Vocabulary, de
 	return avg_loss
 
 
-def eval_load(model: nn.Module, val_loader: DataLoader, vocab: Vocabulary, device: torch.device, epoch: int,
-			  max_epochs: int, criterion: nn.Module, calc_bleu: Optional[bool], max_caption_len: Optional[int],
-			  smoothing: Any) -> tuple:
+def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
+			  max_caption_len: Optional[int], smoothing: Any, wandb_run) -> tuple:
 	"""
 	Evaluates the model on the validation set for one epoch
 
 	:param model: Model to evaluate
 	:param val_loader: DataLoader for the validation set
-	:param vocab: Vocabulary of the dataset
 	:param device: Device to run the evaluation on
 	:param epoch: Current epoch
-	:param max_epochs: Maximum number of epochs to train
 	:param criterion: Loss function
-	:param calc_bleu: Whether to calculate BLEU score
 	:param max_caption_len: Maximum length of the generated captions
 	:param smoothing: Smoothing function for BLEU score
+	:param wandb_run: Wandb run object
 	:return: Average validation loss and BLEU score (if calc_bleu is True)
 	"""
-	model.eval()
 	val_loss = 0.0
 	total_tokens = 0
 	df = val_loader.dataset.df if isinstance(val_loader.dataset, FlickerDataset) else val_loader.dataset.dataset.df
+	vocab = val_loader.dataset.vocab if isinstance(val_loader.dataset, FlickerDataset) else val_loader.dataset.dataset.vocab
+	pad_idx = vocab.to_idx(PAD)
 	all_references = []  # List of lists of reference captions
 	all_hypothesis = []  # List of generated captions (hypotheses)
+	config = wandb_run.config
 
+	model.eval()
 	with torch.no_grad():
-		batch_progress = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{max_epochs} [Val]")
+		batch_progress = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Val]")
 		for images, captions, images_id in batch_progress:
 			images = images.to(device)
 			captions = captions.to(device)
 
-			loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))  # Forward pass
+			loss, num_tokens = forward_pass(model, images, captions, criterion, pad_idx)  # Forward pass
 
 			val_loss += loss.item()
 			total_tokens += num_tokens
 			batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
-			if calc_bleu:
+			if max_caption_len is not None:
 				# Generate captions
 				generated = gen_captions(model, vocab, device, images, max_caption_len)
 				all_hypothesis.extend(generated)
@@ -191,7 +183,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, vocab: Vocabulary, devic
 				all_references.extend(references)
 
 	avg_loss = val_loss / total_tokens if total_tokens > 0 else 0
-	if not calc_bleu:
+	if max_caption_len is None:
 		return avg_loss, None
 
 	return avg_loss, corpus_bleu(all_references, all_hypothesis, smoothing_function=smoothing)

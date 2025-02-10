@@ -22,29 +22,30 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
-def test(model: nn.Module, test_loader: DataLoader, vocab: Vocabulary, device: torch.device, max_caption_len: int,
-		 wandb_run: Run, save_results: bool) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device, max_caption_len: int, save_results: bool,
+		 wandb_run: Run) -> tuple:
 	"""
-	Evaluate model on test set and log results in a wandb table
+	Evaluate model on test set and log results
 	:param model: Model to evaluate
 	:param test_loader: Test data loader to use
-	:param vocab: Vocabulary of the dataset
 	:param device: Device to use (cpu or cuda)
 	:param max_caption_len: Maximum length of generated captions
-	:param wandb_run: Run object to log results
 	:param save_results: Whether to save results to disk
+	:param wandb_run: Wandb run object
 	:return:
 	"""
 
 	logger.info("Start testing model")
-	model.eval()
+	start_time = time.time()
+
 	results = []
 	all_hypotheses = []
 	all_references = []
 	df = test_loader.dataset.df if isinstance(test_loader.dataset, FlickerDataset) else test_loader.dataset.dataset.df
+	vocab = test_loader.dataset.vocab if isinstance(test_loader.dataset, FlickerDataset) else test_loader.dataset.dataset.vocab
 	smoothing = SmoothingFunction().method1
 
-	start_time = time.time()
+	model.eval()
 	with torch.no_grad():
 		for batch_idx, (images, _, image_ids) in enumerate(tqdm(test_loader)):
 			# Generate captions
@@ -144,27 +145,20 @@ def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tu
 	"""
 	tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
 	tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
-	bleu_1 = corpus_bleu(tokenized_references,
-						 tokenized_hypotheses,
-						 weights=(1, 0, 0, 0),
+	bleu_1 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(1, 0, 0, 0), smoothing_function=smoothing)
+	bleu_2 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(0.5, 0.5, 0, 0),
 						 smoothing_function=smoothing)
-	bleu_2 = corpus_bleu(tokenized_references,
-						 tokenized_hypotheses,
-						 weights=(0.5, 0.5, 0, 0),
-						 smoothing_function=smoothing)
-	bleu_4 = corpus_bleu(tokenized_references,
-						 tokenized_hypotheses,
-						 smoothing_function=smoothing)
+	bleu_4 = corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 	return bleu_1, bleu_2, bleu_4
 
 
-def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, wandb_run: Run):
+def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, wandb_run):
 	"""
 	Log results and metrics to wandb and save them to disk
 	:param metrics: Metrics to log and save
 	:param results: Results to log and save
 	:param save_results: Whether to save results to disk
-	:param wandb_run: Run object to log results
+	:param wandb_run: Wandb run object
 	:return:
 	"""
 	results_path = None

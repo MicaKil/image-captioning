@@ -10,6 +10,7 @@ import wandb
 from constants import *
 from dataset.flickr_dataloader import FlickerDataLoader
 from dataset.flickr_dataset import FlickerDataset
+from dataset.vocabulary import Vocabulary
 from models.basic import ImageCaptioning
 from test import test
 from train import train
@@ -59,7 +60,7 @@ FREEZE_ENCODER = True
 # training params
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
-MAX_EPOCHS = 10
+MAX_EPOCHS = 1
 PATIENCE = None
 CALC_BLEU = False
 MAX_CAPTION_LEN = 30
@@ -68,17 +69,19 @@ GRAD_MAX_NORM = 5.0
 
 # run params
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_PATH = "checkpoints/basic/best_val_2025-02-07_19-07-00.pt"
+MODEL_PATH = "checkpoints/basic/best_val_2025-02-09_23-07.pt"
 
 # wandb
 PROJECT = "image-captioning"
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 
-def run(crete_dataset=False, train_model=True, test_model=True, model_path: str = None, save_results=True):
+def run(create_dataset=False, train_model=True, test_model=True, model_path: str = None, save_results=True):
 	date = date_str()
+
 	# create or load dataset
-	if crete_dataset:
+	if create_dataset:
 		ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
 		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 
@@ -86,8 +89,8 @@ def run(crete_dataset=False, train_model=True, test_model=True, model_path: str 
 		torch.save(full_dataset, os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
 
 		total_size = len(full_dataset)
-		train_size = int((TRAIN_SIZE/100) * total_size)
-		val_size = int((VAL_SIZE/100) * total_size)
+		train_size = int((TRAIN_SIZE / 100) * total_size)
+		val_size = int((VAL_SIZE / 100) * total_size)
 		test_size = total_size - train_size - val_size
 
 		train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
@@ -112,51 +115,49 @@ def run(crete_dataset=False, train_model=True, test_model=True, model_path: str 
 	# create or load model
 	vocab = full_dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
-	model = ImageCaptioning(EMBED_SIZE, HIDDEN_SIZE, len(vocab), DROPOUT, NUM_LAYERS, pad_idx, FREEZE_ENCODER)
+	wandb_run = init_wandb_run(vocab)
+	config = wandb.config
+
+	model = ImageCaptioning(config["embed_size"], config["hidden_size"], config["vocab_size"],
+							config["dropout"], config["num_layers"], pad_idx,
+							config["freeze_encoder"])
 	if model_path is not None:
+		logger.info(f"Loading model from {model_path}")
 		model.load_state_dict(torch.load(os.path.join(ROOT, model_path), weights_only=True))
 
-	wandb_run = None
-
 	if train_model:
-		train_dataloader = FlickerDataLoader(train_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		val_dataloader = FlickerDataLoader(val_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		if wandb_run is None:
-			wandb_run = init_wandb_run(vocab)
+		train_dataloader = FlickerDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+		val_dataloader = FlickerDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
 		optimizer = torch.optim.Adam([
-			{"params": model.encoder.parameters(), "lr": ENCODER_LR},
-			{"params": model.decoder.parameters(), "lr": DECODER_LR},
+			{"params": model.encoder.parameters(), "lr": config["encoder_learning_rate"]},
+			{"params": model.decoder.parameters(), "lr": config["decoder_learning_rate"]}
 		])
-		train(model, train_dataloader, val_dataloader, DEVICE, vocab, MAX_EPOCHS, criterion, optimizer, CHECKPOINT_DIR,
-			  wandb_run, GRAD_MAX_NORM, PATIENCE, CALC_BLEU, MAX_CAPTION_LEN)
+		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, CHECKPOINT_DIR, wandb_run,
+			  MAX_CAPTION_LEN)
 
 	if test_model:
 		# create test dataloader
 		test_dataloader = FlickerDataLoader(test_dataset, BATCH_SIZE, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		# init wandb run if not already done
-		if wandb_run is None:
-			wandb_run = init_wandb_run(vocab)
-		test(model, test_dataloader, vocab, DEVICE, MAX_CAPTION_LEN, wandb_run, save_results)
+		test(model, test_dataloader, DEVICE, MAX_CAPTION_LEN, save_results, wandb_run)
 
-	if wandb_run is not None:
-		if crete_dataset:
-			log_dataset(wandb_run,
-						wandb.Artifact(f"{DATASET}_full_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
-						os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
-			log_dataset(wandb_run,
-						wandb.Artifact(f"{DATASET}_train_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
-						os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{TRAIN_SIZE}_{date}.pt"))
-			log_dataset(wandb_run,
-						wandb.Artifact(f"{DATASET}_val_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
-						os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{VAL_SIZE}_{date}.pt"))
-			log_dataset(wandb_run,
-						wandb.Artifact(f"{DATASET}_test_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
-						os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"))
-		wandb_run.finish()
+	if create_dataset:
+		log_dataset(wandb.Artifact(f"{DATASET}_full_dataset", type="dataset",
+								   metadata={"version": DATASET_VERSION}),
+					os.path.join(ROOT, f"datasets/flickr8k/full_dataset_{date}.pt"))
+		log_dataset(wandb.Artifact(f"{DATASET}_train_dataset", type="dataset",
+								   metadata={"version": DATASET_VERSION}),
+					os.path.join(ROOT, f"datasets/flickr8k/train_dataset_s-{TRAIN_SIZE}_{date}.pt"))
+		log_dataset(wandb.Artifact(f"{DATASET}_val_dataset", type="dataset", metadata={"version": DATASET_VERSION}),
+					os.path.join(ROOT, f"datasets/flickr8k/val_dataset_s-{VAL_SIZE}_{date}.pt"))
+		log_dataset(wandb.Artifact(f"{DATASET}_test_dataset", type="dataset",
+								   metadata={"version": DATASET_VERSION}),
+					os.path.join(ROOT, f"datasets/flickr8k/test_dataset_s-{TEST_SIZE}_{date}.pt"))
+	wandb.finish()
 
 
-def init_wandb_run(vocab: VOCAB_THRESHOLD) -> Run:
+def init_wandb_run(vocab: Vocabulary) -> Run:
 	"""
 	Initialize wandb run
 	:param vocab: Vocabulary of the dataset
@@ -197,16 +198,15 @@ def init_wandb_run(vocab: VOCAB_THRESHOLD) -> Run:
 	return wandb_run
 
 
-def log_dataset(wandb_run: Run, wandb_artifact: wandb.Artifact, dataset_path: str):
+def log_dataset(wandb_artifact: wandb.Artifact, dataset_path: str):
 	"""
 	Log dataset to wandb
-	:param wandb_run: Wandb run
 	:param wandb_artifact: Wandb artifact
 	:param dataset_path: Path to the dataset
 	"""
 	wandb_artifact.add_file(dataset_path)
-	wandb_run.log_artifact(wandb_artifact)
+	wandb.log_artifact(wandb_artifact)
 
 
 if __name__ == "__main__":
-	run(crete_dataset=False, train_model=True, test_model=True, model_path=None, save_results=True)
+	run(create_dataset=False, train_model=False, test_model=True, model_path=MODEL_PATH, save_results=True)
