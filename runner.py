@@ -1,6 +1,10 @@
 import os.path
+from typing import Optional
 
 import torch
+import torch.nn as nn
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import random_split
 from wandb.sdk.wandb_run import Run
 
@@ -17,8 +21,8 @@ from scripts.train import train
 from scripts.utils import date_str
 
 
-def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: bool, test_model: bool, model_path: str,
-		save_results: bool):
+def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: bool, test_model: bool,
+		model_path: Optional[str], save_results: bool):
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
@@ -97,12 +101,14 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 	if train_model:
 		train_dataloader = FlickerDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		val_dataloader = FlickerDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
-		optimizer = torch.optim.Adam([
+		criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
+		optimizer = Adam([
 			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
 			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 		])
-		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, CHECKPOINT_DIR)
+		scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
+									  patience=config["scheduler"]["patience"])
+		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR)
 
 	if test_model:
 		test_dataloader = FlickerDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)

@@ -34,12 +34,13 @@ DROPOUT = 0.4
 FREEZE_ENCODER = True
 
 # training
+MAX_EPOCHS = 100
+PATIENCE = 20
+MAX_CAPTION_LEN = 30
 ENCODER_LR = 1e-4
 DECODER_LR = 4e-4
-MAX_EPOCHS = 1
-PATIENCE = 10
-MAX_CAPTION_LEN = 30
-
+SCHEDULER_FACTOR = 0.2
+SCHEDULER_PATIENCE = PATIENCE // 2
 GRAD_MAX_NORM = 5.0
 
 # run
@@ -56,6 +57,11 @@ RUN_CONFIG = {
 	"freeze_encoder": FREEZE_ENCODER,
 	"encoder_lr": ENCODER_LR,
 	"decoder_lr": DECODER_LR,
+	"scheduler": {
+		"type": "ReduceLROnPlateau",
+		"factor": SCHEDULER_FACTOR,
+		"patience": SCHEDULER_PATIENCE,
+	},
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
 	"max_epochs": MAX_EPOCHS,

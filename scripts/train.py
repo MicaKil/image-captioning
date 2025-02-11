@@ -16,7 +16,8 @@ from scripts.utils import time_str
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
-		  criterion: nn.Module, optimizer: torch.optim, checkpoint_dir: Optional[str]) -> str:
+		  criterion: nn.Module, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
+		  checkpoint_dir: Optional[str]) -> str:
 	"""
 	Training loop for the model.
 
@@ -26,6 +27,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param device: Device to run the training on
 	:param criterion: Loss function
 	:param optimizer: Optimizer for training
+	:param scheduler: Learning rate scheduler
 	:param checkpoint_dir: Directory to save the best model
 	:return: Path to the best model
 	"""
@@ -45,14 +47,15 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
-		wandb.log({
-			"epoch": epoch + 1,
-			"train_loss": avg_train_loss
-		})
+		wandb.log({"epoch": epoch + 1, "train_loss": avg_train_loss})
 
 		avg_val_loss = eval_load(model, val_loader, device, epoch, criterion)
 		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 		wandb.log({"val_loss": avg_val_loss})
+
+		scheduler.step(avg_val_loss)
+		cur_lr = scheduler.get_last_lr()
+		wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
 		# Early stopping and checkpointing
 		cur_time = time_str()
