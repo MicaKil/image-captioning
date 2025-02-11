@@ -1,4 +1,3 @@
-import logging
 import os.path
 import time
 
@@ -11,14 +10,12 @@ from pycocoevalcap.cider.cider import Cider
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from config import logger
 from constants import BASIC_RESULTS, ROOT
 from scripts.caption import gen_caption
 from scripts.dataset.flickr_dataset import FlickerDataset
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.utils import time_str
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
 def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool) -> tuple:

@@ -1,12 +1,9 @@
-import logging
 from collections import Counter
 
 from nltk import word_tokenize, TreebankWordDetokenizer
 
+from config import logger
 from constants import PAD, SOS, EOS, UNK
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
 class Vocabulary:
@@ -75,7 +72,8 @@ class Vocabulary:
 		:param idxs: List of indices to convert
 		:return: Text corresponding to the indices
 		"""
-		return TreebankWordDetokenizer().detokenize([self.to_word(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
+		return TreebankWordDetokenizer().detokenize(
+			[self.to_word(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
 
 	def to_word(self, idx: int) -> str:
 		"""

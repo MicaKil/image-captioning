@@ -1,4 +1,3 @@
-import logging
 import os.path
 
 import pandas as pd
@@ -6,12 +5,9 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
 
-from constants import ROOT, EOS, SOS, VOCAB_FILE, FLICKR8K_CSV_FILE
+from config import logger
+from constants import ROOT, EOS, SOS, FLICKR8K_CSV_FILE
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.utils import dump
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
 class FlickerDataset(Dataset):
@@ -19,22 +15,41 @@ class FlickerDataset(Dataset):
 	Custom Dataset for loading Flickr8k images and captions.
 	"""
 
-	def __init__(self,
-				 ann_file: str,
-				 img_dir: str,
-				 save_captions=False,
-				 vocab_threshold=2,
-				 vocab: Vocabulary = None,
-				 save_vocab=False,
-				 transform=None,
+	# def __init__(self, ann_file: str, img_dir: str, save_captions=False, vocab_threshold=2, vocab: Vocabulary = None,
+	# 			 save_vocab=False, transform=None, target_transform=None):
+	# 	"""
+	# 	:param ann_file: Path to the annotation file with the image IDs and captions
+	# 	:param img_dir: Path to the directory containing the images
+	# 	:param save_captions: If True, save the captions to a CSV file
+	# 	:param vocab_threshold: Minimum frequency of a word to be included in the vocabulary
+	# 	:param vocab: Vocabulary object to use if provided
+	# 	:param save_vocab: If True, save the vocabulary to a file
+	# 	:param transform: Transform to apply to the images
+	# 	:param target_transform: Transform to apply to the target captions
+	# 	"""
+	# 	logger.info("Initializing FlickerDataset.")
+	# 	self.img_dir = img_dir
+	# 	self.transform = transform
+	# 	self.target_transform = target_transform
+	#
+	# 	self.df = load_captions(ann_file, save_captions)
+	# 	self.img_ids, self.captions = self.df["image_id"], self.df["caption"]
+	#
+	# 	if vocab is not None:
+	# 		logger.info("Using existing vocabulary.")
+	# 		self.vocab = vocab
+	# 	else:
+	# 		self.vocab = Vocabulary(vocab_threshold, self.captions)
+	#
+	# 	if save_vocab:
+	# 		dump(self.vocab, str(os.path.join(ROOT, VOCAB_FILE)))
+
+	def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None,
 				 target_transform=None):
 		"""
-		:param ann_file: Path to the annotation file with the image IDs and captions
 		:param img_dir: Path to the directory containing the images
-		:param save_captions: If True, save the captions to a CSV file
-		:param vocab_threshold: Minimum frequency of a word to be included in the vocabulary
+		:param df_captions: DataFrame containing the image IDs and captions
 		:param vocab: Vocabulary object to use if provided
-		:param save_vocab: If True, save the vocabulary to a file
 		:param transform: Transform to apply to the images
 		:param target_transform: Transform to apply to the target captions
 		"""
@@ -42,18 +57,9 @@ class FlickerDataset(Dataset):
 		self.img_dir = img_dir
 		self.transform = transform
 		self.target_transform = target_transform
-
-		self.df = load_captions(ann_file, save_captions)
+		self.df = df_captions
 		self.img_ids, self.captions = self.df["image_id"], self.df["caption"]
-
-		if vocab is not None:
-			logger.info("Using existing vocabulary.")
-			self.vocab = Vocabulary
-		else:
-			self.vocab = Vocabulary(vocab_threshold, self.captions)
-
-		if save_vocab:
-			dump(self.vocab, str(os.path.join(ROOT, VOCAB_FILE)))
+		self.vocab = vocab
 
 	def __len__(self):
 		"""

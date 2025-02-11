@@ -1,4 +1,3 @@
-import logging
 import os.path
 import time
 from typing import Optional
@@ -10,12 +9,10 @@ import wandb
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from config import logger
 from constants import ROOT, PAD
 from scripts.dataset.flickr_dataset import FlickerDataset
 from scripts.utils import time_str
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)s | %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=logging.INFO)
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
@@ -33,7 +30,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:return: Path to the best model
 	"""
 	config = wandb.config
-	wandb.watch(model, criterion=criterion, log="all", log_freq=100)
+	wandb.watch(model, criterion=criterion, log="all")
 
 	logger.info(
 		f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}"
@@ -42,28 +39,30 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 
 	best_val_loss = np.inf
 	best_model = None
+	best_model_pth = None
 	epochs_no_improve = 0
 
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
-		avg_val_loss = eval_load(model, val_loader, device, epoch, criterion)
-
-		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 		wandb.log({
 			"epoch": epoch + 1,
-			"train_loss": avg_train_loss,
-			"val_loss": avg_val_loss
+			"train_loss": avg_train_loss
 		})
 
+		avg_val_loss = eval_load(model, val_loader, device, epoch, criterion)
+		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
+		wandb.log({"val_loss": avg_val_loss})
+
 		# Early stopping and checkpointing
-		time_ = time_str()
+		cur_time = time_str()
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
 			if checkpoint_dir is not None:
-				best_model = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_}.pt")
-				torch.save(model.state_dict(), best_model)
+				best_model_pth = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{cur_time}.pt")
+				best_model = model.state_dict()
+				print(f"\nBest model state dict:\n{best_model}")
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if config["patience"] is not None:
@@ -78,9 +77,11 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	logger.info(f"Training completed in {train_time:.2f} seconds")
 	wandb.log({"train_time": train_time})
 	# Log best model
-	if best_model is not None:
-		wandb.log_model(path=best_model)
-	return best_model
+	if best_model_pth is not None:
+		print(f"\nBest model state dict FINAL:\n{best_model}")
+		torch.save(best_model, best_model_pth)
+		wandb.log_model(path=best_model_pth)
+	return best_model_pth
 
 
 def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
@@ -102,7 +103,6 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	total_tokens = 0
 	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
 													 FlickerDataset) else train_loader.dataset.dataset.vocab
-	pad_idx = vocab.to_idx(PAD)
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
@@ -111,12 +111,12 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 		captions = captions.to(device)
 
 		# Forward pass
-		loss, num_tokens = forward_pass(model, images, captions, criterion, pad_idx)
+		loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))
 		# Backward pass
 		optimizer.zero_grad()
 		loss.backward()
 		if config["gradient_clip"] is not None:
-			nn.utils.clip_grad_norm_(model.parameters(), max_norm=config["gradient_clip"])  # Gradient clipping
+			nn.utils.clip_grad_norm_(model.parameters(), max_norm=config["gradient_clip"])
 		optimizer.step()
 
 		train_loss += loss.item()

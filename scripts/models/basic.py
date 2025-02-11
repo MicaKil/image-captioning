@@ -50,12 +50,7 @@ class DecoderLSTM(nn.Module):
 	Decoder class that uses an LSTM to generate captions for images.
 	"""
 
-	def __init__(self,
-				 embed_size: int,
-				 hidden_size: int,
-				 vocab_size: int,
-				 dropout: float,
-				 num_layers: int,
+	def __init__(self, embed_size: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
 				 padding_idx: int) -> None:
 		"""
 		Constructor for the DecoderLSTM class
@@ -97,14 +92,8 @@ class ImageCaptioning(nn.Module):
 	Image captioning model that combines an Encoder and Decoder.
 	"""
 
-	def __init__(self,
-				 embed_size: int,
-				 hidden_size: int,
-				 vocab_size: int,
-				 dropout: float,
-				 num_layers=1,
-				 padding_idx: int = 0,
-				 freeze_encoder=True):
+	def __init__(self, embed_size: int, hidden_size: int, vocab_size: int, dropout: float, num_layers=1,
+				 padding_idx: int = 0, freeze_encoder=True):
 		"""
 		Constructor for the ImageCaptioning class
 

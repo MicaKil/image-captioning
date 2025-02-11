@@ -9,12 +9,8 @@ from constants import SOS, EOS
 from scripts.dataset.vocabulary import Vocabulary
 
 
-def gen_caption(model: nn.Module,
-				image: torch.Tensor,
-				vocab: Vocabulary,
-				max_length: int = 30,
-				device: torch.device = torch.device("cpu"),
-				temperature: Optional[float] = None) -> str:
+def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30,
+				device: torch.device = torch.device("cpu"), temperature: Optional[float] = None) -> str:
 	"""
 	Generate a caption for an image using greedy search or temperature-based sampling.
 
@@ -33,7 +29,7 @@ def gen_caption(model: nn.Module,
 	with torch.no_grad():
 		image = image.to(device)
 		features = model.encoder(image)  # Encode the image
-		caption = [vocab.str_to_idx[SOS]]  # Initialize caption with start token
+		caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
 		for _ in range(max_length):
 			caption_tensor = torch.tensor(caption, dtype=torch.long).unsqueeze(0).to(device)
 			outputs = model.decoder(features, caption_tensor)  # Get predictions (batch_size, seq_len+1, vocab_size)
@@ -49,7 +45,7 @@ def gen_caption(model: nn.Module,
 				next_token = torch.argmax(logits, dim=-1).item()
 
 			# Stop if we predict the end token
-			if next_token == vocab.str_to_idx[EOS]:
+			if next_token == vocab.to_idx(EOS):
 				break
 
 			caption.append(next_token)
