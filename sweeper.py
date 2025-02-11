@@ -3,64 +3,18 @@ import os.path
 import torch
 
 import wandb
-from constants import ROOT, PAD, CHECKPOINT_DIR, PROJECT, FLICKR8K_DIR
+from constants import ROOT, PAD, CHECKPOINT_DIR, FLICKR8K_DIR
 from scripts.dataset.flickr_dataloader import FlickerDataLoader
 from scripts.dataset.flickr_dataset import FlickerDataset
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
+from sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, SWEEP_TAGS
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-default_config = {
-	"encoder": "resnet50",
-	"decoder": "LSTM",
-	"batch_size": 32,
-	"embed_size": 256,
-	"hidden_size": 512,
-	"num_layers": 1,
-	"dropout": 0.2,
-	"freeze_encoder": True,
-	"encoder_lr": 1e-4,
-	"decoder_lr": 1e-4,
-	"criterion": "CrossEntropyLoss",
-	"optimizer": "Adam",
-	"max_epochs": 100,
-	"patience": 10,
-	"gradient_clip": None,
-	"dataset": "flickr8k",
-	"dataset_version": "2025-02-10",
-	"dataset_split": {"train": 80, "val": 10, "test": 10},
-	"vocab_threshold": 3,
-	"vocab_size": 4107,
-	"max_caption_len": 30
-}
-
-sweep_config = {
-	"project": PROJECT,
-	"method": "bayes",
-	"metric": {
-		"name": "val_loss",
-		"goal": "minimize"
-	},
-	"parameters": {
-		# architecture
-		"hidden_size": {
-			"value": 512
-		},
-		"embed_size": {
-			"value": 256
-		},
-		# regularisation
-		"dropout": {
-			"values": [0.4, 0.5]
-		},
-		"batch_size": {
-			"value": 32
-		}
-	}
-}
-
+default_config = DEFAULT_CONFIG
+sweeper_config = SWEEP_CONFIG
 
 def run_sweep():
 	num_workers = 4
@@ -69,8 +23,7 @@ def run_sweep():
 	save_results = True
 
 	# Initialize wandb run
-	wandb_run = wandb.init(project=PROJECT, config=default_config, job_type="train",
-						   tags=["basic", "flickr8k", "sweep"])
+	wandb_run = wandb.init(project=PROJECT, config=default_config, tags=SWEEP_TAGS)
 	wandb_run.define_metric("train_loss", summary="min")
 	wandb_run.define_metric("val_loss", summary="min")
 	config = wandb_run.config
@@ -91,7 +44,7 @@ def run_sweep():
 	test_dataloader = FlickerDataLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
 
 	# Initialize model and optimizer
-	model = ImageCaptioning(config["embed_size"], config["hidden_size"], config["vocab_size"], config["dropout"],
+	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
 							config["num_layers"], pad_idx, config["freeze_encoder"])
 
 	criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
@@ -108,6 +61,6 @@ def run_sweep():
 
 
 if __name__ == "__main__":
-	sweep_id = wandb.sweep(sweep=sweep_config, project=PROJECT)
+	sweep_id = wandb.sweep(sweep=SWEEP_CONFIG, project=PROJECT)
 	print(f"Sweep id: {sweep_id}")
 	wandb.agent(sweep_id=sweep_id, function=run_sweep, count=2)
