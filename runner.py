@@ -153,5 +153,5 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 if __name__ == "__main__":
 	# model_path_ = os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-09_23-07.pt")
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, train_model=True, test_model=True,
-		model_path=None, save_results=False)
+	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, train_model=True, test_model=True,
+		model_path=None, save_results=True)
