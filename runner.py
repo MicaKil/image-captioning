@@ -6,8 +6,8 @@ from wandb.sdk.wandb_run import Run
 
 import wandb
 from config import logger
-from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, PROJECT
-from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, RUN_TAGS
+from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR
+from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, RUN_TAGS, PROJECT
 from scripts.dataset.flickr_dataloader import FlickerDataLoader
 from scripts.dataset.flickr_dataset import FlickerDataset, load_captions
 from scripts.dataset.vocabulary import Vocabulary
@@ -17,8 +17,19 @@ from scripts.train import train
 from scripts.utils import date_str
 
 
-def run(run_config: dict, run_tags: list, create_dataset=False, train_model=True, test_model=True,
-		model_path: str = None, save_results=True):
+def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: bool, test_model: bool, model_path: str,
+		save_results: bool):
+	"""
+	Run the training and testing pipeline
+	:param run_config: A dictionary the wandb run configuration
+	:param run_tags: A list of tags to be added to the wandb run
+	:param create_dataset: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
+	:param train_model: Whether to train the model
+	:param test_model: Whether to test the model
+	:param model_path: Path to the model to be loaded
+	:param save_results: Whether to save the test results
+	:return:
+	"""
 	date = date_str()
 	init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
 	config = wandb.config
@@ -71,10 +82,10 @@ def run(run_config: dict, run_tags: list, create_dataset=False, train_model=True
 								  weights_only=False)
 
 	# create or load model
-	vocab = train_dataset.vocab
+	vocab = train_dataset.vocab if isinstance(train_dataset, FlickerDataset) else train_dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 
-	model = ImageCaptioning(config["embed_size"], config["hidden_size"], config["vocab_size"], config["dropout"],
+	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
 							config["num_layers"], pad_idx, config["freeze_encoder"])
 	if model_path is not None:
 		logger.info(f"Loading model from {model_path}")
@@ -103,6 +114,9 @@ def run(run_config: dict, run_tags: list, create_dataset=False, train_model=True
 def init_wandb_run(project, tags, config) -> Run:
 	"""
 	Initialize wandb run
+	:param project: Project name
+	:param tags: List of tags
+	:param config: Configuration dictionary
 	:return: Wandb run
 	"""
 	wandb_run = wandb.init(
@@ -133,5 +147,5 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 if __name__ == "__main__":
 	# model_path_ = os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-09_23-07.pt")
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, train_model=True, test_model=True,
-		model_path=None, save_results=True)
+	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, train_model=True, test_model=True,
+		model_path=None, save_results=False)
