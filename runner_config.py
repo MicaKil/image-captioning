@@ -17,7 +17,7 @@ VOCAB_THRESHOLD = 3
 
 # dataset
 DATASET = "flickr8k"
-DATASET_VERSION = "2025-02-10"
+DATASET_VERSION = "2025-02-12"
 DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
 
 # dataloaders

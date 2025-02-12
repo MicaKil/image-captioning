@@ -4,7 +4,7 @@ from typing import Union
 
 import torch
 from matplotlib import pyplot as plt
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 
 from scripts.dataset.vocabulary import Vocabulary
 
@@ -83,6 +83,6 @@ def get_dataset(obj: Union[DataLoader, Dataset]) -> Dataset:
 	:param obj: DataLoader or Dataset object
 	:return: Vocabulary object
 	"""
-	while not isinstance(obj, Dataset):
+	while not isinstance(obj, Dataset) or isinstance(obj, Subset):
 		obj = obj.dataset
 	return obj
