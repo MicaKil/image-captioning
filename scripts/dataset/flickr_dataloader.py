@@ -6,20 +6,15 @@ from torch.utils.data import DataLoader, Subset
 
 from config import logger
 from constants import PAD
-from scripts.dataset.flickr_dataset import FlickerDataset
+from scripts.dataset.flickr_dataset import FlickrDataset
 
 
-class FlickerDataLoader(DataLoader):
+class FlickrDataLoader(DataLoader):
 	"""
 	Custom DataLoader for the Flickr8k dataset.
 	"""
 
-	def __init__(self,
-				 dataset: Union[FlickerDataset | Subset],
-				 batch_size=32,
-				 num_workers=4,
-				 shuffle=True,
-				 pin_memory=True):
+	def __init__(self, dataset: Union[FlickrDataset | Subset], batch_size=32, num_workers=4, shuffle=True, pin_memory=True):
 		"""
 		Initialize the DataLoader for the Flickr8k dataset.
 
@@ -35,10 +30,10 @@ class FlickerDataLoader(DataLoader):
 						 num_workers=num_workers,
 						 shuffle=shuffle,
 						 pin_memory=pin_memory,
-						 collate_fn=Collate(dataset.vocab.to_idx(PAD) if isinstance(dataset, FlickerDataset)
+						 collate_fn=Collate(dataset.vocab.to_idx(PAD) if isinstance(dataset, FlickrDataset)
 											else dataset.dataset.vocab.to_idx(PAD))
 						 )
-		self.vocab = dataset.vocab if isinstance(dataset, FlickerDataset) else dataset.dataset.vocab
+		self.vocab = dataset.vocab if isinstance(dataset, FlickrDataset) else dataset.dataset.vocab
 		logger.info(f"FlickerDataLoader initialized.")
 
 

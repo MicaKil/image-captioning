@@ -12,8 +12,8 @@ import wandb
 from config import logger
 from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR
 from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, RUN_TAGS, PROJECT
-from scripts.dataset.flickr_dataloader import FlickerDataLoader
-from scripts.dataset.flickr_dataset import FlickerDataset, load_captions
+from scripts.dataset.flickr_dataloader import FlickrDataLoader
+from scripts.dataset.flickr_dataset import FlickrDataset, load_captions
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
@@ -44,7 +44,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 		df_captions = load_captions(ann_file)
 		vocab = Vocabulary(config["vocab"]["freq_threshold"], df_captions["caption"])
-		full_dataset = FlickerDataset(img_dir, df_captions, vocab, transform=TRANSFORM)
+		full_dataset = FlickrDataset(img_dir, df_captions, vocab, transform=TRANSFORM)
 
 		torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
 
@@ -86,7 +86,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 								  weights_only=False)
 
 	# create or load model
-	vocab = train_dataset.vocab if isinstance(train_dataset, FlickerDataset) else train_dataset.dataset.vocab
+	vocab = train_dataset.vocab if isinstance(train_dataset, FlickrDataset) else train_dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 
 	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
@@ -99,8 +99,8 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
 
 	if train_model:
-		train_dataloader = FlickerDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		val_dataloader = FlickerDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+		train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+		val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
 		optimizer = Adam([
 			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
@@ -111,7 +111,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR)
 
 	if test_model:
-		test_dataloader = FlickerDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+		test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		test(model, test_dataloader, DEVICE, save_results)
 
 	wandb.finish()

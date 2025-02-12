@@ -4,8 +4,8 @@ import torch
 
 import wandb
 from constants import ROOT, PAD, CHECKPOINT_DIR, FLICKR8K_DIR
-from scripts.dataset.flickr_dataloader import FlickerDataLoader
-from scripts.dataset.flickr_dataset import FlickerDataset
+from scripts.dataset.flickr_dataloader import FlickrDataLoader
+from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
@@ -29,19 +29,19 @@ def run_sweep():
 	config = wandb_run.config
 
 	# Load datasets
-	train_dataset: FlickerDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_s-80_2025-02-10.pt"),
-											   weights_only=False)
-	val_dataset: FlickerDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_s-10_2025-02-10.pt"),
-											 weights_only=False)
-	test_dataset: FlickerDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s-10_2025-02-10.pt"),
+	train_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_s-80_2025-02-10.pt"),
 											  weights_only=False)
+	val_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_s-10_2025-02-10.pt"),
+											weights_only=False)
+	test_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s-10_2025-02-10.pt"),
+											 weights_only=False)
 	vocab = train_dataset.dataset.vocab
 	pad_idx = vocab.to_idx(PAD)
 
 	# Initialize dataloaders
-	train_dataloader = FlickerDataLoader(train_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
-	val_dataloader = FlickerDataLoader(val_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
-	test_dataloader = FlickerDataLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
+	train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
+	val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
+	test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
 
 	# Initialize model and optimizer
 	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],

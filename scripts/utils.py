@@ -4,6 +4,8 @@ from datetime import datetime
 import torch
 from matplotlib import pyplot as plt
 
+from scripts.dataset.flickr_dataloader import FlickrDataLoader
+
 
 def dump(obj: any, path: str):
 	"""
@@ -61,3 +63,7 @@ def date_str() -> str:
 	:return: Current date as a string
 	"""
 	return datetime.now().strftime("%Y-%m-%d")
+
+
+def get_vocab(object):
+	if isinstance(object, FlickrDataLoader)

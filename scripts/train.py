@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from config import logger
 from constants import ROOT, PAD
-from scripts.dataset.flickr_dataset import FlickerDataset
+from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.utils import time_str
 
 
@@ -56,6 +56,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		scheduler.step(avg_val_loss)
 		cur_lr = scheduler.get_last_lr()
 		wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
+		if epochs_no_improve == config["scheduler"]["patience"]:
+			logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
 		# Early stopping and checkpointing
 		cur_time = time_str()
@@ -63,16 +65,17 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
 			if checkpoint_dir is not None:
-				best_model_pth = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{cur_time}.pt")
+				best_model_pth = os.path.join(
+					ROOT,
+					f"{checkpoint_dir}/best_val_{cur_time}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
+				)
 				best_model = model.state_dict()
-				print(f"\nBest model state dict:\n{best_model}")
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if config["patience"] is not None:
 				epochs_no_improve += 1
 				if epochs_no_improve >= config["patience"]:
 					logger.info(f"Early stopping after {epoch + 1} epochs")
-					wandb.log({"early_stopping": True})
 					break
 
 	# Log training time
@@ -81,7 +84,6 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	wandb.log({"train_time": train_time})
 	# Log best model
 	if best_model_pth is not None:
-		print(f"\nBest model state dict FINAL:\n{best_model}")
 		torch.save(best_model, best_model_pth)
 		wandb.log_model(path=best_model_pth)
 	return best_model_pth
@@ -105,7 +107,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	train_loss = 0.
 	total_tokens = 0
 	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
-													 FlickerDataset) else train_loader.dataset.dataset.vocab
+													 FlickrDataset) else train_loader.dataset.dataset.vocab
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
@@ -146,7 +148,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	val_loss = 0.0
 	total_tokens = 0
 	vocab = val_loader.dataset.vocab if isinstance(val_loader.dataset,
-												   FlickerDataset) else val_loader.dataset.dataset.vocab
+												   FlickrDataset) else val_loader.dataset.dataset.vocab
 
 	model.eval()
 	with torch.no_grad():
