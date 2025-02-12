@@ -18,7 +18,7 @@ from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
-from scripts.utils import date_str
+from scripts.utils import date_str, get_vocab
 
 
 def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: bool, test_model: bool,
@@ -86,7 +86,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 								  weights_only=False)
 
 	# create or load model
-	vocab = train_dataset.vocab if isinstance(train_dataset, FlickrDataset) else train_dataset.dataset.vocab
+	vocab = get_vocab(train_dataset)
 	pad_idx = vocab.to_idx(PAD)
 
 	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],

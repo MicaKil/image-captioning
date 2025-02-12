@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, Subset
 from config import logger
 from constants import PAD
 from scripts.dataset.flickr_dataset import FlickrDataset
+from scripts.utils import get_vocab
 
 
 class FlickrDataLoader(DataLoader):
@@ -14,7 +15,8 @@ class FlickrDataLoader(DataLoader):
 	Custom DataLoader for the Flickr8k dataset.
 	"""
 
-	def __init__(self, dataset: Union[FlickrDataset | Subset], batch_size=32, num_workers=4, shuffle=True, pin_memory=True):
+	def __init__(self, dataset: Union[FlickrDataset | Subset], batch_size=32, num_workers=4, shuffle=True,
+				 pin_memory=True):
 		"""
 		Initialize the DataLoader for the Flickr8k dataset.
 
@@ -25,15 +27,10 @@ class FlickrDataLoader(DataLoader):
 		:param pin_memory: Whether to pin memory.
 		"""
 		logger.info(f"Initializing DataLoader.")
-		super().__init__(dataset,
-						 batch_size=batch_size,
-						 num_workers=num_workers,
-						 shuffle=shuffle,
-						 pin_memory=pin_memory,
-						 collate_fn=Collate(dataset.vocab.to_idx(PAD) if isinstance(dataset, FlickrDataset)
-											else dataset.dataset.vocab.to_idx(PAD))
-						 )
-		self.vocab = dataset.vocab if isinstance(dataset, FlickrDataset) else dataset.dataset.vocab
+		vocab = get_vocab(dataset)
+		super().__init__(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle,
+						 pin_memory=pin_memory, collate_fn=Collate(vocab.to_idx(PAD)))
+		self.vocab = vocab
 		logger.info(f"FlickerDataLoader initialized.")
 
 

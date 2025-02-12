@@ -13,9 +13,8 @@ from tqdm import tqdm
 from config import logger
 from constants import BASIC_RESULTS, ROOT
 from scripts.caption import gen_caption
-from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.utils import time_str
+from scripts.utils import time_str, get_dataset, get_vocab
 
 
 def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool) -> tuple:
@@ -34,9 +33,8 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_r
 	results = []
 	all_hypotheses = []
 	all_references = []
-	df = test_loader.dataset.df if isinstance(test_loader.dataset, FlickrDataset) else test_loader.dataset.dataset.df
-	vocab = test_loader.dataset.vocab if isinstance(test_loader.dataset,
-													FlickrDataset) else test_loader.dataset.dataset.vocab
+	df = get_dataset(test_loader).df
+	vocab = get_vocab(test_loader)
 	smoothing = SmoothingFunction().method1
 
 	model.eval()

@@ -9,12 +9,14 @@ from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
+from scripts.utils import get_vocab
 from sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, SWEEP_TAGS
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 default_config = DEFAULT_CONFIG
 sweeper_config = SWEEP_CONFIG
+
 
 def run_sweep():
 	num_workers = 4
@@ -35,7 +37,7 @@ def run_sweep():
 											weights_only=False)
 	test_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s-10_2025-02-10.pt"),
 											 weights_only=False)
-	vocab = train_dataset.dataset.vocab
+	vocab = get_vocab(train_dataset)
 	pad_idx = vocab.to_idx(PAD)
 
 	# Initialize dataloaders

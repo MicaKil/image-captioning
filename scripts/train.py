@@ -11,8 +11,7 @@ from tqdm import tqdm
 
 from config import logger
 from constants import ROOT, PAD
-from scripts.dataset.flickr_dataset import FlickrDataset
-from scripts.utils import time_str
+from scripts.utils import time_str, get_vocab
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
@@ -106,8 +105,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 	train_loss = 0.
 	total_tokens = 0
-	vocab = train_loader.dataset.vocab if isinstance(train_loader.dataset,
-													 FlickrDataset) else train_loader.dataset.dataset.vocab
+	vocab = get_vocab(train_loader)
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
@@ -147,8 +145,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 
 	val_loss = 0.0
 	total_tokens = 0
-	vocab = val_loader.dataset.vocab if isinstance(val_loader.dataset,
-												   FlickrDataset) else val_loader.dataset.dataset.vocab
+	vocab = get_vocab(val_loader)
 
 	model.eval()
 	with torch.no_grad():

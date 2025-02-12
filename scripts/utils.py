@@ -1,10 +1,14 @@
 import pickle
 from datetime import datetime
+from typing import Union
 
 import torch
 from matplotlib import pyplot as plt
+from torch.utils.data import Dataset, DataLoader
 
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
+from scripts.dataset.flickr_dataset import FlickrDataset
+from scripts.dataset.vocabulary import Vocabulary
 
 
 def dump(obj: any, path: str):
@@ -65,5 +69,27 @@ def date_str() -> str:
 	return datetime.now().strftime("%Y-%m-%d")
 
 
-def get_vocab(object):
-	if isinstance(object, FlickrDataLoader)
+def get_vocab(obj: Union[DataLoader, Dataset]) -> Vocabulary:
+	"""
+	Get the vocabulary from a DataLoader or Dataset object.
+	:param obj: DataLoader or Dataset object
+	:return: Vocabulary object
+	"""
+	if isinstance(obj, FlickrDataLoader):
+		obj = obj.dataset
+	if isinstance(obj, FlickrDataset):
+		return obj.vocab
+	return obj.dataset.vocab
+
+
+def get_dataset(obj: Union[DataLoader, Dataset]) -> FlickrDataset:
+	"""
+	Get the vocabulary from a DataLoader or Dataset object.
+	:param obj: DataLoader or Dataset object
+	:return: Vocabulary object
+	"""
+	if isinstance(obj, FlickrDataLoader):
+		obj = obj.dataset
+	if isinstance(obj, FlickrDataset):
+		return obj
+	return obj.dataset
