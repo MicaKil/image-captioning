@@ -55,11 +55,11 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 		save_datasets(full_dataset, test_dataset, train_dataset, val_dataset, date)  # save new datasets
 		log_datasets(date)  # log datasets to wandb
 	else:
-		train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_s80_2025-02-10.pt"),
+		train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_2025-02-12_s80.pt"),
 								   weights_only=False)
-		val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_s10_2025-02-10.pt"),
+		val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_2025-02-12_s10.pt"),
 								 weights_only=False)
-		test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_s10_2025-02-10.pt"),
+		test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_2025-02-12_s10.pt"),
 								  weights_only=False)
 
 	# create or load model
@@ -83,7 +83,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
 			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 		])
-		scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
+		scheduler = ReduceLROnPlateau(optimizer.param_groups[1], mode="min", factor=config["scheduler"]["factor"],
 									  patience=config["scheduler"]["patience"])
 		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR)
 
@@ -182,5 +182,5 @@ def save_datasets(full_dataset: FlickrDataset, test_dataset: Union[FlickrDataset
 if __name__ == "__main__":
 	# model_path_ = os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-09_23-07.pt")
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, train_model=True, test_model=True,
+	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, train_model=True, test_model=True,
 		model_path=None, save_results=True)
