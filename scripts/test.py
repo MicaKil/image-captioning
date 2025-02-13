@@ -11,19 +11,19 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from config import logger
-from constants import BASIC_RESULTS, ROOT
+from constants import ROOT
 from scripts.caption import gen_caption
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.utils import time_str, get_dataset, get_vocab
 
 
-def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool, tag: str) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str) -> tuple:
 	"""
 	Evaluate model on test set and log results
 	:param model: Model to evaluate
 	:param test_loader: Test data loader to use
 	:param device: Device to use (cpu or cuda)
-	:param save_results: Whether to save results to disk
+	:param save_dir: If not None, save results to this directory
 	:param tag: Tag to use for saving results
 	:return:
 	"""
@@ -78,7 +78,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_r
 	}
 	results = pd.DataFrame(results)
 
-	log_and_save(metrics, results, save_results, tag)
+	log_and_save(metrics, results, save_dir, tag)
 	return results, metrics
 
 
@@ -146,31 +146,31 @@ def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tu
 	return bleu_1, bleu_2, bleu_4
 
 
-def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, tag: str) -> None:
+def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str) -> None:
 	"""
 	Log results and metrics to wandb and save them to disk
-	:param tag:
 	:param metrics: Metrics to log and save
 	:param results: Results to log and save
-	:param save_results: Whether to save results to disk
+	:param save_dir: If not None, save results to this directory
+	:param tag: Tag to use for saving results
 	:return:
 	"""
 	results_path = None
-	if save_results:
+	if save_dir is not None:
 		time_ = time_str()
 		# Save results
-		results_path = os.path.join(ROOT, f"{BASIC_RESULTS}/results_{tag}_{time_}.csv")
+		results_path = os.path.join(ROOT, f"{save_dir}/results_{tag}_{time_}.csv")
 		results.to_csv(results_path, index=False, header=True)
 		# Save metrics
 		metrics_pd = pd.DataFrame(metrics, index=[0])
-		metrics_pd.to_csv(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{tag}_{time_}.csv"), index=False,
+		metrics_pd.to_csv(os.path.join(ROOT, f"{save_dir}/metrics_{tag}_{time_}.csv"), index=False,
 						  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
 	wandb.log(metrics)
 	results_table = wandb.Table(dataframe=results)
 	results_artifact = wandb.Artifact(f"test_{tag}_results", type="evaluation", metadata={"metrics": metrics})
 	results_artifact.add(results_table, f"{tag}_results")
-	if save_results:
+	if save_dir is not None:
 		results_artifact.add_file(results_path)
 	wandb.log({f"test_{tag}_results": results_table})
 	wandb.log_artifact(results_artifact)

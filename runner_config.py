@@ -19,6 +19,9 @@ VOCAB_THRESHOLD = 3
 DATASET = "flickr8k"
 DATASET_VERSION = "2025-02-12"
 DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
+TRAIN_PATH = "datasets/flickr8k/train_dataset_2025-02-12_s80.pt"
+VAL_PATH = "datasets/flickr8k/val_dataset_2025-02-12_s10.pt"
+TEST_PATH = "datasets/flickr8k/test_dataset_2025-02-12_s10.pt"
 
 # dataloaders
 BATCH_SIZE = 64

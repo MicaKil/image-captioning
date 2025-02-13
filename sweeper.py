@@ -4,13 +4,13 @@ import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import wandb
-from constants import ROOT, PAD, CHECKPOINT_DIR
+from constants import ROOT, PAD, CHECKPOINT_DIR, BASIC_RESULTS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
 from scripts.utils import get_vocab
-from sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, SWEEP_TAGS
+from sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, SWEEP_TAGS, TRAIN_PATH, VAL_PATH, TEST_PATH
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -31,12 +31,9 @@ def run_sweep():
 	config = wandb_run.config
 
 	# Load datasets
-	train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_2025-02-12_s80.pt"),
-							   weights_only=False)
-	val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_2025-02-12_s10.pt"),
-							 weights_only=False)
-	test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_2025-02-12_s10.pt"),
-							  weights_only=False)
+	train_dataset = torch.load(str(os.path.join(ROOT, TRAIN_PATH)), weights_only=False)
+	val_dataset = torch.load(str(os.path.join(ROOT, VAL_PATH)), weights_only=False)
+	test_dataset = torch.load(str(os.path.join(ROOT, TEST_PATH)), weights_only=False)
 	vocab = get_vocab(train_dataset)
 	pad_idx = vocab.to_idx(PAD)
 
@@ -60,14 +57,15 @@ def run_sweep():
 	print(f"Model:\n{model}")
 	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
 
-	best_model_pth, _ = train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR)
+	best_model_pth, _ = train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler,
+							  CHECKPOINT_DIR)
 	# test last model
-	test(model, test_dataloader, device, save_results, "last")
-	# test model with best validation loss
+	test(model, test_dataloader, device, BASIC_RESULTS, "last-model")
+	# test model with the best validation loss
 	best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
 						   config["num_layers"], pad_idx, config["freeze_encoder"])
 	best.load_state_dict(torch.load(best_model_pth, weights_only=True))
-	test(best, test_dataloader, device, save_results, "best")
+	test(best, test_dataloader, device, BASIC_RESULTS, "best-model")
 
 
 if __name__ == "__main__":
