@@ -1,11 +1,11 @@
 import os.path
 
 import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import wandb
-from constants import ROOT, PAD, CHECKPOINT_DIR, FLICKR8K_DIR
+from constants import ROOT, PAD, CHECKPOINT_DIR
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
-from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
@@ -31,12 +31,12 @@ def run_sweep():
 	config = wandb_run.config
 
 	# Load datasets
-	train_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_s-80_2025-02-10.pt"),
-											  weights_only=False)
-	val_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_s-10_2025-02-10.pt"),
-											weights_only=False)
-	test_dataset: FlickrDataset = torch.load(os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_s-10_2025-02-10.pt"),
-											 weights_only=False)
+	train_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/train_dataset_2025-02-12_s80.pt"),
+							   weights_only=False)
+	val_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/val_dataset_2025-02-12_s10.pt"),
+							 weights_only=False)
+	test_dataset = torch.load(os.path.join(ROOT, "datasets/flickr8k/test_dataset_2025-02-12_s10.pt"),
+							  weights_only=False)
 	vocab = get_vocab(train_dataset)
 	pad_idx = vocab.to_idx(PAD)
 
@@ -54,12 +54,20 @@ def run_sweep():
 		{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
 		{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 	])
+	scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
+								  patience=config["scheduler"]["patience"])
 
 	print(f"Model:\n{model}")
 	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
 
-	train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR)
-	test(model, test_dataloader, device, save_results)
+	best_model_pth, _ = train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR)
+	# test last model
+	test(model, test_dataloader, device, save_results, "last")
+	# test model with best validation loss
+	best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
+						   config["num_layers"], pad_idx, config["freeze_encoder"])
+	best.load_state_dict(torch.load(best_model_pth, weights_only=True))
+	test(best, test_dataloader, device, save_results, "best")
 
 
 if __name__ == "__main__":
