@@ -17,13 +17,14 @@ from scripts.dataset.vocabulary import Vocabulary
 from scripts.utils import time_str, get_dataset, get_vocab
 
 
-def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_results: bool, tag: str) -> tuple:
 	"""
 	Evaluate model on test set and log results
 	:param model: Model to evaluate
 	:param test_loader: Test data loader to use
 	:param device: Device to use (cpu or cuda)
 	:param save_results: Whether to save results to disk
+	:param tag: Tag to use for saving results
 	:return:
 	"""
 
@@ -55,30 +56,30 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_r
 					"generated": gen
 				})
 
-		# BLEU scores
-		bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
+	# BLEU scores
+	bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
 
-		# CIDEr score
-		cider_score = get_cider_score(all_hypotheses, all_references)
+	# CIDEr score
+	cider_score = get_cider_score(all_hypotheses, all_references)
 
-		# Log time
-		test_time = time.time() - start_time
-		wandb.log({"test_time": test_time})
+	# Log time
+	test_time = time.time() - start_time
+	wandb.log({f"test_{tag}_time": test_time})
 
-		logger.info(f"Testing took {test_time:.2f} seconds")
-		logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
+	logger.info(f"Testing took {test_time:.2f} seconds")
+	logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
 
-		# Log metrics
-		metrics = {
-			"test_BLEU-1": bleu_1,
-			"test_BLEU-2": bleu_2,
-			"test_BLEU-4": bleu_4,
-			"test_CIDEr": cider_score
-		}
-		results = pd.DataFrame(results)
+	# Log metrics
+	metrics = {
+		f"test_{tag}_BLEU-1": bleu_1,
+		f"test_{tag}_BLEU-2": bleu_2,
+		f"test_{tag}_BLEU-4": bleu_4,
+		f"test_{tag}_CIDEr": cider_score
+	}
+	results = pd.DataFrame(results)
 
-		log_and_save(metrics, results, save_results)
-		return results, metrics
+	log_and_save(metrics, results, save_results, tag)
+	return results, metrics
 
 
 def get_references(df: pd.DataFrame, image_ids: list) -> list:
@@ -145,9 +146,10 @@ def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tu
 	return bleu_1, bleu_2, bleu_4
 
 
-def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool):
+def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool, tag: str) -> None:
 	"""
 	Log results and metrics to wandb and save them to disk
+	:param tag:
 	:param metrics: Metrics to log and save
 	:param results: Results to log and save
 	:param save_results: Whether to save results to disk
@@ -157,18 +159,18 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_results: bool):
 	if save_results:
 		time_ = time_str()
 		# Save results
-		results_path = os.path.join(ROOT, f"{BASIC_RESULTS}/results_{time_}.csv")
+		results_path = os.path.join(ROOT, f"{BASIC_RESULTS}/results_{tag}_{time_}.csv")
 		results.to_csv(results_path, index=False, header=True)
 		# Save metrics
 		metrics_pd = pd.DataFrame(metrics, index=[0])
-		metrics_pd.to_csv(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{time_}.csv"), index=False,
+		metrics_pd.to_csv(os.path.join(ROOT, f"{BASIC_RESULTS}/metrics_{tag}_{time_}.csv"), index=False,
 						  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
 	wandb.log(metrics)
 	results_table = wandb.Table(dataframe=results)
-	results_artifact = wandb.Artifact("test_results", type="evaluation", metadata={"metrics": metrics})
-	results_artifact.add(results_table, "results")
+	results_artifact = wandb.Artifact(f"test_{tag}_results", type="evaluation", metadata={"metrics": metrics})
+	results_artifact.add(results_table, f"{tag}_results")
 	if save_results:
 		results_artifact.add_file(results_path)
-	wandb.log({"test_results": results_table})
+	wandb.log({f"test_{tag}_results": results_table})
 	wandb.log_artifact(results_artifact)

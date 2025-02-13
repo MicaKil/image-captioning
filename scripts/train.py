@@ -1,6 +1,5 @@
 import os.path
 import time
-from typing import Optional
 
 import numpy as np
 import torch
@@ -16,7 +15,7 @@ from scripts.utils import time_str, get_vocab
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
 		  criterion: nn.Module, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
-		  checkpoint_dir: Optional[str]) -> str:
+		  checkpoint_dir: str) -> tuple[str | None, str | None]:
 	"""
 	Training loop for the model.
 
@@ -41,7 +40,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	best_val_loss = np.inf
 	best_model = None
 	best_model_pth = None
+	last_model_pth = None
 	epochs_no_improve = 0
+	avg_val_loss = -1
 
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
@@ -52,21 +53,18 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 
 		scheduler.step(avg_val_loss)
 		cur_lr = scheduler.get_last_lr()
-		wandb.log({"decoder_lr": cur_lr})
-		if epochs_no_improve % config["scheduler"]["patience"] == 0:
-			logger.info(f"Reducing learning rate. Decoder LR: {cur_lr}")
+		wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
 		# Early stopping and checkpointing
 		cur_time = time_str()
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
-			if checkpoint_dir is not None:
-				best_model_pth = os.path.join(
-					ROOT,
-					f"{checkpoint_dir}/best_val_{cur_time}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
-				)
-				best_model = model.state_dict()
+			best_model_pth = os.path.join(
+				ROOT,
+				f"{checkpoint_dir}/best_val_{cur_time}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
+			)
+			best_model = model.state_dict()
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if config["patience"] is not None:
@@ -74,6 +72,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 				if epochs_no_improve >= config["patience"]:
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
+
+		if epochs_no_improve > 0 and epochs_no_improve % config["scheduler"]["patience"] == 0:
+			logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
 	# Log training time
 	train_time = time.time() - start_time
@@ -83,7 +84,15 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	if best_model_pth is not None:
 		torch.save(best_model, best_model_pth)
 		wandb.log_model(path=best_model_pth)
-	return best_model_pth
+	# Log last model
+	if avg_val_loss != -1:
+		last_model_pth = os.path.join(
+			ROOT,
+			f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt"
+		)
+		torch.save(model.state_dict(), last_model_pth)
+		wandb.log_model(path=last_model_pth)
+	return best_model_pth, last_model_pth
 
 
 def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,

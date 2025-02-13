@@ -22,7 +22,7 @@ from scripts.utils import date_str, get_vocab
 
 
 def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: bool, test_model: bool,
-		model_path: Optional[str], save_results: bool):
+		saved_model: Optional[tuple[str, str]], save_results: bool):
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
@@ -30,8 +30,8 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 	:param create_dataset: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
 	:param train_model: Whether to train the model
 	:param test_model: Whether to test the model
-	:param model_path: Path to the model to be loaded
-	:param save_results: Whether to save the test results
+	:param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
+	:param save_results: Whether to save the test results to disk
 	:return:
 	"""
 	date = date_str()
@@ -67,10 +67,15 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 	pad_idx = vocab.to_idx(PAD)
 
 	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-							config["num_layers"], pad_idx, config["freeze_encoder"])
-	if model_path is not None:
-		logger.info(f"Loading model from {model_path}")
-		model.load_state_dict(torch.load(os.path.join(ROOT, model_path), weights_only=True))
+							 config["num_layers"], pad_idx, config["freeze_encoder"])
+	if saved_model is not None:
+		logger.info(f"Loading model from {saved_model}")
+		model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
+		if test_model:
+			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+			test(model, test_dataloader, DEVICE, save_results, saved_model[1])
+		wandb.finish()
+		return
 
 	print(f"Model:\n{model}")
 	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
@@ -85,11 +90,16 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 		])
 		scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
 									  patience=config["scheduler"]["patience"])
-		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR)
-
-	if test_model:
-		test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		test(model, test_dataloader, DEVICE, save_results)
+		best_model_pth, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
+								  CHECKPOINT_DIR)
+		if test_model:
+			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+			test(model, test_dataloader, DEVICE, save_results, "last-model")
+			if best_model_pth is not None:
+				best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
+							 config["num_layers"], pad_idx, config["freeze_encoder"])
+				best.load_state_dict(torch.load(best_model_pth, weights_only=True))
+				test(best, test_dataloader, DEVICE, save_results, "best-model")
 
 	wandb.finish()
 
@@ -183,4 +193,4 @@ if __name__ == "__main__":
 	# model_path_ = os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-09_23-07.pt")
 	wandb.teardown()
 	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, train_model=True, test_model=True,
-		model_path=None, save_results=True)
+		saved_model=None, save_results=True)
