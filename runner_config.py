@@ -22,7 +22,7 @@ DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
 
 # dataloaders
 BATCH_SIZE = 64
-NUM_WORKERS = 2
+NUM_WORKERS = 4
 SHUFFLE = True
 PIN_MEMORY = True
 
@@ -30,7 +30,7 @@ PIN_MEMORY = True
 EMBED_SIZE = 512
 HIDDEN_SIZE = 1024
 NUM_LAYERS = 2
-DROPOUT = 0.2
+DROPOUT = 0.25
 FREEZE_ENCODER = True
 
 # training

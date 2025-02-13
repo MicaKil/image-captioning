@@ -83,7 +83,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, train_model: boo
 			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
 			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 		])
-		scheduler = ReduceLROnPlateau(optimizer.param_groups[1], mode="min", factor=config["scheduler"]["factor"],
+		scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
 									  patience=config["scheduler"]["patience"])
 		train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR)
 
