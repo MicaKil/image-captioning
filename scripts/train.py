@@ -65,6 +65,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 				f"{checkpoint_dir}/best_val_{cur_time}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
 			)
 			best_model = model.state_dict()
+			torch.save(best_model, best_model_pth)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if config["patience"] is not None:
@@ -82,7 +83,6 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	wandb.log({"train_time": train_time})
 	# Log best model
 	if best_model_pth is not None:
-		torch.save(best_model, best_model_pth)
 		wandb.log_model(path=best_model_pth)
 	# Log last model
 	if avg_val_loss != -1:

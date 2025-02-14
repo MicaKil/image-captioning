@@ -11,8 +11,8 @@ from wandb.sdk.wandb_run import Run
 import wandb
 from config import logger
 from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, BASIC_RESULTS
-from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, RUN_TAGS, PROJECT, \
-	TRAIN_PATH, VAL_PATH, TEST_PATH
+from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, \
+	TRAIN_PATH, VAL_PATH, TEST_PATH, RUN_TAGS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, load_captions
 from scripts.dataset.vocabulary import Vocabulary
@@ -22,7 +22,8 @@ from scripts.train import train
 from scripts.utils import date_str, get_vocab
 
 
-def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool, test_model: bool,
+def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool,
+		test_model: bool,
 		saved_model: Optional[tuple[str, str]], save_dir: str):
 	"""
 	Run the training and testing pipeline
@@ -67,7 +68,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	pad_idx = vocab.to_idx(PAD)
 
 	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-							 config["num_layers"], pad_idx, config["freeze_encoder"])
+							config["num_layers"], pad_idx, config["freeze_encoder"])
 	if saved_model is not None:
 		logger.info(f"Loading model from {saved_model}")
 		model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
@@ -95,9 +96,11 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 			test(model, test_dataloader, DEVICE, save_dir, "last-model")
+			wandb.finish()
 			if best_model_pth is not None:
+				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
 				best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-							 config["num_layers"], pad_idx, config["freeze_encoder"])
+									   config["num_layers"], pad_idx, config["freeze_encoder"])
 				best.load_state_dict(torch.load(best_model_pth, weights_only=True))
 				test(best, test_dataloader, DEVICE, save_dir, "best-model")
 
@@ -189,8 +192,35 @@ def save_datasets(full_dataset: FlickrDataset, test_dataset: Union[FlickrDataset
 	)
 
 
+def state_dicts_equal(state_a, state_b) -> bool:
+	# Check keys match
+	if state_a.keys() != state_b.keys():
+		return False
+
+	# Check tensor values match
+	for key in state_a:
+		if not torch.equal(state_a[key], state_b[key]):
+			return False
+
+	return True
+
+
 if __name__ == "__main__":
-	# model_path_ = os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-09_23-07.pt")
 	wandb.teardown()
 	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True,
 		test_model=True, saved_model=None, save_dir=BASIC_RESULTS)
+	# test_dataset = torch.load(str(os.path.join(ROOT, TEST_PATH)), weights_only=False)
+	# vocab = get_vocab(test_dataset)
+	# pad_idx = vocab.to_idx(PAD)
+	# config = RUN_CONFIG
+	# model1 = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
+	# 						 config["num_layers"], pad_idx, config["freeze_encoder"])
+	# model1.load_state_dict(
+	# 	torch.load(os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-13_17-34_2-4852.pt"), weights_only=True))
+	#
+	# model2 = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
+	# 						 config["num_layers"], pad_idx, config["freeze_encoder"])
+	# model2.load_state_dict(
+	# 	torch.load(os.path.join(ROOT, f"{CHECKPOINT_DIR}/last_model_2025-02-13_20-08_2-9148.pt"), weights_only=True))
+	#
+	# print(state_dicts_equal(model1.state_dict(), model2.state_dict()))

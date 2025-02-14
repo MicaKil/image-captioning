@@ -64,17 +64,17 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 
 	# Log time
 	test_time = time.time() - start_time
-	wandb.log({f"test_{tag}_time": test_time})
+	wandb.log({f"test_time": test_time})
 
 	logger.info(f"Testing took {test_time:.2f} seconds")
 	logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
 
 	# Log metrics
 	metrics = {
-		f"test_{tag}_BLEU-1": bleu_1,
-		f"test_{tag}_BLEU-2": bleu_2,
-		f"test_{tag}_BLEU-4": bleu_4,
-		f"test_{tag}_CIDEr": cider_score
+		f"test_BLEU-1": bleu_1,
+		f"test_BLEU-2": bleu_2,
+		f"test_BLEU-4": bleu_4,
+		f"test_CIDEr": cider_score
 	}
 	results = pd.DataFrame(results)
 
@@ -168,9 +168,9 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str) 
 	# Log results and metrics
 	wandb.log(metrics)
 	results_table = wandb.Table(dataframe=results)
-	results_artifact = wandb.Artifact(f"test_{tag}_results", type="evaluation", metadata={"metrics": metrics})
-	results_artifact.add(results_table, f"{tag}_results")
+	results_artifact = wandb.Artifact(f"test_results", type="evaluation", metadata={"metrics": metrics})
+	results_artifact.add(results_table, f"results")
 	if save_dir is not None:
 		results_artifact.add_file(results_path)
-	wandb.log({f"test_{tag}_results": results_table})
+	wandb.log({f"test_results": results_table})
 	wandb.log_artifact(results_artifact)
