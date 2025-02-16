@@ -1,5 +1,4 @@
 import os.path
-import time
 
 import pandas as pd
 import torch
@@ -29,7 +28,6 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	"""
 
 	logger.info("Start testing model")
-	start_time = time.time()
 
 	results = []
 	all_hypotheses = []
@@ -63,10 +61,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	cider_score = get_cider_score(all_hypotheses, all_references)
 
 	# Log time
-	test_time = time.time() - start_time
-	wandb.log({f"test_time": test_time})
-
-	logger.info(f"Testing took {test_time:.2f} seconds")
+	logger.info(f"Finished testing model.")
 	logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
 
 	# Log metrics
@@ -144,6 +139,19 @@ def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tu
 						 smoothing_function=smoothing)
 	bleu_4 = corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 	return bleu_1, bleu_2, bleu_4
+
+
+def get_bleu4_score(all_hypotheses: list, all_references: list, smoothing) -> float:
+	"""
+	Calculate BLEU4 score for a list of hypotheses and references
+	:param all_hypotheses: Hypotheses (generated captions) to evaluate
+	:param all_references: References (ground truth captions) to evaluate
+	:param smoothing: Smoothing function to use
+	:return: BLEU-4 score
+	"""
+	tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
+	tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
+	return corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 
 
 def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str) -> None:

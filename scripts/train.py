@@ -1,21 +1,23 @@
 import os.path
-import time
+from typing import Any
 
 import numpy as np
 import torch
 import torch.nn as nn
 import wandb
+from nltk.translate.bleu_score import SmoothingFunction
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from config import logger
 from constants import ROOT, PAD
-from scripts.utils import time_str, get_vocab
+from scripts import test
+from scripts.utils import time_str, get_vocab, get_dataset
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
-		  criterion: nn.Module, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
-		  checkpoint_dir: str) -> tuple[str | None, str | None]:
+		  criterion: nn.Module, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str,
+		  eval_bleu4: bool) -> tuple[str | None, dict[str, float | int | Any] | None, str | None]:
 	"""
 	Training loop for the model.
 
@@ -27,6 +29,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param optimizer: Optimizer for training
 	:param scheduler: Learning rate scheduler
 	:param checkpoint_dir: Directory to save the best model
+	:param eval_bleu4: Whether to calculate the BLEU score
 	:return: Path to the best model
 	"""
 	config = wandb.config
@@ -35,11 +38,10 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	logger.info(
 		f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}"
 	)
-	start_time = time.time()
 
 	best_val_loss = np.inf
-	best_model = None
-	best_model_pth = None
+	best_val_info = None
+	best_val_model = None
 	last_model_pth = None
 	epochs_no_improve = 0
 	avg_val_loss = -1
@@ -47,25 +49,25 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
-		avg_val_loss = eval_load(model, val_loader, device, epoch, criterion)
-		logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
-		wandb.log({"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss})
+		avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, eval_bleu4)
+		logger.info(
+			f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4}"
+		)
+		metric = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
+		if eval_bleu4:
+			metric["val_BLEU-4"] = val_bleu4
+		wandb.log(metric)
 
 		scheduler.step(avg_val_loss)
 		cur_lr = scheduler.get_last_lr()
 		wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
 		# Early stopping and checkpointing
-		cur_time = time_str()
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
-			best_model_pth = os.path.join(
-				ROOT,
-				f"{checkpoint_dir}/best_val_{cur_time}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
-			)
-			best_model = model.state_dict()
-			torch.save(best_model, best_model_pth)
+			best_val_info, best_val_model = checkpoint(model, checkpoint_dir, best_val_loss, best_val_model, cur_lr,
+													   epoch)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if config["patience"] is not None:
@@ -77,13 +79,6 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		if epochs_no_improve > 0 and epochs_no_improve % config["scheduler"]["patience"] == 0:
 			logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
-	# Log training time
-	train_time = time.time() - start_time
-	logger.info(f"Training completed in {train_time:.2f} seconds")
-	wandb.log({"train_time": train_time})
-	# Log best model
-	if best_model_pth is not None:
-		wandb.log_model(path=best_model_pth)
 	# Log last model
 	if avg_val_loss != -1:
 		last_model_pth = os.path.join(
@@ -92,7 +87,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		)
 		torch.save(model.state_dict(), last_model_pth)
 		wandb.log_model(path=last_model_pth)
-	return best_model_pth, last_model_pth
+	logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
+	return best_val_model, best_val_info, last_model_pth
 
 
 def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
@@ -136,8 +132,8 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int,
-			  criterion: nn.Module) -> float:
+def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
+			  eval_bleu4: bool) -> tuple[float | int | Any, float | None]:
 	"""
 	Evaluates the model on the validation set for one epoch
 
@@ -146,14 +142,21 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	:param device: Device to run the evaluation on
 	:param epoch: Current epoch
 	:param criterion: Loss function
+	:param eval_bleu4: Whether to calculate the BLEU score
 	:return: Average validation loss and BLEU score (if calc_bleu is True)
 	"""
 	config = wandb.config
 
+	# for BLEU score
+	val_ble4 = None
+	all_hypotheses = []
+	all_references = []
+	df = get_dataset(val_loader).df
+	smoothing = SmoothingFunction().method1
+
 	val_loss = 0.0
 	total_tokens = 0
 	vocab = get_vocab(val_loader)
-
 	model.eval()
 	with torch.no_grad():
 		batch_progress = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Val]")
@@ -163,9 +166,21 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 			loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))  # Forward pass
 			val_loss += loss.item()
 			total_tokens += num_tokens
+
+			if eval_bleu4:
+				generated = test.gen_captions(model, vocab, device, images)
+				all_hypotheses.extend(generated)
+				references = test.get_references(df, images_id)
+				all_references.extend(references)
+
 			batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
-	return val_loss / total_tokens if total_tokens > 0 else 0
+	if eval_bleu4:
+		val_ble4 = test.get_bleu4_score(all_hypotheses, all_references, smoothing)
+		logger.info(f"Validation BLEU-4: {val_ble4}")
+		wandb.log({"val_BLEU-4": val_ble4})
+
+	return val_loss / total_tokens if total_tokens > 0 else 0, val_ble4
 
 
 def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module,
@@ -191,3 +206,28 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 		targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
 	)
 	return loss, num_tokens
+
+
+def checkpoint(model: nn.Module, checkpoint_dir: str, best_val_loss: float, best_val_model: str, cur_lr: tuple,
+			   epoch: int):
+	"""
+	Checkpoint the model
+	:param model: Current model
+	:param checkpoint_dir: Path to directory to save the model
+	:param best_val_loss: Current best validation loss
+	:param best_val_model: Current best model path
+	:param cur_lr: Current learning rate
+	:param epoch: Current epoch
+	:return:
+	"""
+	# delete previous best model
+	if best_val_model is not None:
+		os.remove(best_val_model)
+	# save new best model
+	best_val_model = os.path.join(
+		ROOT,
+		f"{checkpoint_dir}/best_val_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
+	)
+	best_val_info = {"epoch": epoch + 1, "val_loss": best_val_loss, "encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]}
+	torch.save(model.state_dict(), best_val_model)
+	return best_val_info, best_val_model

@@ -23,8 +23,7 @@ from scripts.utils import date_str, get_vocab
 
 
 def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool,
-		test_model: bool,
-		saved_model: Optional[tuple[str, str]], save_dir: str):
+		test_model: bool, saved_model: Optional[tuple[str, str]], save_dir: str, eval_bleu: bool):
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
@@ -35,6 +34,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	:param test_model: Whether to test the model
 	:param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
 	:param save_dir: If not None, the test results are saved to this directory
+	:param eval_bleu: Whether to evaluate the BLEU score
 	:return:
 	"""
 	date = date_str()
@@ -91,18 +91,20 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		])
 		scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
 									  patience=config["scheduler"]["patience"])
-		best_model_pth, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
-								  CHECKPOINT_DIR)
+		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer,
+												 scheduler, CHECKPOINT_DIR, eval_bleu)
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 			test(model, test_dataloader, DEVICE, save_dir, "last-model")
 			wandb.finish()
-			if best_model_pth is not None:
+			if best_val_model is not None:
 				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
 				best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
 									   config["num_layers"], pad_idx, config["freeze_encoder"])
-				best.load_state_dict(torch.load(best_model_pth, weights_only=True))
+				best.load_state_dict(torch.load(best_val_model, weights_only=True))
 				test(best, test_dataloader, DEVICE, save_dir, "best-model")
+				wandb.log(best_val_info)
+				wandb.log_model(path=best_val_model)
 
 	wandb.finish()
 
@@ -208,19 +210,4 @@ def state_dicts_equal(state_a, state_b) -> bool:
 if __name__ == "__main__":
 	wandb.teardown()
 	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True,
-		test_model=True, saved_model=None, save_dir=BASIC_RESULTS)
-	# test_dataset = torch.load(str(os.path.join(ROOT, TEST_PATH)), weights_only=False)
-	# vocab = get_vocab(test_dataset)
-	# pad_idx = vocab.to_idx(PAD)
-	# config = RUN_CONFIG
-	# model1 = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-	# 						 config["num_layers"], pad_idx, config["freeze_encoder"])
-	# model1.load_state_dict(
-	# 	torch.load(os.path.join(ROOT, f"{CHECKPOINT_DIR}/best_val_2025-02-13_17-34_2-4852.pt"), weights_only=True))
-	#
-	# model2 = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-	# 						 config["num_layers"], pad_idx, config["freeze_encoder"])
-	# model2.load_state_dict(
-	# 	torch.load(os.path.join(ROOT, f"{CHECKPOINT_DIR}/last_model_2025-02-13_20-08_2-9148.pt"), weights_only=True))
-	#
-	# print(state_dicts_equal(model1.state_dict(), model2.state_dict()))
+		test_model=True, saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=False)
