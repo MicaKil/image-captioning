@@ -92,8 +92,10 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
 			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 		])
-		scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
-									  patience=config["scheduler"]["patience"])
+		scheduler = None
+		if config["scheduler"] is not None:
+			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
+										  patience=config["scheduler"]["patience"])
 		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer,
 												 scheduler, CHECKPOINT_DIR, eval_bleu)
 		if test_model:
@@ -223,4 +225,4 @@ def state_dicts_equal(state_a, state_b) -> bool:
 if __name__ == "__main__":
 	wandb.teardown()
 	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True,
-		test_model=True, saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=False)
+		test_model=True, saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=True)

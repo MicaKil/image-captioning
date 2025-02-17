@@ -44,23 +44,28 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	best_val_model = None
 	last_model_pth = None
 	epochs_no_improve = 0
+	cur_lr = (config["encoder_lr"], config["decoder_lr"])
 	avg_val_loss = -1
 
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
 		avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, eval_bleu4)
-		logger.info(
-			f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4}"
-		)
+		if val_bleu4 is not None:
+			logger.info(
+				f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}"
+			)
+		else:
+			logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 		metric = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
 		if eval_bleu4:
 			metric["val_BLEU-4"] = val_bleu4
 		wandb.log(metric)
 
-		scheduler.step(avg_val_loss)
-		cur_lr = scheduler.get_last_lr()
-		wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
+		if scheduler is not None:
+			scheduler.step(avg_val_loss)
+			cur_lr = scheduler.get_last_lr()
+			wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
 		# Early stopping and checkpointing
 		if avg_val_loss < best_val_loss:
@@ -76,8 +81,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
 
-		if epochs_no_improve > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
-			logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
+		if scheduler is not None:
+			if epochs_no_improve > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
+				logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
 	# Log last model
 	if avg_val_loss != -1:
@@ -91,6 +97,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	# check best_val_model != last_model
 	if best_val_info["epoch"] == metric["epoch"]:
 		# if they are the same, then the best model is the last model
+		logger.info("Best model is the last model")
 		best_val_model = None
 		best_val_info = None
 	return best_val_model, best_val_info, last_model_pth
