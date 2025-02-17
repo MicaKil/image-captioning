@@ -17,7 +17,7 @@ from scripts.utils import time_str, get_vocab, get_dataset
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
 		  criterion: nn.Module, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str,
-		  eval_bleu4: bool) -> tuple[str | None, dict[str, float | int | Any] | None, str | None]:
+		  eval_bleu4: bool, eval_bleu4_step: int) -> tuple[str | None, dict[str, float | int | Any] | None, str | None]:
 	"""
 	Training loop for the model.
 
@@ -30,8 +30,12 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	:param scheduler: Learning rate scheduler
 	:param checkpoint_dir: Directory to save the best model
 	:param eval_bleu4: Whether to calculate the BLEU score
+	:param eval_bleu4_step: The step at which to evaluate the BLEU-4 score
 	:return: Path to the best model
 	"""
+	if eval_bleu4 and (eval_bleu4_step is None or eval_bleu4_step < 1):
+		raise ValueError("eval_bleu4_step must be greater than 0 if eval_bleu4 is True")
+
 	config = wandb.config
 	wandb.watch(model, criterion=criterion, log="all")
 
@@ -50,7 +54,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
-		avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, eval_bleu4)
+		avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, eval_bleu4, eval_bleu4_step)
 		if val_bleu4 is not None:
 			logger.info(
 				f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}"
@@ -145,7 +149,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
-			  eval_bleu4: bool) -> tuple[float | int | Any, float | None]:
+			  eval_bleu4: bool, eval_bleu4_step: int) -> tuple[float | int | Any, float | None]:
 	"""
 	Evaluates the model on the validation set for one epoch
 
@@ -155,6 +159,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	:param epoch: Current epoch
 	:param criterion: Loss function
 	:param eval_bleu4: Whether to calculate the BLEU score
+	:param eval_bleu4_step: The step at which to evaluate the BLEU-4 score
 	:return: Average validation loss and BLEU score (if calc_bleu is True)
 	"""
 	config = wandb.config
@@ -165,6 +170,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	all_references = []
 	df = get_dataset(val_loader).df
 	smoothing = SmoothingFunction().method1
+	calc_bleu4 = eval_bleu4 and (epoch + 1) % eval_bleu4_step == 0
 
 	val_loss = 0.0
 	total_tokens = 0
@@ -179,7 +185,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 			val_loss += loss.item()
 			total_tokens += num_tokens
 
-			if eval_bleu4:
+			if calc_bleu4:
 				generated = test.gen_captions(model, vocab, device, images)
 				all_hypotheses.extend(generated)
 				references = test.get_references(df, images_id)
@@ -187,7 +193,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 
 			batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
-	if eval_bleu4:
+	if calc_bleu4:
 		val_ble4 = test.get_bleu4_score(all_hypotheses, all_references, smoothing)
 		logger.info(f"Validation BLEU-4: {val_ble4}")
 		wandb.log({"val_BLEU-4": val_ble4})

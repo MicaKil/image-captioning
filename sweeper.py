@@ -23,6 +23,7 @@ def run_sweep():
 	shuffle = True
 	pin_memory = True
 	eval_bleu4 = False
+	eval_bleu4_step = 10
 
 	# Initialize wandb run
 	init_wandb_run(project=PROJECT, tags=sweep_tags, config=default_config)
@@ -56,7 +57,7 @@ def run_sweep():
 	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
 
 	best_val_model, _, _ = train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler,
-								 CHECKPOINT_DIR, eval_bleu4)
+								 CHECKPOINT_DIR, eval_bleu4, eval_bleu4_step)
 	# test last model
 	test(model, test_dataloader, device, BASIC_RESULTS, "last-model")
 	# test model with the best validation loss

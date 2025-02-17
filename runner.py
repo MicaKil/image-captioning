@@ -24,7 +24,7 @@ from scripts.utils import date_str, get_vocab
 
 
 def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool,
-		test_model: bool, saved_model: Optional[tuple[str, str]], save_dir: str, eval_bleu: bool):
+		test_model: bool, saved_model: Optional[tuple[str, str]], save_dir: str, eval_bleu: bool, eval_bleu4_step: int):
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
@@ -36,6 +36,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	:param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
 	:param save_dir: If not None, the test results are saved to this directory
 	:param eval_bleu: Whether to evaluate the BLEU score
+	:param eval_bleu4_step: The step at which to evaluate the BLEU-4 score
 	:return:
 	"""
 	date = date_str()
@@ -97,7 +98,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
 										  patience=config["scheduler"]["patience"])
 		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer,
-												 scheduler, CHECKPOINT_DIR, eval_bleu)
+												 scheduler, CHECKPOINT_DIR, eval_bleu, eval_bleu4_step)
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 			test(model, test_dataloader, DEVICE, save_dir, "last-model")
@@ -225,4 +226,4 @@ def state_dicts_equal(state_a, state_b) -> bool:
 if __name__ == "__main__":
 	wandb.teardown()
 	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True,
-		test_model=True, saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=True)
+		test_model=True, saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=True, eval_bleu4_step=5)

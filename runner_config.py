@@ -30,10 +30,10 @@ SHUFFLE = True
 PIN_MEMORY = True
 
 # model param
-EMBED_SIZE = 512
-HIDDEN_SIZE = 1024
-NUM_LAYERS = 1
-DROPOUT = 0.5
+EMBED_SIZE = 1024
+HIDDEN_SIZE = 512
+NUM_LAYERS = 2
+DROPOUT = 0.3
 FREEZE_ENCODER = True
 
 # training
@@ -43,7 +43,7 @@ MAX_CAPTION_LEN = 30
 ENCODER_LR = 5e-4
 DECODER_LR = 5e-4
 SCHEDULER_FACTOR = 0.5
-SCHEDULER_PATIENCE = 10
+SCHEDULER_PATIENCE = 15
 GRAD_MAX_NORM = 5.0
 
 # run
@@ -85,4 +85,4 @@ else:
 		"patience": SCHEDULER_PATIENCE,
 	}
 
-RUN_TAGS = ["basic", "flickr8k", "test-new-dataset"]
+RUN_TAGS = ["basic", "flickr8k"]
