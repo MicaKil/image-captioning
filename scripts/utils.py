@@ -48,6 +48,7 @@ def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = Non
 		img = img + torch.tensor(mean)
 	img = img.clamp(0, 1)
 	plt.imshow(img)
+	plt.axis("off")
 	plt.show()
 
 

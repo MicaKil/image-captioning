@@ -5,6 +5,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import wandb
 from constants import ROOT, PAD, CHECKPOINT_DIR, BASIC_RESULTS
+from runner import init_wandb_run
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
@@ -15,8 +16,7 @@ from sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, SWEEP_TAGS, TR
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 default_config = DEFAULT_CONFIG
-sweeper_config = SWEEP_CONFIG
-
+sweep_tags = SWEEP_TAGS
 
 def run_sweep():
 	num_workers = 4
@@ -25,10 +25,8 @@ def run_sweep():
 	eval_bleu4 = False
 
 	# Initialize wandb run
-	wandb_run = wandb.init(project=PROJECT, config=default_config, tags=SWEEP_TAGS)
-	wandb_run.define_metric("train_loss", summary="min")
-	wandb_run.define_metric("val_loss", summary="min")
-	config = wandb_run.config
+	init_wandb_run(project=PROJECT, tags=sweep_tags, config=default_config)
+	config = wandb.config
 
 	# Load datasets
 	train_dataset = torch.load(str(os.path.join(ROOT, TRAIN_PATH)), weights_only=False)

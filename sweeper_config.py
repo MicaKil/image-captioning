@@ -87,14 +87,17 @@ SWEEP_CONFIG = {
 	"parameters": {
 		# architecture
 		"hidden_size": {
-			"values": [512, 1024]
+			"values": [256, 512, 1024]
 		},
 		"embed_size": {
-			"values": [256, 512]
+			"values": [256, 512, 1024]
+		},
+		"num_layers": {
+			"values": [1, 2, 3, 5]
 		},
 		# regularisation
 		"dropout": {
-			"values": [0.4, 0.5]
+			"values": [0.1, 0.2, 0.4, 0.5]
 		}
 	}
 }
