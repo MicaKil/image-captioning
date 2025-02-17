@@ -9,9 +9,8 @@ from constants import SOS, EOS
 from scripts.dataset.vocabulary import Vocabulary
 
 
-def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30,
-				device: torch.device = torch.device("cpu"), temperature: Optional[float] = None,
-				beam_size: int = 1) -> str:
+def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
+                temperature: Optional[float] = None, beam_size: int = 1) -> str:
 	"""
 	Generate a caption for an image using greedy search, temperature-based sampling, or beam search.
 
@@ -40,8 +39,8 @@ def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_le
 	return vocab.to_text(caption)
 
 
-def temperature_sampling(model: nn.Module, vocab: Vocabulary, device: torch.device, features: torch.Tensor,
-						 max_length: int, temperature: Optional[float]) -> list[int]:
+def temperature_sampling(model: nn.Module, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int,
+                         temperature: Optional[float]) -> list[int]:
 	"""
 	Generate a caption using temperature-based sampling if temperature is not None, otherwise use greedy search.
 
@@ -76,8 +75,7 @@ def temperature_sampling(model: nn.Module, vocab: Vocabulary, device: torch.devi
 	return caption
 
 
-def beam_search(model: nn.Module, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int,
-				beam_size: int) -> list[int]:
+def beam_search(model: nn.Module, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int, beam_size: int) -> list[int]:
 	"""
 	Generate a caption using beam search.
 
@@ -114,10 +112,7 @@ def beam_search(model: nn.Module, vocab: Vocabulary, device: torch.device, featu
 		token_indices = top_indices % vocab_size  # Which token does this predict?
 
 		# Update sequences
-		beam_sequences = torch.cat([
-			beam_sequences[beam_indices],
-			token_indices.unsqueeze(1)
-		], dim=1)
+		beam_sequences = torch.cat([beam_sequences[beam_indices], token_indices.unsqueeze(1)], dim=1)
 		beam_scores = top_scores
 
 		# Check for completed sequences

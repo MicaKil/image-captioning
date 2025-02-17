@@ -18,6 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 default_config = DEFAULT_CONFIG
 sweep_tags = SWEEP_TAGS
 
+
 def run_sweep():
 	num_workers = 4
 	shuffle = True
@@ -42,8 +43,8 @@ def run_sweep():
 	test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
 
 	# Initialize model and optimizer
-	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-							config["num_layers"], pad_idx, config["freeze_encoder"])
+	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx,
+	                        config["freeze_encoder"])
 
 	criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
 	optimizer = torch.optim.Adam([
@@ -51,18 +52,18 @@ def run_sweep():
 		{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
 	])
 	scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
-								  patience=config["scheduler"]["patience"])
+	                              patience=config["scheduler"]["patience"])
 
 	print(f"Model:\n{model}")
 	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
 
 	best_val_model, _, _ = train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler,
-								 CHECKPOINT_DIR, eval_bleu4, eval_bleu4_step)
+	                             CHECKPOINT_DIR, eval_bleu4, eval_bleu4_step)
 	# test last model
 	test(model, test_dataloader, device, BASIC_RESULTS, "last-model")
 	# test model with the best validation loss
-	best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-						   config["num_layers"], pad_idx, config["freeze_encoder"])
+	best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx,
+	                       config["freeze_encoder"])
 	best.load_state_dict(torch.load(best_val_model, weights_only=True))
 	test(best, test_dataloader, device, BASIC_RESULTS, "best-model")
 

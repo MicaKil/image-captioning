@@ -48,11 +48,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 
 			# Log results
 			for img_id, ref, gen in zip(image_ids, references, generated):
-				results.append({
-					"image_id": img_id,
-					"references": ref,
-					"generated": gen
-				})
+				results.append({"image_id": img_id, "references": ref, "generated": gen})
 
 	# BLEU scores
 	bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
@@ -135,8 +131,7 @@ def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tu
 	tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
 	tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
 	bleu_1 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(1, 0, 0, 0), smoothing_function=smoothing)
-	bleu_2 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(0.5, 0.5, 0, 0),
-						 smoothing_function=smoothing)
+	bleu_2 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(0.5, 0.5, 0, 0), smoothing_function=smoothing)
 	bleu_4 = corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 	return bleu_1, bleu_2, bleu_4
 
@@ -172,7 +167,7 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str) 
 		# Save metrics
 		metrics_pd = pd.DataFrame(metrics, index=[0])
 		metrics_pd.to_csv(os.path.join(ROOT, f"{save_dir}/metrics_{tag}_{time_}.csv"), index=False,
-						  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
+		                  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
 	wandb.log(metrics)
 	results_table = wandb.Table(dataframe=results)

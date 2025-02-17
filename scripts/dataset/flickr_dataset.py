@@ -16,8 +16,7 @@ class FlickrDataset(Dataset):
 	Custom Dataset for loading Flickr8k images and captions.
 	"""
 
-	def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None,
-				 target_transform=None):
+	def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None, target_transform=None):
 		"""
 		:param img_dir: Path to the directory containing the images
 		:param df_captions: DataFrame containing the image IDs and captions
@@ -109,9 +108,7 @@ def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataF
 
 	# Verify that the sum of split lengths equals the number of unique images
 	if sum(split_lengths) != n_total:
-		raise ValueError(
-			f"Sum of split lengths ({sum(split_lengths)}) must equal the number of unique images ({n_total})."
-		)
+		raise ValueError(f"Sum of split lengths ({sum(split_lengths)}) must equal the number of unique images ({n_total}).")
 
 	# Shuffle the unique image IDs to ensure randomness
 	shuffled_images = np.random.permutation(unique_images)

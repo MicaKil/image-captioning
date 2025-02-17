@@ -1,7 +1,6 @@
 import os.path
 from typing import Optional, Union
 
-import pandas as pd
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -11,11 +10,10 @@ from wandb.sdk.wandb_run import Run
 
 import wandb
 from config import logger
-from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, BASIC_RESULTS
-from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, \
-	TRAIN_PATH, VAL_PATH, TEST_PATH, RUN_TAGS
+from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE
+from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, TRAIN_PATH, VAL_PATH, TEST_PATH, RUN_TAGS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
-from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe
+from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
@@ -23,8 +21,8 @@ from scripts.train import train
 from scripts.utils import date_str, get_vocab
 
 
-def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool,
-		test_model: bool, saved_model: Optional[tuple[str, str]], save_dir: str, eval_bleu: bool, eval_bleu4_step: int):
+def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool, test_model: bool,
+        saved_model: Optional[tuple[str, str]], save_dir: Optional[str], eval_bleu: bool, eval_bleu4_step: int):
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
@@ -45,7 +43,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 
 	# create or load dataset
 	if create_dataset:
-		df_captions = pd.read_csv(str(os.path.join(ROOT, FLICKR8K_CSV_FILE)))
+		df_captions = load_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
 		total_size = len(df_captions["image_id"].unique())
 		train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
 		val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
@@ -71,8 +69,8 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	vocab = get_vocab(train_dataset)
 	pad_idx = vocab.to_idx(PAD)
 
-	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-							config["num_layers"], pad_idx, config["freeze_encoder"])
+	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx,
+	                        config["freeze_encoder"])
 	if saved_model is not None:
 		logger.info(f"Loading model from {saved_model}")
 		model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
@@ -95,18 +93,17 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		])
 		scheduler = None
 		if config["scheduler"] is not None:
-			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"],
-										  patience=config["scheduler"]["patience"])
-		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer,
-												 scheduler, CHECKPOINT_DIR, eval_bleu, eval_bleu4_step)
+			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
+		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR,
+		                                         eval_bleu, eval_bleu4_step)
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 			test(model, test_dataloader, DEVICE, save_dir, "last-model")
 			wandb.finish()
 			if best_val_model is not None:
 				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
-				best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"],
-									   config["num_layers"], pad_idx, config["freeze_encoder"])
+				best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"],
+				                       pad_idx, config["freeze_encoder"])
 				best.load_state_dict(torch.load(best_val_model, weights_only=True))
 				test(best, test_dataloader, DEVICE, save_dir, "best-model")
 				wandb.log(best_val_info)
@@ -116,12 +113,9 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 
 
 def save_df(config, date, test_df, train_df, val_df):
-	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{config['dataset']['split']['train']}_{date}.csv")),
-					header=["image_id", "caption"])
-	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{config['dataset']['split']['val']}_{date}.csv")),
-				  header=["image_id", "caption"])
-	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{config['dataset']['split']['test']}_{date}.csv")),
-				   header=["image_id", "caption"])
+	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{config['dataset']['split']['train']}_{date}.csv")), header=["image_id", "caption"])
+	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{config['dataset']['split']['val']}_{date}.csv")), header=["image_id", "caption"])
+	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{config['dataset']['split']['test']}_{date}.csv")), header=["image_id", "caption"])
 
 
 def init_wandb_run(project: str, tags: list, config: dict) -> Run:
@@ -151,23 +145,19 @@ def log_datasets(date: str):
 	"""
 	config = wandb.config
 	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_full_dataset", type="dataset",
-					   metadata={"version": config["dataset"]["version"]}),
+		wandb.Artifact(f"{config["dataset"]["name"]}_full_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
 		os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt")
 	)
 	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_train_dataset", type="dataset",
-					   metadata={"version": config["dataset"]["version"]}),
+		wandb.Artifact(f"{config["dataset"]["name"]}_train_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
 		os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_{date}_s{config["dataset"]["split"]["train"]}.pt")
 	)
 	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_val_dataset", type="dataset",
-					   metadata={"version": config["dataset"]["version"]}),
+		wandb.Artifact(f"{config["dataset"]["name"]}_val_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
 		os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_{date}_s{config["dataset"]["split"]["val"]}.pt")
 	)
 	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_test_dataset", type="dataset",
-					   metadata={"version": config["dataset"]["version"]}),
+		wandb.Artifact(f"{config["dataset"]["name"]}_test_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
 		os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_{date}_s{config["dataset"]["split"]["test"]}.pt")
 	)
 
@@ -182,8 +172,8 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 	wandb.log_artifact(artifact)
 
 
-def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset],
-				  val_dataset: Union[FlickrDataset | Subset], test_dataset: Union[FlickrDataset | Subset], date: str):
+def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset], val_dataset: Union[FlickrDataset | Subset],
+                  test_dataset: Union[FlickrDataset | Subset], date: str):
 	"""
 	Save datasets to disk
 	:param full_dataset: Complete dataset
@@ -196,18 +186,9 @@ def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[Fl
 	config = wandb.config
 	if full_dataset is not None:
 		torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
-	torch.save(
-		train_dataset,
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_{date}_s{config["dataset"]["split"]["train"]}.pt")
-	)
-	torch.save(
-		val_dataset,
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_{date}_s{config["dataset"]["split"]["val"]}.pt")
-	)
-	torch.save(
-		test_dataset,
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_{date}_s{config["dataset"]["split"]["test"]}.pt")
-	)
+	torch.save(train_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_{date}_s{config["dataset"]["split"]["train"]}.pt"))
+	torch.save(val_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_{date}_s{config["dataset"]["split"]["val"]}.pt"))
+	torch.save(test_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_{date}_s{config["dataset"]["split"]["test"]}.pt"))
 
 
 def state_dicts_equal(state_a, state_b) -> bool:
@@ -225,5 +206,5 @@ def state_dicts_equal(state_a, state_b) -> bool:
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True,
-		test_model=True, saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=True, eval_bleu4_step=5)
+	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, save_dataset_=False, train_model=True, test_model=True, saved_model=None,
+	    save_dir=None, eval_bleu=True, eval_bleu4_step=1)

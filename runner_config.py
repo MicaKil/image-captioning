@@ -37,17 +37,17 @@ DROPOUT = 0.3
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 100
+MAX_EPOCHS = 2
 PATIENCE = None
 MAX_CAPTION_LEN = 30
 ENCODER_LR = 5e-4
 DECODER_LR = 5e-4
 SCHEDULER_FACTOR = 0.5
-SCHEDULER_PATIENCE = 15
+SCHEDULER_PATIENCE = None
 GRAD_MAX_NORM = 5.0
 
 # run
-PROJECT = "image-captioning-v1"
+PROJECT = "image-captioning-v0"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 RUN_CONFIG = {
 	"encoder": "resnet50",

@@ -15,9 +15,9 @@ from scripts import test
 from scripts.utils import time_str, get_vocab, get_dataset
 
 
-def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device,
-		  criterion: nn.Module, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str,
-		  eval_bleu4: bool, eval_bleu4_step: int) -> tuple[str | None, dict[str, float | int | Any] | None, str | None]:
+def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
+          scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, eval_bleu4: bool,
+          eval_bleu4_step: int) -> tuple[str | None, dict[str, float | int | Any] | None, str | None]:
 	"""
 	Training loop for the model.
 
@@ -39,9 +39,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	config = wandb.config
 	wandb.watch(model, criterion=criterion, log="all")
 
-	logger.info(
-		f"Start training model for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}"
-	)
+	logger.info(f"Start training model for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
 	best_val_loss = np.inf
 	best_val_info = None
@@ -56,9 +54,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer)
 		avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, eval_bleu4, eval_bleu4_step)
 		if val_bleu4 is not None:
-			logger.info(
-				f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}"
-			)
+			logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}")
 		else:
 			logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 		metric = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
@@ -75,8 +71,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		if avg_val_loss < best_val_loss:
 			best_val_loss = avg_val_loss
 			epochs_no_improve = 0
-			best_val_info, best_val_model = checkpoint(model, checkpoint_dir, best_val_loss, best_val_model, cur_lr,
-													   epoch)
+			best_val_info, best_val_model = checkpoint(model, checkpoint_dir, best_val_loss, best_val_model, cur_lr, epoch)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
 			if config["patience"] is not None:
@@ -91,10 +86,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 
 	# Log last model
 	if avg_val_loss != -1:
-		last_model_pth = os.path.join(
-			ROOT,
-			f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt"
-		)
+		last_model_pth = os.path.join(ROOT, f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt")
 		torch.save(model.state_dict(), last_model_pth)
 		wandb.log_model(path=last_model_pth)
 	logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
@@ -107,8 +99,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	return best_val_model, best_val_info, last_model_pth
 
 
-def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
-			   optimizer: torch.optim) -> float:
+def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim) -> float:
 	"""
 	Trains the model on the training set for one epoch
 
@@ -148,8 +139,8 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module,
-			  eval_bleu4: bool, eval_bleu4_step: int) -> tuple[float | int | Any, float | None]:
+def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, eval_bleu4: bool,
+              eval_bleu4_step: int) -> tuple[float | int | Any, float | None]:
 	"""
 	Evaluates the model on the validation set for one epoch
 
@@ -170,7 +161,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	all_references = []
 	df = get_dataset(val_loader).df
 	smoothing = SmoothingFunction().method1
-	calc_bleu4 = eval_bleu4 and (epoch + 1) % eval_bleu4_step == 0
+	calc_bleu4 = eval_bleu4 and ((epoch + 1) % eval_bleu4_step == 0 or epoch == 0)
 
 	val_loss = 0.0
 	total_tokens = 0
@@ -201,8 +192,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	return val_loss / total_tokens if total_tokens > 0 else 0, val_ble4
 
 
-def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module,
-				 pad_idx: int) -> tuple:
+def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module, pad_idx: int) -> tuple[torch.Tensor, int]:
 	"""
 	Performs a forward pass through the model.
 
@@ -226,8 +216,7 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 	return loss, num_tokens
 
 
-def checkpoint(model: nn.Module, checkpoint_dir: str, best_val_loss: float, best_val_model: str, cur_lr: tuple,
-			   epoch: int):
+def checkpoint(model: nn.Module, checkpoint_dir: str, best_val_loss: float, best_val_model: str, cur_lr: tuple, epoch: int):
 	"""
 	Checkpoint the model
 	:param model: Current model
@@ -242,10 +231,7 @@ def checkpoint(model: nn.Module, checkpoint_dir: str, best_val_loss: float, best
 	if best_val_model is not None:
 		os.remove(best_val_model)
 	# save new best model
-	best_val_model = os.path.join(
-		ROOT,
-		f"{checkpoint_dir}/best_val_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt"
-	)
+	best_val_model = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt")
 	best_val_info = {"epoch": epoch + 1, "val_loss": best_val_loss, "encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]}
 	torch.save(model.state_dict(), best_val_model)
 	return best_val_info, best_val_model
