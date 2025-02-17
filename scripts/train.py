@@ -36,7 +36,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	wandb.watch(model, criterion=criterion, log="all")
 
 	logger.info(
-		f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}"
+		f"Start training model for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}"
 	)
 
 	best_val_loss = np.inf
@@ -76,7 +76,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
 
-		if epochs_no_improve > 0 and epochs_no_improve % config["scheduler"]["patience"] == 0:
+		if epochs_no_improve > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
 			logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
 	# Log last model
@@ -88,6 +88,11 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		torch.save(model.state_dict(), last_model_pth)
 		wandb.log_model(path=last_model_pth)
 	logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
+	# check best_val_model != last_model
+	if best_val_info["epoch"] == metric["epoch"]:
+		# if they are the same, then the best model is the last model
+		best_val_model = None
+		best_val_info = None
 	return best_val_model, best_val_info, last_model_pth
 
 

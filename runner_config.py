@@ -32,18 +32,18 @@ PIN_MEMORY = True
 # model param
 EMBED_SIZE = 256
 HIDDEN_SIZE = 512
-NUM_LAYERS = 3
+NUM_LAYERS = 1
 DROPOUT = 0.5
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 100
-PATIENCE = 30
+MAX_EPOCHS = 10
+PATIENCE = None
 MAX_CAPTION_LEN = 40
 ENCODER_LR = 1e-4
 DECODER_LR = 5e-4
 SCHEDULER_FACTOR = 0.5
-SCHEDULER_PATIENCE = 10
+SCHEDULER_PATIENCE = None
 GRAD_MAX_NORM = 5.0
 
 # run
@@ -60,11 +60,6 @@ RUN_CONFIG = {
 	"freeze_encoder": FREEZE_ENCODER,
 	"encoder_lr": ENCODER_LR,
 	"decoder_lr": DECODER_LR,
-	"scheduler": {
-		"type": "ReduceLROnPlateau",
-		"factor": SCHEDULER_FACTOR,
-		"patience": SCHEDULER_PATIENCE,
-	},
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
 	"max_epochs": MAX_EPOCHS,
@@ -81,4 +76,13 @@ RUN_CONFIG = {
 	"max_caption_len": MAX_CAPTION_LEN
 }
 
-RUN_TAGS = ["basic", "flickr8k"]
+if SCHEDULER_PATIENCE is None:
+	RUN_CONFIG["scheduler"] = None
+else:
+	RUN_CONFIG["scheduler"] = {
+		"type": "ReduceLROnPlateau",
+		"factor": SCHEDULER_FACTOR,
+		"patience": SCHEDULER_PATIENCE,
+	}
+
+RUN_TAGS = ["basic", "flickr8k", "test-new-dataset"]

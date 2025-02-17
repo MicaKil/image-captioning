@@ -113,14 +113,12 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 
 
 def save_df(config, date, test_df, train_df, val_df):
-	train_df.to_csv(
-		str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{config['dataset']['split']['train']}_{date}.csv")),
-		header=["image_id", "caption"])
+	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{config['dataset']['split']['train']}_{date}.csv")),
+					header=["image_id", "caption"])
 	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{config['dataset']['split']['val']}_{date}.csv")),
 				  header=["image_id", "caption"])
-	test_df.to_csv(
-		str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{config['dataset']['split']['test']}_{date}.csv")),
-		header=["image_id", "caption"])
+	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{config['dataset']['split']['test']}_{date}.csv")),
+				   header=["image_id", "caption"])
 
 
 def init_wandb_run(project: str, tags: list, config: dict) -> Run:
