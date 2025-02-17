@@ -1,11 +1,12 @@
 import os.path
 from typing import Optional, Union
 
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.utils.data import random_split, Subset
+from torch.utils.data import Subset
 from wandb.sdk.wandb_run import Run
 
 import wandb
@@ -14,7 +15,7 @@ from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR8K_IMG_DIR, CHECKPOINT_DIR,
 from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, \
 	TRAIN_PATH, VAL_PATH, TEST_PATH, RUN_TAGS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
-from scripts.dataset.flickr_dataset import FlickrDataset, load_captions
+from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.basic import ImageCaptioning
 from scripts.test import test
@@ -43,20 +44,22 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 
 	# create or load dataset
 	if create_dataset:
-		ann_file = str(os.path.join(ROOT, FLICKR8K_CSV_FILE))
-		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-		df_captions = load_captions(ann_file)
-		vocab = Vocabulary(config["vocab"]["freq_threshold"], df_captions["caption"])
-		full_dataset = FlickrDataset(img_dir, df_captions, vocab, transform=TRANSFORM)
-
-		total_size = len(full_dataset)
+		df_captions = pd.read_csv(str(os.path.join(ROOT, FLICKR8K_CSV_FILE)))
+		total_size = len(df_captions["image_id"].unique())
 		train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
 		val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
 		test_size = total_size - train_size - val_size
-		train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
+		train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
+
+		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
+		vocab = Vocabulary(config["vocab_threshold"], train_df["caption"])
+		train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
+		val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
+		test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
 		if save_dataset_:
-			save_datasets(full_dataset, test_dataset, train_dataset, val_dataset, date)  # save new datasets
+			save_df(config, date, test_df, train_df, val_df)
+			save_datasets(None, train_dataset, val_dataset, test_dataset, date)  # save new datasets
 			log_datasets(date)  # log datasets to wandb
 	else:
 		train_dataset = torch.load(str(os.path.join(ROOT, TRAIN_PATH)), weights_only=False)
@@ -107,6 +110,17 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 				wandb.log_model(path=best_val_model)
 
 	wandb.finish()
+
+
+def save_df(config, date, test_df, train_df, val_df):
+	train_df.to_csv(
+		str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{config['dataset']['split']['train']}_{date}.csv")),
+		header=["image_id", "caption"])
+	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{config['dataset']['split']['val']}_{date}.csv")),
+				  header=["image_id", "caption"])
+	test_df.to_csv(
+		str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{config['dataset']['split']['test']}_{date}.csv")),
+		header=["image_id", "caption"])
 
 
 def init_wandb_run(project: str, tags: list, config: dict) -> Run:
@@ -167,8 +181,8 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 	wandb.log_artifact(artifact)
 
 
-def save_datasets(full_dataset: FlickrDataset, test_dataset: Union[FlickrDataset | Subset],
-				  train_dataset: Union[FlickrDataset | Subset], val_dataset: Union[FlickrDataset | Subset], date: str):
+def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset],
+				  val_dataset: Union[FlickrDataset | Subset], test_dataset: Union[FlickrDataset | Subset], date: str):
 	"""
 	Save datasets to disk
 	:param full_dataset: Complete dataset
@@ -179,7 +193,8 @@ def save_datasets(full_dataset: FlickrDataset, test_dataset: Union[FlickrDataset
 	:return:
 	"""
 	config = wandb.config
-	torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
+	if full_dataset is not None:
+		torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
 	torch.save(
 		train_dataset,
 		os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_{date}_s{config["dataset"]["split"]["train"]}.pt")

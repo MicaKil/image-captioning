@@ -1,5 +1,6 @@
 import os.path
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
@@ -14,35 +15,6 @@ class FlickrDataset(Dataset):
 	"""
 	Custom Dataset for loading Flickr8k images and captions.
 	"""
-
-	# def __init__(self, ann_file: str, img_dir: str, save_captions=False, vocab_threshold=2, vocab: Vocabulary = None,
-	# 			 save_vocab=False, transform=None, target_transform=None):
-	# 	"""
-	# 	:param ann_file: Path to the annotation file with the image IDs and captions
-	# 	:param img_dir: Path to the directory containing the images
-	# 	:param save_captions: If True, save the captions to a CSV file
-	# 	:param vocab_threshold: Minimum frequency of a word to be included in the vocabulary
-	# 	:param vocab: Vocabulary object to use if provided
-	# 	:param save_vocab: If True, save the vocabulary to a file
-	# 	:param transform: Transform to apply to the images
-	# 	:param target_transform: Transform to apply to the target captions
-	# 	"""
-	# 	logger.info("Initializing FlickerDataset.")
-	# 	self.img_dir = img_dir
-	# 	self.transform = transform
-	# 	self.target_transform = target_transform
-	#
-	# 	self.df = load_captions(ann_file, save_captions)
-	# 	self.img_ids, self.captions = self.df["image_id"], self.df["caption"]
-	#
-	# 	if vocab is not None:
-	# 		logger.info("Using existing vocabulary.")
-	# 		self.vocab = vocab
-	# 	else:
-	# 		self.vocab = Vocabulary(vocab_threshold, self.captions)
-	#
-	# 	if save_vocab:
-	# 		dump(self.vocab, str(os.path.join(ROOT, VOCAB_FILE)))
 
 	def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None,
 				 target_transform=None):
@@ -122,3 +94,39 @@ def extract_captions(path: str) -> list[dict[str, str]]:
 			image_id = image_id.split("#")[0]
 			captions.append({"image_id": image_id, "caption": caption})
 	return captions
+
+
+def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataFrame]:
+	"""
+	Split a DataFrame containing image IDs and captions into multiple DataFrames based on the specified lengths.
+	:param df: DataFrame containing the Flickr8k image IDs and captions
+	:param split_lengths: List of integers specifying the lengths of the splits. Must sum to the number of unique images.
+	:return: List of DataFrames containing the splits
+	"""
+	# Extract all unique image IDs from the dataframe
+	unique_images = df['image_id'].unique()
+	n_total = len(unique_images)
+
+	# Verify that the sum of split lengths equals the number of unique images
+	if sum(split_lengths) != n_total:
+		raise ValueError(
+			f"Sum of split lengths ({sum(split_lengths)}) must equal the number of unique images ({n_total})."
+		)
+
+	# Shuffle the unique image IDs to ensure randomness
+	shuffled_images = np.random.permutation(unique_images)
+
+	# Calculate the indices where the splits occur
+	split_indices = np.cumsum(split_lengths[:-1])
+
+	# Split the shuffled image IDs into groups according to split_lengths
+	image_splits = np.split(shuffled_images, split_indices)
+
+	# Create dataframe splits based on the image IDs in each split
+	df_splits = []
+	for images in image_splits:
+		mask = df['image_id'].isin(images)
+		df_split = df[mask]
+		df_splits.append(df_split)
+
+	return df_splits
