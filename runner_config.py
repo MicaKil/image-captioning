@@ -24,7 +24,7 @@ VAL_PATH = "datasets/flickr8k/val_10_2025-02-16.pt"
 TEST_PATH = "datasets/flickr8k/test_10_2025-02-16.pt"
 
 # dataloaders
-BATCH_SIZE = 64
+BATCH_SIZE = 8
 NUM_WORKERS = 8
 SHUFFLE = True
 PIN_MEMORY = True

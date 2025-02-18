@@ -186,7 +186,6 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 
 	if calc_bleu4:
 		val_ble4 = test.get_bleu4_score(all_hypotheses, all_references, smoothing)
-		logger.info(f"Validation BLEU-4: {val_ble4}")
 		wandb.log({"val_BLEU-4": val_ble4})
 
 	return val_loss / total_tokens if total_tokens > 0 else 0, val_ble4

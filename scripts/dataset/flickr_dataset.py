@@ -123,7 +123,7 @@ def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataF
 	df_splits = []
 	for images in image_splits:
 		mask = df['image_id'].isin(images)
-		df_split = df[mask]
+		df_split = df[mask].reset_index(drop=True)
 		df_splits.append(df_split)
 
 	return df_splits

@@ -51,7 +51,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
 
 		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-		vocab = Vocabulary(config["vocab_threshold"], train_df["caption"])
+		vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
 		train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
 		val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
 		test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
@@ -59,7 +59,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		if save_dataset_:
 			save_df(config, date, test_df, train_df, val_df)
 			save_datasets(None, train_dataset, val_dataset, test_dataset, date)  # save new datasets
-			log_datasets(date)  # log datasets to wandb
+			log_datasets(date, False)  # log datasets to wandb
 	else:
 		train_dataset = torch.load(str(os.path.join(ROOT, TRAIN_PATH)), weights_only=False)
 		val_dataset = torch.load(str(os.path.join(ROOT, VAL_PATH)), weights_only=False)
@@ -112,12 +112,6 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	wandb.finish()
 
 
-def save_df(config, date, test_df, train_df, val_df):
-	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{config['dataset']['split']['train']}_{date}.csv")), header=["image_id", "caption"])
-	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{config['dataset']['split']['val']}_{date}.csv")), header=["image_id", "caption"])
-	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{config['dataset']['split']['test']}_{date}.csv")), header=["image_id", "caption"])
-
-
 def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 	"""
 	Initialize wandb run
@@ -137,39 +131,10 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 	return wandb_run
 
 
-def log_datasets(date: str):
-	"""
-	Log datasets to wandb
-	:param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
-	:return:
-	"""
-	config = wandb.config
-	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_full_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt")
-	)
-	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_train_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_{date}_s{config["dataset"]["split"]["train"]}.pt")
-	)
-	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_val_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_{date}_s{config["dataset"]["split"]["val"]}.pt")
-	)
-	log_dataset(
-		wandb.Artifact(f"{config["dataset"]["name"]}_test_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-		os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_{date}_s{config["dataset"]["split"]["test"]}.pt")
-	)
-
-
-def log_dataset(artifact: wandb.Artifact, dataset_path: str):
-	"""
-	Log dataset to wandb
-	:param artifact: Wandb artifact
-	:param dataset_path: Path to the dataset
-	"""
-	artifact.add_file(dataset_path)
-	wandb.log_artifact(artifact)
+def save_df(config, date, test_df, train_df, val_df):
+	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"], index=False)
+	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"], index=False)
+	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{date}_{config['dataset']['split']['test']}.csv")), header=["image_id", "caption"], index=False)
 
 
 def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset], val_dataset: Union[FlickrDataset | Subset],
@@ -186,9 +151,46 @@ def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[Fl
 	config = wandb.config
 	if full_dataset is not None:
 		torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
-	torch.save(train_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/train_dataset_{date}_s{config["dataset"]["split"]["train"]}.pt"))
-	torch.save(val_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/val_dataset_{date}_s{config["dataset"]["split"]["val"]}.pt"))
-	torch.save(test_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/test_dataset_{date}_s{config["dataset"]["split"]["test"]}.pt"))
+	torch.save(train_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/train_{date}_{config["dataset"]["split"]["train"]}.pt"))
+	torch.save(val_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/val_{date}_{config["dataset"]["split"]["val"]}.pt"))
+	torch.save(test_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/test_{date}_{config["dataset"]["split"]["test"]}.pt"))
+
+
+def log_datasets(date: str, has_full_ds):
+	"""
+	Log datasets to wandb
+	:param has_full_ds:
+	:param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
+	:return:
+	"""
+	config = wandb.config
+	if has_full_ds:
+		log_dataset(
+			wandb.Artifact(f"{config["dataset"]["name"]}_full_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
+			os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt")
+		)
+	log_dataset(
+		wandb.Artifact(f"{config["dataset"]["name"]}_train_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
+		os.path.join(ROOT, f"{FLICKR8K_DIR}/train_{date}_{config["dataset"]["split"]["train"]}.pt")
+	)
+	log_dataset(
+		wandb.Artifact(f"{config["dataset"]["name"]}_val_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
+		os.path.join(ROOT, f"{FLICKR8K_DIR}/val_{date}_{config["dataset"]["split"]["val"]}.pt")
+	)
+	log_dataset(
+		wandb.Artifact(f"{config["dataset"]["name"]}_test_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
+		os.path.join(ROOT, f"{FLICKR8K_DIR}/test_{date}_{config["dataset"]["split"]["test"]}.pt")
+	)
+
+
+def log_dataset(artifact: wandb.Artifact, dataset_path: str):
+	"""
+	Log dataset to wandb
+	:param artifact: Wandb artifact
+	:param dataset_path: Path to the dataset
+	"""
+	artifact.add_file(dataset_path)
+	wandb.log_artifact(artifact)
 
 
 def state_dicts_equal(state_a, state_b) -> bool:
@@ -206,5 +208,5 @@ def state_dicts_equal(state_a, state_b) -> bool:
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, save_dataset_=False, train_model=True, test_model=True, saved_model=None,
+	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, save_dataset_=True, train_model=True, test_model=True, saved_model=None,
 	    save_dir=None, eval_bleu=True, eval_bleu4_step=1)
