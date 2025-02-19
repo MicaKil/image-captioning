@@ -24,30 +24,30 @@ VAL_PATH = "datasets/flickr8k/val_10_2025-02-16.pt"
 TEST_PATH = "datasets/flickr8k/test_10_2025-02-16.pt"
 
 # dataloaders
-BATCH_SIZE = 8
+BATCH_SIZE = 64
 NUM_WORKERS = 8
 SHUFFLE = True
 PIN_MEMORY = True
 
 # model param
-EMBED_SIZE = 1024
+EMBED_SIZE = 256
 HIDDEN_SIZE = 512
-NUM_LAYERS = 2
+NUM_LAYERS = 1
 DROPOUT = 0.3
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 2
-PATIENCE = None
+MAX_EPOCHS = 100
+PATIENCE = 10
 MAX_CAPTION_LEN = 30
-ENCODER_LR = 5e-4
-DECODER_LR = 5e-4
+ENCODER_LR = 1e-4
+DECODER_LR = 1e-4
 SCHEDULER_FACTOR = 0.5
 SCHEDULER_PATIENCE = None
 GRAD_MAX_NORM = 5.0
 
 # run
-PROJECT = "image-captioning-v0"
+PROJECT = "image-captioning-v1"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 RUN_CONFIG = {
 	"encoder": "resnet50",

@@ -59,13 +59,13 @@ def temperature_sampling(model: nn.Module, vocab: Vocabulary, device: torch.devi
 		logits = outputs[:, -1, :]  # Get last predicted token (batch_size, vocab_size)
 
 		# Choose next token
-		if temperature is not None:
+		if temperature is None or temperature == 0.0:
+			# Greedy search
+			next_token = torch.argmax(logits, dim=-1).item()
+		else:
 			# Temperature sampling
 			probs = torch.softmax(logits / temperature, dim=-1)
 			next_token = torch.multinomial(probs, 1).item()
-		else:
-			# Greedy search
-			next_token = torch.argmax(logits, dim=-1).item()
 
 		# Stop if we predict the end token
 		if next_token == vocab.to_idx(EOS):

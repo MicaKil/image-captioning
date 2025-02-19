@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+# import torch.nn.functional as F
 from einops import rearrange
+from torch.nn.functional import log_softmax, softmax
 
 from constants import SOS, EOS, UNK
 from scripts.models.basic import EncoderResnet
@@ -144,3 +146,89 @@ class ImageCaptioningTransformer(nn.Module):
 		# Final output
 		logits = self.output_layer(txt_emb)
 		return logits
+
+	def generate(self, image, vocab, max_length=30, temperature=1.0, beam_size=1):
+		self.eval()
+		with torch.no_grad():
+			# Encode image
+			img_features = self.encoder(image.unsqueeze(0))
+			img_features = rearrange(img_features, 'b c h w -> b (h w) c')
+
+			if beam_size > 1:
+				return self.beam_search(img_features, vocab, max_length, beam_size)
+			else:
+				return self.temperature_sampling(img_features, vocab, max_length, temperature)
+
+	def beam_search(self, img_features, vocab, max_length, beam_size):
+		# Initialize beam search
+		sos_idx = vocab.to_idx(SOS)
+		eos_idx = vocab.to_idx(EOS)
+		# vocab_size = len(vocab)
+
+		# Expand features for beam search
+		img_features = img_features.repeat(beam_size, 1, 1)
+
+		# Initialize beams (log_prob, sequence)
+		beams = [(0.0, [sos_idx])]
+
+		for _ in range(max_length):
+			candidates = []
+			for score, seq in beams:
+				if seq[-1] == eos_idx:
+					candidates.append((score, seq))
+					continue
+
+				# Prepare input
+				tokens = torch.tensor([seq], device=img_features.device)
+
+				# Forward pass
+				txt_emb = self.seq_embedding(tokens)
+				for layer in self.decoder_layers:
+					txt_emb = layer(img_features[:len(tokens)], txt_emb)
+				logits = self.output_layer(txt_emb[:, -1, :])
+
+				# Get probabilities
+				log_probs = log_softmax(logits, dim=-1)
+				top_probs, top_indices = log_probs.topk(beam_size)
+
+				# Add candidates
+				for i in range(beam_size):
+					candidates.append((
+						score + top_probs[0, i].item(),
+						seq + [top_indices[0, i].item()]
+					))
+
+			# Keep top-k candidates
+			candidates.sort(reverse=True, key=lambda x: x[0] / (len(x[1]) ** 0.5))  # Length normalization
+			beams = candidates[:beam_size]
+
+			# Check if all beams are complete
+			if all(seq[-1] == eos_idx for _, seq in beams):
+				break
+
+		# Return best sequence
+		best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
+		return best_seq[1:-1]  # Remove SOS and EOS
+
+	def temperature_sampling(self, img_features, vocab, max_length, temperature):
+		tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
+
+		for _ in range(max_length):
+			txt_emb = self.seq_embedding(tokens)
+			for layer in self.decoder_layers:
+				txt_emb = layer(img_features, txt_emb)
+			logits = self.output_layer(txt_emb[:, -1, :])
+
+			if temperature is None or temperature == 0:
+				next_token = logits.argmax(-1)
+			else:
+				probs = softmax(logits / temperature, dim=-1)
+				next_token = torch.multinomial(probs, 1)
+
+			tokens = torch.cat([tokens, next_token], dim=1)
+
+			if next_token.item() == vocab.to_idx(EOS):
+				break
+
+		# return tokens.squeeze().tolist()[1:-1]
+		return vocab.to_text(tokens.squeeze().tolist())

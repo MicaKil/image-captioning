@@ -10,7 +10,7 @@ from wandb.sdk.wandb_run import Run
 
 import wandb
 from config import logger
-from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE
+from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, BASIC_RESULTS
 from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, TRAIN_PATH, VAL_PATH, TEST_PATH, RUN_TAGS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
@@ -208,5 +208,5 @@ def state_dicts_equal(state_a, state_b) -> bool:
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=True, save_dataset_=True, train_model=True, test_model=True, saved_model=None,
-	    save_dir=None, eval_bleu=True, eval_bleu4_step=1)
+	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True, test_model=True, saved_model=None,
+	    save_dir=BASIC_RESULTS, eval_bleu=True, eval_bleu4_step=10)
