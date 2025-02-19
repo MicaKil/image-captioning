@@ -208,7 +208,7 @@ class ImageCaptioningTransformer(nn.Module):
 
 		# Return best sequence
 		best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
-		return best_seq[1:-1]  # Remove SOS and EOS
+		return vocab.to_text(best_seq)
 
 	def temperature_sampling(self, img_features, vocab, max_length, temperature):
 		tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
