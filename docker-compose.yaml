@@ -1,8 +1,7 @@
-version: '3.8'
-
 services:
   trainer:
     build: .
+    env_file: .env
     environment:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - DATASET_NAME=${DATASET_NAME}
@@ -25,3 +24,9 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    secrets:
+      - wandb_api_key
+
+secrets:
+  wandb_api_key:
+    file: ./secrets.txt

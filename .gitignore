@@ -235,3 +235,5 @@ datasets/*
 /wandb/
 /checkpoints/
 /results/
+
+secrets.txt
