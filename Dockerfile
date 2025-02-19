@@ -6,10 +6,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3.13 \
-    python3.13-dev \
-    python3.13-distutils \
-    python3-pip \
+    python3.13-full \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +15,7 @@ WORKDIR /app
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python3.13 -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
