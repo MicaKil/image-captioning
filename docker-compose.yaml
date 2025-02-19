@@ -1,19 +1,11 @@
 services:
   trainer:
-    build: .
+    build: 
+      context: .
+      args:
+        - NVIDIA_CUDA_VERSION=12.6
+    runtime: nvidia
     env_file: .env
-    environment:
-      - WANDB_API_KEY=${WANDB_API_KEY}
-      - DATASET_NAME=${DATASET_NAME}
-      - DATASET_VERSION=${DATASET_VERSION}
-      - EMBED_SIZE=${EMBED_SIZE}
-      - HIDDEN_SIZE=${HIDDEN_SIZE}
-      - NUM_LAYERS=${NUM_LAYERS}
-      - DROPOUT=${DROPOUT}
-      - FREEZE_ENCODER=${FREEZE_ENCODER}
-      - MAX_EPOCHS=${MAX_EPOCHS}
-      - PATIENCE=${PATIENCE}
-      - BATCH_SIZE=${BATCH_SIZE}
     volumes:
       - ./checkpoints:/app/checkpoints
       - ./datasets:/app/datasets
@@ -22,10 +14,10 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
               capabilities: [gpu]
     secrets:
-      - wandb_api_key
+      - source: wandb_api_key
+        target: wandb_api_key
 
 secrets:
   wandb_api_key:
