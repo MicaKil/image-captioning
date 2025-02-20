@@ -1,6 +1,7 @@
 import os.path
 from typing import Optional, Union
 
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -11,8 +12,8 @@ from wandb.sdk.wandb_run import Run
 import scripts.models.basic as basic
 import wandb
 from config import logger
-from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, BASIC_RESULTS
-from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, TRAIN_PATH, VAL_PATH, TEST_PATH, RUN_TAGS
+from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, BASIC_RESULTS, TRAIN_CSV, VAL_CSV, TEST_CSV
+from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
 from scripts.dataset.vocabulary import Vocabulary
@@ -43,6 +44,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	config = wandb.config
 
 	# create or load dataset
+	img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 	if create_dataset:
 		df_captions = load_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
 		total_size = len(df_captions["image_id"].unique())
@@ -50,21 +52,20 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
 		test_size = total_size - train_size - val_size
 		train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
-
-		img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-		vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
-		train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
-		val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
-		test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
-
-		if save_dataset_:
-			save_df(config, date, test_df, train_df, val_df)
-			save_datasets(None, train_dataset, val_dataset, test_dataset, date)  # save new datasets
-			log_datasets(date, False)  # log datasets to wandb
 	else:
-		train_dataset = torch.load(str(os.path.join(ROOT, TRAIN_PATH)), weights_only=False)
-		val_dataset = torch.load(str(os.path.join(ROOT, VAL_PATH)), weights_only=False)
-		test_dataset = torch.load(str(os.path.join(ROOT, TEST_PATH)), weights_only=False)
+		train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
+		val_df = pd.read_csv(str(os.path.join(ROOT, VAL_CSV)))
+		test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
+
+	vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
+	train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
+	val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
+	test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
+
+	if save_dataset_:
+		save_df(config, date, test_df, train_df, val_df)
+		save_datasets(None, train_dataset, val_dataset, test_dataset, date)  # save new datasets
+		log_datasets(date, False)  # log datasets to wandb
 
 	# create or load model
 	vocab = get_vocab(train_dataset)
@@ -85,8 +86,9 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		wandb.finish()
 		return
 
-	print(f"Model:\n{model}")
-	print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}\n")
+	parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+	wandb.run.summary["trainable_parameters"] = parameter_count
+	logger.info(f"\nNumber of trainable parameters: {parameter_count}\n")
 
 	if train_model:
 		train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
@@ -135,6 +137,7 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 	wandb_run.define_metric("test_BLEU-2", summary="max")
 	wandb_run.define_metric("test_BLEU-4", summary="max")
 	wandb_run.define_metric("test_CIDEr", summary="max")
+	wandb_run.define_metric("epoch", summary="max")
 	return wandb_run
 
 

@@ -2,8 +2,6 @@
 import torch
 from torchvision.transforms import v2
 
-from constants import TRAIN_DS_GPU, VAL_DS_GPU, TEST_DS_GPU
-
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
 
@@ -21,9 +19,6 @@ VOCAB_THRESHOLD = 3
 DATASET = "flickr8k"
 DATASET_VERSION = "2025-02-20"
 DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
-TRAIN_PATH = TRAIN_DS_GPU
-VAL_PATH = VAL_DS_GPU
-TEST_PATH = TEST_DS_GPU
 
 # dataloaders
 BATCH_SIZE = 64
@@ -39,7 +34,7 @@ DROPOUT = 0.5
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 10
+MAX_EPOCHS = 2
 PATIENCE = None
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4

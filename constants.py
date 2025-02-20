@@ -7,16 +7,13 @@ FLICKR8K_DIR = "datasets/flickr8k"
 FLICKR8K_ANN_FILE = "datasets/flickr8k/Flickr8k.token.txt"
 FLICKR8K_CSV_FILE = "datasets/flickr8k/captions.csv"
 FLICKR8K_IMG_DIR = "datasets/flickr8k/images"
+# dataset splits
+TRAIN_CSV = "datasets/flickr8k/train_80_2025-02-16.csv"
+VAL_CSV = "datasets/flickr8k/val_10_2025-02-16.csv"
+TEST_CSV = "datasets/flickr8k/test_10_2025-02-16.csv"
 # checkpoints
 CHECKPOINT_DIR = "checkpoints/basic"
 BASIC_RESULTS = "results/basic"
-# datasets
-TRAIN_DS_HOME = "datasets/flickr8k/train_80_2025-02-16.pt"
-VAL_DS_HOME = "datasets/flickr8k/val_10_2025-02-16.pt"
-TEST_DS_HOME = "datasets/flickr8k/test_10_2025-02-16.pt"
-TRAIN_DS_GPU = "datasets/flickr8k/train_2025-02-20_80.pt"
-VAL_DS_GPU = "datasets/flickr8k/val_2025-02-20_10.pt"
-TEST_DS_GPU = "datasets/flickr8k/test_2025-02-20_10.pt"
 
 # VOCABULARY -----------------------------------------------------------------------------------------------------------
 # Special tokens
@@ -24,11 +21,3 @@ PAD = "<PAD>"
 SOS = "<SOS>"
 EOS = "<EOS>"
 UNK = "<UNK>"
-
-# TEST DATA ------------------------------------------------------------------------------------------------------------
-TEST_IMG = "datasets/flickr8k/images/300222673_573fd4044b.jpg"
-TEST_IMG_CAPTIONS = ["A man plays a song on the guitar for his cat.",
-                     "A man plays a yellow guitar while a cat watches him.",
-                     "A man plays his yellow guitar while staring at his cat.",
-                     "A man, sitting by his computer, playing guitar to his cat.",
-                     "The man is playing guitar and sitting with a cat."]
