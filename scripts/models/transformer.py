@@ -44,7 +44,8 @@ class CausalSelfAttention(nn.Module):
 		x = x + attn_output
 		return self.layer_norm(x)
 
-	def causal_mask(self, x):
+	@staticmethod
+	def causal_mask(x):
 		"""
 		Creates triangular mask to prevent looking at future tokens
 		:param x:

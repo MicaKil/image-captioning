@@ -39,8 +39,8 @@ DROPOUT = 0.5
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 100
-PATIENCE = 10
+MAX_EPOCHS = 10
+PATIENCE = None
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
 SCHEDULER_FACTOR = 0.5
@@ -53,7 +53,7 @@ TEMPERATURE = None
 BEAM_SIZE = 5
 
 # run
-PROJECT = "image-captioning-v1"
+PROJECT = "image-captioning-v0"
 RUN_TAGS = ["basic", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 RUN_CONFIG = {

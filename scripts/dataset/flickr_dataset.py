@@ -13,7 +13,7 @@ from scripts.dataset.vocabulary import Vocabulary
 
 class FlickrDataset(Dataset):
 	"""
-	Custom Dataset for loading Flickr8k images and captions.
+	Custom Dataset for loading Flickr images and captions.
 	"""
 
 	def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None, target_transform=None):
@@ -82,7 +82,7 @@ def extract_captions(path: str) -> list[dict[str, str]]:
 	"""
 	Extract the captions from the annotation file.
 	Sample line:
-		"1000268201_693b08cb0e.jpg#0	A child in a pink dress is climbing up a set of stairs in an entry way."
+		"1000268201_693b08cb0e.jpg#0	A child in a pink dress is climbing up a set of stairs in an entryway."
 	:param path: Path to the annotation file
 	:return: List of dictionaries containing the image ID and caption
 	"""
@@ -98,7 +98,7 @@ def extract_captions(path: str) -> list[dict[str, str]]:
 def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataFrame]:
 	"""
 	Split a DataFrame containing image IDs and captions into multiple DataFrames based on the specified lengths.
-	:param df: DataFrame containing the Flickr8k image IDs and captions
+	:param df: DataFrame containing the Flickr image IDs and captions
 	:param split_lengths: List of integers specifying the lengths of the splits. Must sum to the number of unique images.
 	:return: List of DataFrames containing the splits
 	"""

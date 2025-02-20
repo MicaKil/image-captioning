@@ -41,13 +41,14 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 
 	logger.info(f"Start training model for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
+	avg_val_loss = -1
+	metric = dict()
+	cur_lr = (config["encoder_lr"], config["decoder_lr"])
 	best_val_loss = np.inf
 	best_val_info = None
 	best_val_model = None
 	last_model_pth = None
 	epochs_no_improve = 0
-	cur_lr = (config["encoder_lr"], config["decoder_lr"])
-	avg_val_loss = -1
 
 	model = model.to(device)
 	for epoch in range(config["max_epochs"]):
@@ -89,6 +90,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 		torch.save(model.state_dict(), last_model_pth)
 		wandb.log_model(path=last_model_pth)
 	logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
+
 	# check best_val_model != last_model
 	if best_val_info["epoch"] == metric["epoch"]:
 		# if they are the same, then the best model is the last model
