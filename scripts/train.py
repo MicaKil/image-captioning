@@ -80,7 +80,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
 			if scheduler is not None:
-				if epochs_no_improve > 0 and epochs_no_improve % config["scheduler"]["patience"] == 0:
+				if (epochs_no_improve - 1) > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
 					logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
 	# Log last model
