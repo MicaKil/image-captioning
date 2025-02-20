@@ -129,9 +129,11 @@ class ImageCaptioning(nn.Module):
 	def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
 	             temperature: Optional[float] = None, beam_size: int = 1) -> str:
 		self.eval()
-
 		with torch.no_grad():
 			image = image.to(device)
+			print(f"Image shape: {image.shape}")
+			print(f"Image type: {type(image)}")
+			print(f"Image device: {image.device}")
 			features = self.encoder(image)  # Encode the image (1, embed_size)
 			if beam_size > 1:
 				return self.beam_search(vocab, device, features, max_length, beam_size)

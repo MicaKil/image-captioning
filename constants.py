@@ -10,6 +10,13 @@ FLICKR8K_IMG_DIR = "datasets/flickr8k/images"
 # checkpoints
 CHECKPOINT_DIR = "checkpoints/basic"
 BASIC_RESULTS = "results/basic"
+# datasets
+TRAIN_DS_HOME = "datasets/flickr8k/train_80_2025-02-16.pt"
+VAL_DS_HOME = "datasets/flickr8k/val_10_2025-02-16.pt"
+TEST_DS_HOME = "datasets/flickr8k/test_10_2025-02-16.pt"
+TRAIN_DS_GPU = "datasets/flickr8k/train_2025-02-20_80.pt"
+VAL_DS_GPU = "datasets/flickr8k/val_2025-02-20_10.pt"
+TEST_DS_GPU = "datasets/flickr8k/test_2025-02-20_10.pt"
 
 # VOCABULARY -----------------------------------------------------------------------------------------------------------
 # Special tokens

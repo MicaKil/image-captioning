@@ -2,6 +2,8 @@
 import torch
 from torchvision.transforms import v2
 
+from constants import TRAIN_DS_GPU, VAL_DS_GPU, TEST_DS_GPU
+
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
 
@@ -17,11 +19,11 @@ VOCAB_THRESHOLD = 3
 
 # dataset
 DATASET = "flickr8k"
-DATASET_VERSION = "2025-02-16"
+DATASET_VERSION = "2025-02-20"
 DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
-TRAIN_PATH = "datasets/flickr8k/train_80_2025-02-16.pt"
-VAL_PATH = "datasets/flickr8k/val_10_2025-02-16.pt"
-TEST_PATH = "datasets/flickr8k/test_10_2025-02-16.pt"
+TRAIN_PATH = TRAIN_DS_GPU
+VAL_PATH = VAL_DS_GPU
+TEST_PATH = TEST_DS_GPU
 
 # dataloaders
 BATCH_SIZE = 64
@@ -37,7 +39,7 @@ DROPOUT = 0.3
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 10
+MAX_EPOCHS = 2
 PATIENCE = 10
 MAX_CAPTION_LEN = 30
 ENCODER_LR = 1e-4
@@ -47,7 +49,7 @@ SCHEDULER_PATIENCE = None
 GRAD_MAX_NORM = 5.0
 
 # run
-PROJECT = "image-captioning-v1"
+PROJECT = "image-captioning-v0"
 RUN_TAGS = ["basic", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 RUN_CONFIG = {

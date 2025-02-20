@@ -150,6 +150,7 @@ class ImageCaptioningTransformer(nn.Module):
 	def generate(self, image, vocab, max_length=30, temperature=1.0, beam_size=1):
 		self.eval()
 		with torch.no_grad():
+			image = image.to(device)
 			# Encode image
 			img_features = self.encoder(image.unsqueeze(0))
 			img_features = rearrange(img_features, 'b c h w -> b (h w) c')
