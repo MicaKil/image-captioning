@@ -8,7 +8,7 @@ from torch.nn.functional import log_softmax, softmax
 
 from constants import SOS, EOS, UNK
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models.basic import EncoderResnet
+from scripts.models.basic import Encoder
 
 
 class SeqEmbedding(nn.Module):
@@ -111,7 +111,7 @@ class ImageCaptioningTransformer(nn.Module):
 		vocab_size = len(vocab)
 
 		# Image encoder (using ResNet as in your original code)
-		self.encoder = EncoderResnet(embed_size, freeze_encoder)
+		self.encoder = Encoder(embed_size, freeze_encoder)
 
 		# Text embedding
 		self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size)

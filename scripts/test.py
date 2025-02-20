@@ -101,7 +101,7 @@ def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, imag
 	generated = []
 	for img in images:
 		img = img.unsqueeze(0).to(device)
-		caption = gen_caption(model, img, vocab, config["max_caption_len"], device)
+		caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
 		generated.append(caption)
 	return generated
 

@@ -14,10 +14,11 @@ class Encoder(nn.Module):
 	Encoder class that uses a pretrained ResNet-50 model to extract features from images.
 	"""
 
-	def __init__(self, embed_size: int, freeze: bool) -> None:
+	def __init__(self, embed_size: int, freeze: bool, dropout) -> None:
 		"""
 		Constructor for the EncoderResnet class
 
+		:param dropout:
 		:param freeze: Whether to freeze the weights of the ResNet-50 model during training
 		:param embed_size: Size of the embedding vector
 		"""
@@ -35,7 +36,11 @@ class Encoder(nn.Module):
 				param.requires_grad = False
 
 		# Add a linear layer to transform the features to the embedding size
-		self.linear = nn.Linear(in_features, embed_size)
+		self.linear = nn.Sequential(
+            nn.Linear(in_features, embed_size),
+            nn.ReLU(),
+            nn.Dropout(dropout)
+        )
 
 	def forward(self, image: torch.Tensor) -> torch.Tensor:
 		"""
@@ -68,10 +73,16 @@ class Decoder(nn.Module):
 		:param padding_idx: Index of the padding token in the vocabulary
 		"""
 		super().__init__()
+		self.num_layers = num_layers
+		self.hidden_size = hidden_size
+		# Project image features to initialize hidden and cell states
+		self.init_h = nn.Linear(embed_size, num_layers * hidden_size)
+		self.init_c = nn.Linear(embed_size, num_layers * hidden_size)
 		self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=padding_idx)
-		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True)
-		self.linear = nn.Linear(hidden_size, vocab_size)
 		self.dropout = nn.Dropout(dropout)
+		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
+		self.layer_norm = nn.LayerNorm(hidden_size)
+		self.linear = nn.Linear(hidden_size, vocab_size)
 
 	def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
 		"""
@@ -81,12 +92,14 @@ class Decoder(nn.Module):
 		:param captions: Caption word indices
 		:return: Predicted word indices
 		"""
+		batch_size = features.size(0)
+		# Initialize hidden and cell states using image features
+		h = self.init_h(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()  # Shape: (num_layers, batch_size, hidden_size)
+		c = self.init_c(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()
 		embeddings = self.embed(captions)  # Shape: (batch_size, max_caption_length, embed_size)
 		embeddings = self.dropout(embeddings)
-		features = features.unsqueeze(1)  # Shape: (batch_size, 1, feature_dim)
-		lstm_out, _ = self.lstm(
-			torch.cat((features, embeddings), dim=1)  # concatenate the image features and caption embeddings
-		)  # Shape: (batch_size, max_caption_length + 1, hidden_size)
+		lstm_out, _ = self.lstm(embeddings, (h, c))
+		lstm_out = self.layer_norm(lstm_out)
 		outputs = self.linear(lstm_out)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
 
 		return outputs
@@ -97,7 +110,7 @@ class ImageCaptioning(nn.Module):
 	Image captioning model that combines an Encoder and Decoder.
 	"""
 
-	def __init__(self, embed_size: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
+	def __init__(self, embed_size: int, hidden_size: int, vocab_size: int, encoder_dropout, decoder_dropout: float, num_layers: int,
 	             padding_idx: int = 0, freeze_encoder=True):
 		"""
 		Constructor for the ImageCaptioning class
@@ -105,14 +118,15 @@ class ImageCaptioning(nn.Module):
 		:param embed_size: Size of the embedding vector
 		:param hidden_size: Size of the hidden state of the LSTM
 		:param vocab_size: Size of the vocabulary
-		:param dropout: Dropout probability
+		:param encoder_dropout:
+		:param decoder_dropout: Dropout probability
 		:param num_layers: Number of layers in the LSTM
 		:param padding_idx: Index of the padding token in the vocabulary
 		:param freeze_encoder: Whether to freeze the weights of the Encoder during training
 		"""
 		super().__init__()
-		self.encoder = Encoder(embed_size, freeze_encoder)
-		self.decoder = Decoder(embed_size, hidden_size, vocab_size, dropout, num_layers, padding_idx)
+		self.encoder = Encoder(embed_size, freeze_encoder, encoder_dropout)
+		self.decoder = Decoder(embed_size, hidden_size, vocab_size, decoder_dropout, num_layers, padding_idx)
 
 	def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
 		"""

@@ -31,8 +31,8 @@ NUM_WORKERS = 4
 SHUFFLE = True
 PIN_MEMORY = True
 
-# model param
-EMBED_SIZE = 512
+# model params
+EMBED_SIZE = 256
 HIDDEN_SIZE = 1024
 NUM_LAYERS = 2
 DROPOUT = 0.5
@@ -40,13 +40,17 @@ FREEZE_ENCODER = True
 
 # training
 MAX_EPOCHS = 100
-PATIENCE = 30
-MAX_CAPTION_LEN = 30
+PATIENCE = 10
 ENCODER_LR = 1e-4
 DECODER_LR = 1e-4
 SCHEDULER_FACTOR = 0.5
 SCHEDULER_PATIENCE = None
 GRAD_MAX_NORM = 5.0
+
+# captioning
+MAX_CAPTION_LEN = 30
+TEMPERATURE = None
+BEAM_SIZE = 5
 
 # run
 PROJECT = "image-captioning-v1"
@@ -77,6 +81,8 @@ RUN_CONFIG = {
 		"freq_threshold": VOCAB_THRESHOLD
 	},
 	"max_caption_len": MAX_CAPTION_LEN,
+	"temperature": TEMPERATURE,
+	"beam_size": BEAM_SIZE,
 	"scheduler": {
 		"type": "ReduceLROnPlateau",
 		"factor": SCHEDULER_FACTOR,
