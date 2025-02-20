@@ -34,22 +34,22 @@ PIN_MEMORY = True
 # model param
 EMBED_SIZE = 256
 HIDDEN_SIZE = 512
-NUM_LAYERS = 1
+NUM_LAYERS = 2
 DROPOUT = 0.3
 FREEZE_ENCODER = True
 
 # training
-MAX_EPOCHS = 2
-PATIENCE = 10
+MAX_EPOCHS = 100
+PATIENCE = 20
 MAX_CAPTION_LEN = 30
 ENCODER_LR = 1e-4
-DECODER_LR = 1e-4
+DECODER_LR = 5e-4
 SCHEDULER_FACTOR = 0.5
-SCHEDULER_PATIENCE = None
+SCHEDULER_PATIENCE = 10
 GRAD_MAX_NORM = 5.0
 
 # run
-PROJECT = "image-captioning-v0"
+PROJECT = "image-captioning-v1"
 RUN_TAGS = ["basic", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 RUN_CONFIG = {
