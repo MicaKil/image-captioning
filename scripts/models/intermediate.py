@@ -149,9 +149,9 @@ class ImageCaptioning(nn.Module):
 		"""
 		Forward pass of the ImageCaptioning model
 
-		:param lengths:
 		:param images: Input image tensors
 		:param captions: Caption word indices
+		:param lengths: Actual caption lengths excluding padding
 		:return: Predicted word indices
 		"""
 		features = self.encoder(images)  # Shape: (batch_size, embed_size)
@@ -184,7 +184,8 @@ class ImageCaptioning(nn.Module):
 		caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
 		for _ in range(max_length):
 			caption_tensor = torch.tensor(caption, dtype=torch.long).unsqueeze(0).to(device)
-			outputs = self.decoder(features, caption_tensor)  # Get predictions (batch_size, seq_len+1, vocab_size)
+			current_length = caption_tensor.size(1)
+			outputs = self.decoder(features, caption_tensor, [current_length])  # Get predictions (batch_size, seq_len+1, vocab_size)
 			logits = outputs[:, -1, :]  # Get last predicted token (batch_size, vocab_size)
 
 			# Choose next token
@@ -214,18 +215,21 @@ class ImageCaptioning(nn.Module):
 		:param beam_size: Beam size for beam search
 		:return: Generated caption as a list of token indices
 		"""
-		# Beam Search Implementation
-		features = features.expand(beam_size, -1)  # (beam_size, embed_size)
 		sos_idx = vocab.to_idx(SOS)
 		eos_idx = vocab.to_idx(EOS)
 		vocab_size = len(vocab)
+		# The image features are replicated beam_size times (one copy per beam/hypothesis)
+		features = features.expand(beam_size, -1)  # (beam_size, embed_size)
 		# Initialize beam
 		beam_scores = torch.zeros(beam_size).to(device)  # log probabilities
-		beam_sequences = torch.tensor([[sos_idx]] * beam_size, dtype=torch.long).to(device)
+		beam_sequences = torch.tensor([[sos_idx]] * beam_size, dtype=torch.long).to(device)  # all beams start with SOS
 		completed_sequences = []
 		completed_scores = []
 		for _ in range(max_length):
-			outputs = self.decoder(features, beam_sequences)  # (beam_size, seq_len, vocab_size)
+			# Use the decoder to predict logits for the next token:
+			current_lengths = [seq.size(0) for seq in beam_sequences]
+			outputs = self.decoder(features, beam_sequences, current_lengths)  # (beam_size, seq_len, vocab_size)
+			# Extract the last token's logits and compute log probabilities
 			logits = outputs[:, -1, :]  # (beam_size, vocab_size)
 			log_probs = torch.log_softmax(logits, dim=-1)
 
@@ -245,6 +249,7 @@ class ImageCaptioning(nn.Module):
 			# Check for completed sequences
 			eos_mask = token_indices == eos_idx
 			if eos_mask.any():
+				# If a beam predicts the EOS token, move it to the completed_sequences list and remove it from active beams
 				completed_sequences.extend(beam_sequences[eos_mask].tolist())
 				completed_scores.extend(beam_scores[eos_mask].tolist())
 
