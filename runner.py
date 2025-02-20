@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Subset
 from wandb.sdk.wandb_run import Run
 
+import scripts.models.basic as basic
 import wandb
 from config import logger
 from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, BASIC_RESULTS
@@ -15,7 +16,7 @@ from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, R
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models.basic import ImageCaptioning
+from scripts.models.image_captioning import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
 from scripts.utils import date_str, get_vocab
@@ -69,9 +70,13 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	vocab = get_vocab(train_dataset)
 	pad_idx = vocab.to_idx(PAD)
 
-	model = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx,
-	                        config["freeze_encoder"])
+	# Initialize model
+	encoder = basic.Encoder(config["embed_size"], config["freeze_encoder"])
+	decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
+	model = ImageCaptioning(encoder, decoder)
+
 	if saved_model is not None:
+		# Load model from saved model
 		logger.info(f"Loading model from {saved_model}")
 		model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
 		if test_model:
@@ -102,8 +107,10 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 			wandb.finish()
 			if best_val_model is not None:
 				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
-				best = ImageCaptioning(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"],
-				                       pad_idx, config["freeze_encoder"])
+				best = ImageCaptioning(
+					basic.Encoder(config["embed_size"], config["freeze_encoder"]),
+					basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
+				)
 				best.load_state_dict(torch.load(best_val_model, weights_only=True))
 				test(best, test_dataloader, DEVICE, save_dir, "best-model")
 				wandb.log(best_val_info)
@@ -132,9 +139,12 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 
 
 def save_df(config, date, test_df, train_df, val_df):
-	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"], index=False)
-	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"], index=False)
-	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{date}_{config['dataset']['split']['test']}.csv")), header=["image_id", "caption"], index=False)
+	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"],
+	                index=False)
+	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"],
+	              index=False)
+	test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{date}_{config['dataset']['split']['test']}.csv")), header=["image_id", "caption"],
+	               index=False)
 
 
 def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset], val_dataset: Union[FlickrDataset | Subset],

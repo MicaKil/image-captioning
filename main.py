@@ -4,12 +4,13 @@ import os.path
 import torch
 from torchvision.transforms import v2
 
+import scripts.models.basic as basic
 from config import logger
 from constants import ROOT, PAD
 from runner_config import TRAIN_PATH
 from scripts import utils
 from scripts.caption import gen_caption, preprocess_image
-from scripts.models.basic import ImageCaptioning
+from scripts.models.image_captioning import ImageCaptioning
 from scripts.utils import get_vocab
 
 MEAN = [0.485, 0.456, 0.406]
@@ -29,13 +30,13 @@ def main():
 	# parser.add_argument('--checkpoint', type=str, required=True,
 	# 					help='Path to model checkpoint')
 	parser.add_argument('--max_length', type=int, default=30,
-						help='Maximum caption length')
+	                    help='Maximum caption length')
 	parser.add_argument('--temperature', type=float, default=None,
-						help='Temperature for sampling (None for greedy)')
+	                    help='Temperature for sampling (None for greedy)')
 	parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu',
-						help='Compute device (cuda/cpu)')
+	                    help='Compute device (cuda/cpu)')
 	parser.add_argument('--beam_size', type=int, default=1,
-						help='Beam size for beam search (1 for greedy/temperature sampling)')
+	                    help='Beam size for beam search (1 for greedy/temperature sampling)')
 	args = parser.parse_args()
 
 	# Setup device
@@ -51,7 +52,7 @@ def main():
 
 		# Generate caption
 		caption = gen_caption(model=model, image=image_tensor, vocab=vocab, max_length=args.max_length, device=device,
-							  temperature=args.temperature, beam_size=args.beam_size)
+		                      temperature=args.temperature, beam_size=args.beam_size)
 
 		print(f"\nGenerated Caption: {caption}\n")
 
@@ -64,7 +65,9 @@ def main():
 def load_model(device: torch.device) -> tuple:
 	train_dataset = torch.load(str(os.path.join(ROOT, TRAIN_PATH)), weights_only=False)
 	vocab = get_vocab(train_dataset)
-	model = ImageCaptioning(512, 1024, len(vocab), 0.1, 3, vocab.to_idx(PAD), True)
+	encoder = basic.Encoder(512, True)
+	decoder = basic.Decoder(512, 1024, len(vocab), 0.1, 3, vocab.to_idx(PAD))
+	model = ImageCaptioning(encoder, decoder)
 	model.load_state_dict(
 		torch.load(os.path.join(ROOT, "checkpoints/basic/last_model_2025-02-14_03-51_4-3635.pt"), weights_only=True)
 	)
