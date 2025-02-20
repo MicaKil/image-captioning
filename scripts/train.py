@@ -74,15 +74,14 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 			best_val_info, best_val_model = checkpoint(model, checkpoint_dir, best_val_loss, best_val_model, cur_lr, epoch)
 			logger.info(f"New best validation loss: {best_val_loss:.4f}")
 		else:
+			epochs_no_improve += 1
 			if config["patience"] is not None:
-				epochs_no_improve += 1
 				if epochs_no_improve >= config["patience"]:
 					logger.info(f"Early stopping after {epoch + 1} epochs")
 					break
-
-		if scheduler is not None:
-			if epochs_no_improve > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
-				logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
+			if scheduler is not None:
+				if epochs_no_improve > 0 and epochs_no_improve % config["scheduler"]["patience"] == 0:
+					logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
 	# Log last model
 	if avg_val_loss != -1:
