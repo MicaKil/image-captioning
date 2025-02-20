@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 # import torch.nn.functional as F
@@ -5,6 +7,7 @@ from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
 
 from constants import SOS, EOS, UNK
+from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.basic import EncoderResnet
 
 
@@ -147,7 +150,8 @@ class ImageCaptioningTransformer(nn.Module):
 		logits = self.output_layer(txt_emb)
 		return logits
 
-	def generate(self, image, vocab, max_length=30, temperature=1.0, beam_size=1):
+	def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
+	             temperature: Optional[float] = None, beam_size: int = 1) -> str:
 		self.eval()
 		with torch.no_grad():
 			image = image.to(device)

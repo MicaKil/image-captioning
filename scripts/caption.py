@@ -28,7 +28,7 @@ def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_le
 
 	with torch.no_grad():
 		image = image.to(device)
-		return model.generate(image=image, vocab=vocab, max_length=max_length, temperature=temperature, beam_size=beam_size)
+		return model.generate(image=image, vocab=vocab, max_length=max_length, device=device, temperature=temperature, beam_size=beam_size)
 
 
 def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:
