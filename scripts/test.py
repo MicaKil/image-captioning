@@ -38,7 +38,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 
 	model.eval()
 	with torch.no_grad():
-		for batch_idx, (images, _, image_ids) in enumerate(tqdm(test_loader)):
+		for batch_idx, (images, _, _, image_ids) in enumerate(tqdm(test_loader)):
 			# Generate captions
 			generated = gen_captions(model, vocab, device, images)
 			all_hypotheses.extend(generated)

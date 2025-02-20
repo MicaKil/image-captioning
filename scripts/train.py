@@ -118,7 +118,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
-	for images, captions, images_id in batch_progress:
+	for images, captions, lengths, images_id in batch_progress:
 		images = images.to(device)
 		captions = captions.to(device)
 
@@ -168,7 +168,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 	model.eval()
 	with torch.no_grad():
 		batch_progress = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Val]")
-		for images, captions, images_id in batch_progress:
+		for images, captions, lengths, images_id in batch_progress:
 			images = images.to(device)
 			captions = captions.to(device)
 			loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))  # Forward pass
@@ -201,12 +201,14 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 	:param pad_idx: Index of the padding token in the vocabulary.
 	:return: The loss and the number of tokens.
 	"""
-	outputs = model(images, captions[:, :-1])  # Shape: (batch_size, seq_len, vocab_size)
-	outputs = outputs[:, 1:, :]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1, vocab_size)
+	# Trim captions and get lengths (exclude <EOS>)
 	targets = captions[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
+	lengths = (targets != pad_idx).sum(dim=1).tolist()  # Actual lengths
 
-	mask = (targets != pad_idx)
-	num_tokens = mask.sum().item()
+	outputs = model(images, captions[:, :-1], lengths)  # Shape: (batch_size, seq_len, vocab_size)
+	outputs = outputs[:, 1:, :]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1, vocab_size)
+
+	num_tokens = sum(lengths)
 	loss = criterion(
 		outputs.reshape(-1, outputs.size(-1)),  # Shape: (batch_size * (seq_len - 1), vocab_size)
 		targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))

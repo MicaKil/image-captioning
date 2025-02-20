@@ -84,24 +84,41 @@ class Decoder(nn.Module):
 		self.layer_norm = nn.LayerNorm(hidden_size)
 		self.linear = nn.Linear(hidden_size, vocab_size)
 
-	def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
+	def forward(self, features: torch.Tensor, captions: torch.Tensor, lengths: list[int]) -> torch.Tensor:
 		"""
 		Forward pass of the decoder
 
 		:param features: Image feature vectors
 		:param captions: Caption word indices
+		:param lengths: Actual caption lengths excluding padding
 		:return: Predicted word indices
 		"""
 		batch_size = features.size(0)
 		# Initialize hidden and cell states using image features
 		h = self.init_h(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()  # Shape: (num_layers, batch_size, hidden_size)
 		c = self.init_c(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()
+
+		# Sort sequences by length (descending)
+		lengths = torch.tensor(lengths, dtype=torch.long)
+		lengths, sort_idx = torch.sort(lengths, descending=True)
+		captions = captions[sort_idx]
+
+		# Embed and pack sequences
 		embeddings = self.embed(captions)  # Shape: (batch_size, max_caption_length, embed_size)
 		embeddings = self.dropout(embeddings)
-		lstm_out, _ = self.lstm(embeddings, (h, c))
-		lstm_out = self.layer_norm(lstm_out)
-		outputs = self.linear(lstm_out)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
+		packed = nn.utils.rnn.pack_padded_sequence(
+			embeddings, lengths.cpu(), batch_first=True, enforce_sorted=True
+		)
 
+		# LSTM forward
+		packed_out, _ = self.lstm(packed, (h[:, sort_idx, :], c[:, sort_idx, :]))
+		# Unpack, normalize, and restore order
+		lstm_out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True)
+		lstm_out = self.layer_norm(lstm_out)
+		_, unsort_idx = sort_idx.sort()
+		lstm_out = lstm_out[unsort_idx]
+
+		outputs = self.linear(lstm_out)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
 		return outputs
 
 
@@ -128,16 +145,17 @@ class ImageCaptioning(nn.Module):
 		self.encoder = Encoder(embed_size, freeze_encoder, encoder_dropout)
 		self.decoder = Decoder(embed_size, hidden_size, vocab_size, decoder_dropout, num_layers, padding_idx)
 
-	def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
+	def forward(self, images: torch.Tensor, captions: torch.Tensor, lengths: list[int]) -> torch.Tensor:
 		"""
 		Forward pass of the ImageCaptioning model
 
+		:param lengths:
 		:param images: Input image tensors
 		:param captions: Caption word indices
 		:return: Predicted word indices
 		"""
 		features = self.encoder(images)  # Shape: (batch_size, embed_size)
-		outputs = self.decoder(features, captions)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
+		outputs = self.decoder(features, captions, lengths)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
 		return outputs
 
 	def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
