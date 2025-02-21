@@ -64,7 +64,7 @@ class Decoder(nn.Module):
 		"""
 		super().__init__()
 		self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=padding_idx)
-		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True)
+		self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
 		self.linear = nn.Linear(hidden_size, vocab_size)
 		self.dropout = nn.Dropout(dropout)
 

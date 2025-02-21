@@ -88,7 +88,7 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 
 	parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 	wandb.run.summary["trainable_parameters"] = parameter_count
-	logger.info(f"\nNumber of trainable parameters: {parameter_count}\n")
+	logger.info(f"Number of trainable parameters: {parameter_count}")
 
 	if train_model:
 		train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
