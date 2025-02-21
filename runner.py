@@ -23,21 +23,19 @@ from scripts.train import train
 from scripts.utils import date_str
 
 
-def run(run_config: dict, use_wandb: bool, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool, test_model: bool,
-        saved_model: Optional[tuple[str, str]], save_dir: Optional[str], eval_bleu: bool, eval_bleu4_step: int):
+def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool,
+        saved_model: Optional[tuple[str, str]], save_dir: Optional[str]):
 	"""
 	Run the training and testing pipeline
-	:param use_wandb:
 	:param run_config: A dictionary the wandb run configuration
+	:param use_wandb:
 	:param run_tags: A list of tags to be added to the wandb run
-	:param create_dataset: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
-	:param save_dataset_:
+	:param create_ds: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
+	:param save_ds:
 	:param train_model: Whether to train the model
 	:param test_model: Whether to test the model
 	:param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
 	:param save_dir: If not None, the test results are saved to this directory
-	:param eval_bleu: Whether to evaluate the BLEU score
-	:param eval_bleu4_step: The step at which to evaluate the BLEU-4 score
 	:return:
 	"""
 	date = date_str()
@@ -49,7 +47,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_dataset: bool,
 
 	# create or load dataset
 	img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-	if create_dataset:
+	if create_ds:
 		df_captions = load_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
 		total_size = len(df_captions["image_id"].unique())
 		train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
@@ -66,7 +64,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_dataset: bool,
 	val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
 	test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
-	if save_dataset_:
+	if save_ds:
 		save_df(config, date, test_df, train_df, val_df)
 		save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)  # save new datasets
 		if use_wandb:
@@ -106,7 +104,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_dataset: bool,
 		if config["scheduler"] is not None:
 			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
 		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR,
-		                                         eval_bleu, eval_bleu4_step, use_wandb, run_config)
+		                                         use_wandb, run_config)
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, run_config)
@@ -228,5 +226,5 @@ def state_dicts_equal(state_a, state_b) -> bool:
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, use_wandb=True, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True, test_model=True,
-	    saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=True, eval_bleu4_step=10)
+	run(run_config=RUN_CONFIG, use_wandb=True, run_tags=RUN_TAGS, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None,
+	    save_dir=BASIC_RESULTS)

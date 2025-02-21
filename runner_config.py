@@ -82,5 +82,9 @@ RUN_CONFIG = {
 		"type": "ReduceLROnPlateau",
 		"factor": SCHEDULER_FACTOR,
 		"patience": SCHEDULER_PATIENCE,
-	} if SCHEDULER_PATIENCE is not None else None
+	} if SCHEDULER_PATIENCE is not None else None,
+	"validation": {
+		"bleu4": True,
+		"bleu4_step": 10
+	}
 }
