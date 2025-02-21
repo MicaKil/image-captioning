@@ -97,12 +97,7 @@ def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, imag
 	:return: List of generated captions
 	"""
 	config = wandb.config
-
-	generated = []
-	for img in images:
-		img = img.unsqueeze(0).to(device)
-		caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
-		generated.append(caption)
+	generated = [gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"]) for img in images]
 	return generated
 
 

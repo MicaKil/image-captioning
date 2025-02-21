@@ -22,17 +22,16 @@ class ImageCaptioning(nn.Module):
 		self.encoder = encoder
 		self.decoder = decoder
 
-	def forward(self, images: torch.Tensor, captions: torch.Tensor, lengths: list[int]) -> torch.Tensor:
+	def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
 		"""
 		Forward pass of the ImageCaptioning model
 
 		:param images: Input image tensors
 		:param captions: Caption word indices
-		:param lengths: Actual caption lengths excluding padding
 		:return: Predicted word indices
 		"""
 		features = self.encoder(images)  # Shape: (batch_size, embed_size)
-		outputs = self.decoder(features, captions, lengths)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
+		outputs = self.decoder(features, captions)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
 		return outputs
 
 	def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
@@ -104,8 +103,7 @@ class ImageCaptioning(nn.Module):
 		completed_scores = []
 		for _ in range(max_length):
 			# Use the decoder to predict logits for the next token:
-			current_lengths = [seq.size(0) for seq in beam_sequences]
-			outputs = self.decoder(features, beam_sequences, current_lengths)  # (beam_size, seq_len, vocab_size)
+			outputs = self.decoder(features, beam_sequences)  # (beam_size, seq_len, vocab_size)
 			# Extract the last token's logits and compute log probabilities
 			logits = outputs[:, -1, :]  # (beam_size, vocab_size)
 			log_probs = torch.log_softmax(logits, dim=-1)

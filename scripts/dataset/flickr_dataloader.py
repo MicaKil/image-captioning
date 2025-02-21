@@ -52,6 +52,5 @@ class Collate:
 		"""
 		images, captions, image_ids = zip(*batch)
 		images = torch.stack(images)
-		lengths = [len(cap) for cap in captions]  # Capture lengths before padding
 		captions = pad_sequence(captions, batch_first=True, padding_value=self.pad_idx)
-		return images, captions, lengths, image_ids
+		return images, captions, image_ids

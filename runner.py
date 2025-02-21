@@ -20,7 +20,7 @@ from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.image_captioning import ImageCaptioning
 from scripts.test import test
 from scripts.train import train
-from scripts.utils import date_str, get_vocab
+from scripts.utils import date_str
 
 
 def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool, test_model: bool,
@@ -67,11 +67,8 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		save_datasets(None, train_dataset, val_dataset, test_dataset, date)  # save new datasets
 		log_datasets(date, False)  # log datasets to wandb
 
-	# create or load model
-	vocab = get_vocab(train_dataset)
-	pad_idx = vocab.to_idx(PAD)
-
 	# Initialize model
+	pad_idx = vocab.to_idx(PAD)
 	encoder = basic.Encoder(config["embed_size"], config["freeze_encoder"])
 	decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
 	model = ImageCaptioning(encoder, decoder)

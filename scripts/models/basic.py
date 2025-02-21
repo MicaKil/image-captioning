@@ -68,43 +68,22 @@ class Decoder(nn.Module):
 		self.linear = nn.Linear(hidden_size, vocab_size)
 		self.dropout = nn.Dropout(dropout)
 
-	def forward(self, features: torch.Tensor, captions: torch.Tensor, lengths: list[int]) -> torch.Tensor:
+	def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
 		"""
 		Forward pass of the decoder
 
 		:param features: Image feature vectors
 		:param captions: Caption word indices
-		:param lengths: Actual caption lengths excluding padding
 		:return: Predicted word indices (batch_size, padded_length, vocab_size)
 		"""
-		# Calculate new lengths (image feature + actual caption length)
-		new_lengths = [l + 1 for l in lengths]  # +1 for the image feature
-
-		# Sort sequences by descending lengths
-		new_lengths_tensor = torch.tensor(new_lengths, dtype=torch.long)
-		sorted_lengths, sort_idx = torch.sort(new_lengths_tensor, descending=True)
-		sorted_captions = captions[sort_idx]
-		sorted_features = features[sort_idx]
-
 		# Embed sorted captions
-		embeddings = self.embed(sorted_captions)  # (batch_size, padded_seq_len, embed_size)
+		embeddings = self.embed(captions)  # (batch_size, padded_seq_len, embed_size)
 		embeddings = self.dropout(embeddings)
-
 		# Concatenate image features with embeddings
-		image_features = sorted_features.unsqueeze(1)  # (batch_size, 1, embed_size)
-		combined = torch.cat([image_features, embeddings], dim=1)  # (batch_size, padded_seq_len + 1, embed_size)
-
-		# Pack sequences (ignore padding)
-		packed_combined = nn.utils.rnn.pack_padded_sequence(combined, sorted_lengths.cpu(), batch_first=True, enforce_sorted=True)
-
+		features = features.unsqueeze(1)  # (batch_size, 1, embed_size)
+		combined = torch.cat([features, embeddings], dim=1)  # (batch_size, padded_seq_len + 1, embed_size)
 		# LSTM forward pass
-		packed_out, _ = self.lstm(packed_combined)
-
-		# Unpack and restore original order
-		lstm_out, _ = nn.utils.rnn.pad_packed_sequence(packed_out, batch_first=True)
-		_, unsort_idx = sort_idx.sort()
-		lstm_out = lstm_out[unsort_idx]
-
+		lstm_out, _ = self.lstm(combined)
 		# Project to vocabulary
 		outputs = self.linear(lstm_out)
 		return outputs
