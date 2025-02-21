@@ -16,7 +16,7 @@ from scripts.dataset.vocabulary import Vocabulary
 from scripts.utils import time_str, get_dataset, get_vocab
 
 
-def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb, run_config) -> tuple:
 	"""
 	Evaluate model on test set and log results
 	:param model: Model to evaluate
@@ -24,6 +24,8 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	:param device: Device to use (cpu or cuda)
 	:param save_dir: If not None, save results to this directory
 	:param tag: Tag to use for saving results
+	:param use_wandb: Whether to use Weights & Biases for logging
+	:param run_config: Configuration for the run
 	:return:
 	"""
 
@@ -40,7 +42,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	with torch.no_grad():
 		for batch_idx, (images, _, _, image_ids) in enumerate(tqdm(test_loader)):
 			# Generate captions
-			generated = gen_captions(model, vocab, device, images)
+			generated = gen_captions(model, vocab, device, images, use_wandb, run_config)
 			all_hypotheses.extend(generated)
 			# Get references
 			references = get_references(df, image_ids)
@@ -69,7 +71,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	}
 	results = pd.DataFrame(results)
 
-	log_and_save(metrics, results, save_dir, tag)
+	log_and_save(metrics, results, save_dir, tag, use_wandb)
 	return results, metrics
 
 
@@ -87,16 +89,21 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
 	return references
 
 
-def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list) -> list:
+def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, use_wandb, run_config) -> list:
 	"""
 	Generate captions for a list of images
 	:param model: Model to use for caption generation
 	:param device: Device to use
 	:param images: List of images to generate captions for
 	:param vocab: Vocabulary of the dataset
+	:param use_wandb: Whether to use Weights & Biases for logging
+	:param run_config: Configuration for the run
 	:return: List of generated captions
 	"""
-	config = wandb.config
+	if use_wandb:
+		config = wandb.config
+	else:
+		config = run_config
 	generated = [gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"]) for img in images]
 	return generated
 
@@ -144,13 +151,14 @@ def get_bleu4_score(all_hypotheses: list, all_references: list, smoothing) -> fl
 	return corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 
 
-def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str) -> None:
+def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str, use_wandb) -> None:
 	"""
 	Log results and metrics to wandb and save them to disk
 	:param metrics: Metrics to log and save
 	:param results: Results to log and save
 	:param save_dir: If not None, save results to this directory
 	:param tag: Tag to use for saving results
+	:param use_wandb: Whether to use wandb for logging
 	:return:
 	"""
 	results_path = None
@@ -164,11 +172,12 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str) 
 		metrics_pd.to_csv(os.path.join(ROOT, f"{save_dir}/metrics_{tag}_{time_}.csv"), index=False,
 		                  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
-	wandb.log(metrics)
-	results_table = wandb.Table(dataframe=results)
-	results_artifact = wandb.Artifact(f"test_results", type="evaluation", metadata={"metrics": metrics})
-	results_artifact.add(results_table, f"results")
-	if save_dir is not None:
-		results_artifact.add_file(results_path)
-	wandb.log({f"test_results": results_table})
-	wandb.log_artifact(results_artifact)
+	if use_wandb:
+		wandb.log(metrics)
+		results_table = wandb.Table(dataframe=results)
+		results_artifact = wandb.Artifact(f"test_results", type="evaluation", metadata={"metrics": metrics})
+		results_artifact.add(results_table, f"results")
+		if save_dir is not None:
+			results_artifact.add_file(results_path)
+		wandb.log({f"test_results": results_table})
+		wandb.log_artifact(results_artifact)

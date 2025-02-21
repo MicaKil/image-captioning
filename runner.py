@@ -23,10 +23,11 @@ from scripts.train import train
 from scripts.utils import date_str
 
 
-def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool, test_model: bool,
+def run(run_config: dict, use_wandb: bool, run_tags: list, create_dataset: bool, save_dataset_: bool, train_model: bool, test_model: bool,
         saved_model: Optional[tuple[str, str]], save_dir: Optional[str], eval_bleu: bool, eval_bleu4_step: int):
 	"""
 	Run the training and testing pipeline
+	:param use_wandb:
 	:param run_config: A dictionary the wandb run configuration
 	:param run_tags: A list of tags to be added to the wandb run
 	:param create_dataset: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
@@ -40,8 +41,11 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 	:return:
 	"""
 	date = date_str()
-	init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
-	config = wandb.config
+	if use_wandb:
+		init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
+		config = wandb.config
+	else:
+		config = run_config
 
 	# create or load dataset
 	img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
@@ -64,8 +68,9 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 
 	if save_dataset_:
 		save_df(config, date, test_df, train_df, val_df)
-		save_datasets(None, train_dataset, val_dataset, test_dataset, date)  # save new datasets
-		log_datasets(date, False)  # log datasets to wandb
+		save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)  # save new datasets
+		if use_wandb:
+			log_datasets(date, False)
 
 	# Initialize model
 	pad_idx = vocab.to_idx(PAD)
@@ -79,12 +84,14 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-			test(model, test_dataloader, DEVICE, save_dir, saved_model[1])
-		wandb.finish()
+			test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, run_config)
+		if use_wandb:
+			wandb.finish()
 		return
 
 	parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-	wandb.run.summary["trainable_parameters"] = parameter_count
+	if use_wandb:
+		wandb.run.summary["trainable_parameters"] = parameter_count
 	logger.info(f"Number of trainable parameters: {parameter_count}")
 
 	if train_model:
@@ -99,11 +106,12 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 		if config["scheduler"] is not None:
 			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
 		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR,
-		                                         eval_bleu, eval_bleu4_step)
+		                                         eval_bleu, eval_bleu4_step, use_wandb, run_config)
 		if test_model:
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-			test(model, test_dataloader, DEVICE, save_dir, "last-model")
-			wandb.finish()
+			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, run_config)
+			if use_wandb:
+				wandb.finish()
 			if best_val_model is not None:
 				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
 				best = ImageCaptioning(
@@ -111,11 +119,13 @@ def run(run_config: dict, run_tags: list, create_dataset: bool, save_dataset_: b
 					basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
 				)
 				best.load_state_dict(torch.load(best_val_model, weights_only=True))
-				test(best, test_dataloader, DEVICE, save_dir, "best-model")
-				wandb.log(best_val_info)
-				wandb.log_model(path=best_val_model)
+				test(best, test_dataloader, DEVICE, save_dir, "best-model", use_wandb, run_config)
+				if use_wandb:
+					wandb.log(best_val_info)
+					wandb.log_model(path=best_val_model)
 
-	wandb.finish()
+	if use_wandb:
+		wandb.finish()
 
 
 def init_wandb_run(project: str, tags: list, config: dict) -> Run:
@@ -148,9 +158,10 @@ def save_df(config, date, test_df, train_df, val_df):
 
 
 def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset], val_dataset: Union[FlickrDataset | Subset],
-                  test_dataset: Union[FlickrDataset | Subset], date: str):
+                  test_dataset: Union[FlickrDataset | Subset], date: str, config: dict):
 	"""
 	Save datasets to disk
+	:param config:
 	:param full_dataset: Complete dataset
 	:param test_dataset: Test dataset or subset
 	:param train_dataset: Training dataset or subset
@@ -158,7 +169,6 @@ def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[Fl
 	:param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
 	:return:
 	"""
-	config = wandb.config
 	if full_dataset is not None:
 		torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
 	torch.save(train_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/train_{date}_{config["dataset"]["split"]["train"]}.pt"))
@@ -166,7 +176,7 @@ def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[Fl
 	torch.save(test_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/test_{date}_{config["dataset"]["split"]["test"]}.pt"))
 
 
-def log_datasets(date: str, has_full_ds):
+def log_datasets(date: str, has_full_ds: bool):
 	"""
 	Log datasets to wandb
 	:param has_full_ds:
@@ -218,5 +228,5 @@ def state_dicts_equal(state_a, state_b) -> bool:
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True, test_model=True, saved_model=None,
-	    save_dir=BASIC_RESULTS, eval_bleu=True, eval_bleu4_step=10)
+	run(run_config=RUN_CONFIG, use_wandb=True, run_tags=RUN_TAGS, create_dataset=False, save_dataset_=False, train_model=True, test_model=True,
+	    saved_model=None, save_dir=BASIC_RESULTS, eval_bleu=True, eval_bleu4_step=10)
