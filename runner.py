@@ -28,10 +28,10 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
-	:param use_wandb:
+	:param use_wandb: Whether to use wandb
 	:param run_tags: A list of tags to be added to the wandb run
 	:param create_ds: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
-	:param save_ds:
+	:param save_ds: Whether to save the datasets to disk
 	:param train_model: Whether to train the model
 	:param test_model: Whether to test the model
 	:param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
@@ -131,7 +131,7 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 	Initialize wandb run
 	:param project: Project name
 	:param tags: List of tags
-	:param config: Configuration dictionary
+	:param config: Run configuration dictionary
 	:return: Wandb run
 	"""
 	wandb_run = wandb.init(project=project, tags=tags, config=config)
@@ -146,7 +146,16 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 	return wandb_run
 
 
-def save_df(config, date, test_df, train_df, val_df):
+def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame):
+	"""
+	Save dataframes to disk
+	:param config: Run configuration
+	:param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
+	:param test_df: Test dataframe to be saved
+	:param train_df: Training dataframe to be saved
+	:param val_df: Validation dataframe to be saved
+	:return:
+	"""
 	train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"],
 	                index=False)
 	val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"],
@@ -159,12 +168,12 @@ def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[Fl
                   test_dataset: Union[FlickrDataset | Subset], date: str, config: dict):
 	"""
 	Save datasets to disk
-	:param config:
 	:param full_dataset: Complete dataset
 	:param test_dataset: Test dataset or subset
 	:param train_dataset: Training dataset or subset
 	:param val_dataset: Validation dataset or subset
 	:param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
+	:param config: Run configuration
 	:return:
 	"""
 	if full_dataset is not None:
