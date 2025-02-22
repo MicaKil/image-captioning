@@ -7,7 +7,7 @@ from constants import SOS, EOS
 from scripts.dataset.vocabulary import Vocabulary
 
 
-class ImageCaptioning(nn.Module):
+class ImageCaptioner(nn.Module):
 	"""
 	Image captioning model that combines an Encoder and Decoder.
 	"""

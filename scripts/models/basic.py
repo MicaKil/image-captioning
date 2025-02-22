@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
-from scripts.models.image_captioning import ImageCaptioning
+from scripts.models.image_captioning import ImageCaptioner
 
 
 class Encoder(nn.Module):
@@ -91,7 +91,7 @@ class Decoder(nn.Module):
 		return outputs  # (batch_size, padded_seq_len + 1, vocab_size)
 
 
-class BasicImageCaptioning(ImageCaptioning):
+class BasicImageCaptioner(ImageCaptioner):
 	def __init__(self, encoder: nn.Module, decoder: nn.Module):
 		super().__init__(encoder, decoder)
 

@@ -10,7 +10,7 @@ from constants import ROOT, PAD
 from runner_config import TRAIN_PATH
 from scripts import utils
 from scripts.caption import gen_caption, preprocess_image
-from scripts.models.image_captioning import ImageCaptioning
+from scripts.models.image_captioning import ImageCaptioner
 from scripts.utils import get_vocab
 
 MEAN = [0.485, 0.456, 0.406]
@@ -67,7 +67,7 @@ def load_model(device: torch.device) -> tuple:
 	vocab = get_vocab(train_dataset)
 	encoder = basic.Encoder(512, True)
 	decoder = basic.Decoder(512, 1024, len(vocab), 0.1, 3, vocab.to_idx(PAD))
-	model = ImageCaptioning(encoder, decoder)
+	model = ImageCaptioner(encoder, decoder)
 	model.load_state_dict(
 		torch.load(os.path.join(ROOT, "checkpoints/basic/last_model_2025-02-14_03-51_4-3635.pt"), weights_only=True)
 	)
