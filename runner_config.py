@@ -1,4 +1,3 @@
-# transforms
 import torch
 from torchvision.transforms import v2
 
@@ -19,13 +18,13 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-RUN_TAGS = ["basic", "flickr8k"]
+RUN_TAGS = ["intermediate", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-use_scheduler = None
+use_scheduler = False
 
 RUN_CONFIG = {
-	"model": "basic",
+	"model": RUN_TAGS[0],
 	"encoder": "resnet50",
 	"decoder": "LSTM",
 	"batch_size": 64,
@@ -39,9 +38,9 @@ RUN_CONFIG = {
 	"decoder_lr": 0.0001,
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
-	"max_epochs": 100,
-	"patience": 10,
-	"gradient_clip": 2.0,
+	"max_epochs": 10,
+	"patience": None,
+	"gradient_clip": None,
 	"dataset": {
 		"name": "flickr8k",
 		"version": "2025-02-16",
@@ -61,9 +60,9 @@ RUN_CONFIG = {
 		"type": "ReduceLROnPlateau",
 		"factor": 0.5,
 		"patience": 5,
-	} if use_scheduler is not None else None,
+	} if use_scheduler else None,
 	"validation": {
-		"bleu4": True,
-		"bleu4_step": 10
+		"bleu4": False,
+		"bleu4_step": None
 	}
 }
