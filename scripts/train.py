@@ -153,13 +153,6 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def sample_caption(config, device, model, vocab):
-	img = preprocess_image(os.path.join(ROOT, PATH_ALVARITO), TRANSFORM)
-	caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"],
-	                             config["beam_size"])
-	logger.info(f"Sample caption: {caption}")
-
-
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb,
               run_config) -> tuple[float | int | Any, float | None]:
 	"""
@@ -234,6 +227,13 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 	num_tokens = (targets != pad_idx).sum().item()
 	loss = model.calculate_loss(outputs, targets, criterion)
 	return loss, num_tokens
+
+
+def sample_caption(config, device, model, vocab):
+	img = preprocess_image(os.path.join(ROOT, PATH_ALVARITO), TRANSFORM)
+	caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"],
+	                             config["beam_size"])
+	logger.info(f"Sample caption: {caption}")
 
 
 def checkpoint(model: nn.Module, checkpoint_dir: str, best_val_loss: float, best_val_model: str, cur_lr: tuple, epoch: int):
