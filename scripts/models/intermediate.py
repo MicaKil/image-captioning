@@ -1,18 +1,8 @@
-import os
-
-import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from torch.optim import Adam
 from torchvision.models import ResNet50_Weights
 
-from constants import ROOT, TRAIN_CSV, FLICKR8K_IMG_DIR, PAD
-from runner_config import TRANSFORM, NUM_WORKERS, SHUFFLE, PIN_MEMORY, VOCAB_THRESHOLD, EMBED_SIZE, BATCH_SIZE, HIDDEN_SIZE, NUM_LAYERS, DROPOUT, \
-	FREEZE_ENCODER, ENCODER_LR, DECODER_LR
-from scripts.dataset.flickr_dataloader import FlickrDataLoader
-from scripts.dataset.flickr_dataset import FlickrDataset
-from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.image_captioning import ImageCaptioning
 
 
@@ -101,20 +91,14 @@ class Decoder(nn.Module):
 		:param captions: Caption word indices
 		:return: Predicted word indices
 		"""
-		print(f"Captions shape: {captions.shape}\n")
-		print(f"Captions: {captions[0]}\n")
-		print(f"Captions: {captions}\n")
-		print(f"Features shape: {features.shape}\n")
 
 		# Initialize hidden and cell states using image features
 		batch_size = features.size(0)
 		h = self.init_h(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()
 		c = self.init_c(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()
-		print(f"Hidden shape: {h.shape}\nCell shape: {c.shape}\n")
 
 		# Embed and pack sequences
 		embeddings = self.embed(captions)  # Shape: (batch_size, max_caption_length, embed_size)
-		print(f"Embeddings shape: {embeddings.shape}\n")
 		embeddings = self.dropout(embeddings)
 
 		# LSTM forward
@@ -125,46 +109,20 @@ class Decoder(nn.Module):
 		return outputs
 
 
-if __name__ == "__main__":
-	config = {
-		"encoder": "resnet50",
-		"decoder": "LSTM",
-		"batch_size": BATCH_SIZE,
-		"embed_size": EMBED_SIZE,
-		"hidden_size": HIDDEN_SIZE,
-		"num_layers": NUM_LAYERS,
-		"dropout": DROPOUT,
-		"freeze_encoder": FREEZE_ENCODER,
-		"encoder_lr": ENCODER_LR,
-		"decoder_lr": DECODER_LR,
-		"vocab": {
-			"freq_threshold": VOCAB_THRESHOLD
-		}
-	}
+class IntermediateImageCaptioning(ImageCaptioning):
+	def __init__(self, encoder: nn.Module, decoder: nn.Module):
+		super().__init__(encoder, decoder)
 
-	train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
-	vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
-	img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-	train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
-	pad_idx = vocab.to_idx(PAD)
-	encoder = Encoder(config["embed_size"], config["freeze_encoder"], dropout=config["dropout"])
-	decoder = Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
-	model = ImageCaptioning(encoder, decoder)
+	def calculate_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
+		"""
+		Calculate the loss for the given outputs and targets.
 
-	train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-	criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
-	optimizer = Adam([
-		{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
-		{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
-	])
-	images_, captions_, images_id = next(iter(train_dataloader))
-	targets = captions_[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
-	print(f"Initial captions shape: {captions_.shape}\n")
-	print(f"Targets shape: {targets.shape}\n")
-	outputs_ = model(images_, captions_[:, :-1])
-	print(f"Outputs shape: {outputs_.shape}\n")
-	loss = criterion(
-		outputs_.reshape(-1, outputs_.size(-1)),  # Shape: (batch_size * (seq_len - 1), vocab_size)
-		targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
-	)
-	print(f"Loss: {loss}\n")
+		:param outputs: Predicted word indices (batch_size, padded_length, vocab_size)
+		:param targets: Target word indices (batch_size, padded_length)
+		:param criterion: Loss function
+		:return: Loss value
+		"""
+		return criterion(
+			outputs.reshape(-1, outputs.size(-1)),  # Shape: (batch_size * (seq_len - 1), vocab_size)
+			targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
+		)

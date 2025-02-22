@@ -60,8 +60,7 @@ class ImageCaptioning(nn.Module):
 		caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
 		for _ in range(max_length):
 			caption_tensor = torch.tensor(caption, dtype=torch.long).unsqueeze(0).to(device)
-			current_length = caption_tensor.size(1)
-			outputs = self.decoder(features, caption_tensor, [current_length])  # Get predictions (batch_size, seq_len+1, vocab_size)
+			outputs = self.decoder(features, caption_tensor)  # Get predictions (batch_size, seq_len+1, vocab_size)
 			logits = outputs[:, -1, :]  # Get last predicted token (batch_size, vocab_size)
 
 			# Choose next token
@@ -144,3 +143,7 @@ class ImageCaptioning(nn.Module):
 			best_idx = torch.argmax(beam_scores).item()
 			best_sequence = beam_sequences[best_idx].tolist()
 		return vocab.to_text(best_sequence)
+
+
+	def calculate_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
+		raise NotImplementedError("calculate_loss method must be implemented in the subclass")

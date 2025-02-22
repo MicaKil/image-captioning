@@ -3,6 +3,8 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
+from scripts.models.image_captioning import ImageCaptioning
+
 
 class Encoder(nn.Module):
 	"""
@@ -86,4 +88,23 @@ class Decoder(nn.Module):
 		lstm_out, _ = self.lstm(combined)
 		# Project to vocabulary
 		outputs = self.linear(lstm_out)
-		return outputs
+		return outputs  # (batch_size, padded_seq_len + 1, vocab_size)
+
+
+class BasicImageCaptioning(ImageCaptioning):
+	def __init__(self, encoder: nn.Module, decoder: nn.Module):
+		super().__init__(encoder, decoder)
+
+	def calculate_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
+		"""
+		Calculate the loss for the given outputs and targets.
+
+		:param outputs: Predicted word indices (batch_size, padded_length, vocab_size)
+		:param targets: Target word indices (batch_size, padded_length)
+		:param criterion: Loss function
+		:return: Loss value
+		"""
+		return criterion(
+			outputs[:, 1:].reshape(-1, outputs.size(-1)),  # Shape: (batch_size * (seq_len - 1), vocab_size)
+			targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
+		)

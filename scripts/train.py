@@ -202,6 +202,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
 		val_ble4 = test.get_bleu4_score(all_hypotheses, all_references, smoothing)
 		if use_wandb:
 			wandb.log({"val_BLEU-4": val_ble4})
+		logger.info(f"Image ID: {images_id[0]} | Actual caption: {all_references[0][0]} | Generated caption: {all_hypotheses[0]}")
 
 	return val_loss / total_tokens if total_tokens > 0 else 0, val_ble4
 
@@ -222,10 +223,7 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 	# outputs = outputs[:, 1:, :]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1, vocab_size)
 
 	num_tokens = (targets != pad_idx).sum().item()
-	loss = criterion(
-		outputs.reshape(-1, outputs.size(-1)),  # Shape: (batch_size * (seq_len - 1), vocab_size)
-		targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
-	)
+	loss = model.calculate_loss(outputs, targets, criterion)
 	return loss, num_tokens
 
 
