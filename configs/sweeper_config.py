@@ -94,14 +94,12 @@ SWEEP_CONFIG = {
 		},
 		# optimisation
 		"encoder_lr": {
-			"distribution": "log_uniform",
-			"min": -5,
-			"max": -3
+			"min": 0.00001,
+			"max": 0.001
 		},
 		"decoder_lr": {
-			"distribution": "log_uniform",
-			"min": -5,
-			"max": -1
+			"min": 0.00001,
+			"max": 0.001
 		},
 	}
 }
