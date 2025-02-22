@@ -12,77 +12,54 @@ TRANSFORM = v2.Compose([
 	v2.Normalize(mean=MEAN, std=STD),
 ])
 
-# vocab
-VOCAB_THRESHOLD = 3
-
-# dataset
-DATASET = "flickr8k"
-DATASET_VERSION = "2025-02-20"
-DATASET_SPLIT = {"train": 80, "val": 10, "test": 10}
-
 # dataloaders
-BATCH_SIZE = 64
 NUM_WORKERS = 4
 SHUFFLE = True
 PIN_MEMORY = True
-
-# model params
-EMBED_SIZE = 256
-HIDDEN_SIZE = 512
-NUM_LAYERS = 1
-DROPOUT = 0.5
-FREEZE_ENCODER = True
-
-# training
-MAX_EPOCHS = 100
-PATIENCE = 10
-ENCODER_LR = 1e-4
-DECODER_LR = 1e-4
-SCHEDULER_FACTOR = 0.5
-SCHEDULER_PATIENCE = None
-GRAD_MAX_NORM = 2.0
-
-# captioning
-MAX_CAPTION_LEN = 30
-TEMPERATURE = None
-BEAM_SIZE = 5
 
 # run
 PROJECT = "image-captioning-v1"
 RUN_TAGS = ["basic", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+use_scheduler = None
+
 RUN_CONFIG = {
 	"encoder": "resnet50",
 	"decoder": "LSTM",
-	"batch_size": BATCH_SIZE,
-	"embed_size": EMBED_SIZE,
-	"hidden_size": HIDDEN_SIZE,
-	"num_layers": NUM_LAYERS,
-	"dropout": DROPOUT,
-	"freeze_encoder": FREEZE_ENCODER,
-	"encoder_lr": ENCODER_LR,
-	"decoder_lr": DECODER_LR,
+	"batch_size": 64,
+	"embed_size": 256,
+	"hidden_size": 512,
+	"num_layers": 1,
+	"dropout": 0.5,
+	"freeze_encoder": True,
+	"encoder_lr": 0.0001,
+	"decoder_lr": 0.0001,
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
-	"max_epochs": MAX_EPOCHS,
-	"patience": PATIENCE,
-	"gradient_clip": GRAD_MAX_NORM,
+	"max_epochs": 100,
+	"patience": 10,
+	"gradient_clip": 2.0,
 	"dataset": {
-		"name": DATASET,
-		"version": DATASET_VERSION,
-		"split": DATASET_SPLIT
+		"name": "flickr8k",
+		"version": "2025-02-16",
+		"split": {
+			"train": 80,
+			"val": 10,
+			"test": 10
+		}
 	},
 	"vocab": {
-		"freq_threshold": VOCAB_THRESHOLD
+		"freq_threshold": 3
 	},
-	"max_caption_len": MAX_CAPTION_LEN,
-	"temperature": TEMPERATURE,
-	"beam_size": BEAM_SIZE,
+	"max_caption_len": 30,
+	"temperature": None,
+	"beam_size": 5,
 	"scheduler": {
 		"type": "ReduceLROnPlateau",
-		"factor": SCHEDULER_FACTOR,
-		"patience": SCHEDULER_PATIENCE,
-	} if SCHEDULER_PATIENCE is not None else None,
+		"factor": 0.5,
+		"patience": 5,
+	} if use_scheduler is not None else None,
 	"validation": {
 		"bleu4": True,
 		"bleu4_step": 10
