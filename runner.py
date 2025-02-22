@@ -12,7 +12,7 @@ from wandb.sdk.wandb_run import Run
 import scripts.models.basic as basic
 import wandb
 from config import logger
-from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, BASIC_RESULTS, TRAIN_CSV, VAL_CSV, TEST_CSV
+from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, TRAIN_CSV, VAL_CSV, TEST_CSV
 from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
@@ -24,7 +24,7 @@ from scripts.utils import date_str
 
 
 def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool,
-        saved_model: Optional[tuple[str, str]], save_dir: Optional[str]):
+        saved_model: Optional[tuple[str, str]]):
 	"""
 	Run the training and testing pipeline
 	:param run_config: A dictionary the wandb run configuration
@@ -35,7 +35,6 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 	:param train_model: Whether to train the model
 	:param test_model: Whether to test the model
 	:param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
-	:param save_dir: If not None, the test results are saved to this directory
 	:return:
 	"""
 	date = date_str()
@@ -50,6 +49,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 	pad_idx = vocab.to_idx(PAD)
 	model = get_model(config, vocab, pad_idx)
 
+	save_dir = RESULTS_DIR + config["model"]
 	if saved_model is not None:
 		handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb)
 		return
@@ -72,14 +72,16 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 		if config["scheduler"] is not None:
 			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
 
-		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR,
-		                                         use_wandb, run_config)
+		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
+		                                         CHECKPOINT_DIR + config["model"], use_wandb, run_config)
 
 		if test_model:
+			# test last model
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, run_config)
 			if use_wandb:
 				wandb.finish()
+			# test best model
 			if best_val_model is not None:
 				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
 				best = get_model(config, vocab, pad_idx)
@@ -245,5 +247,4 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, use_wandb=True, run_tags=RUN_TAGS, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None,
-	    save_dir=BASIC_RESULTS)
+	run(run_config=RUN_CONFIG, use_wandb=True, run_tags=RUN_TAGS, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None)

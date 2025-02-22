@@ -166,11 +166,11 @@ def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str, 
 	if save_dir is not None:
 		time_ = time_str()
 		# Save results
-		results_path = os.path.join(ROOT, f"{save_dir}/results_{tag}_{time_}.csv")
+		results_path = os.path.join(ROOT, save_dir, f"results_{tag}_{time_}.csv")
 		results.to_csv(results_path, index=False, header=True)
 		# Save metrics
 		metrics_pd = pd.DataFrame(metrics, index=[0])
-		metrics_pd.to_csv(os.path.join(ROOT, f"{save_dir}/metrics_{tag}_{time_}.csv"), index=False,
+		metrics_pd.to_csv(os.path.join(ROOT, save_dir, f"metrics_{tag}_{time_}.csv"), index=False,
 		                  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
 	# Log results and metrics
 	if use_wandb:

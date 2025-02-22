@@ -12,8 +12,8 @@ TRAIN_CSV = "datasets/flickr8k/train_80_2025-02-16.csv"
 VAL_CSV = "datasets/flickr8k/val_10_2025-02-16.csv"
 TEST_CSV = "datasets/flickr8k/test_10_2025-02-16.csv"
 # checkpoints
-CHECKPOINT_DIR = "checkpoints/basic"
-BASIC_RESULTS = "results/basic"
+CHECKPOINT_DIR = "checkpoints/"
+RESULTS_DIR= "results/"
 
 # VOCABULARY -----------------------------------------------------------------------------------------------------------
 # Special tokens
