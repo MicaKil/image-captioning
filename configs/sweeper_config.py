@@ -95,13 +95,13 @@ SWEEP_CONFIG = {
 		# optimisation
 		"encoder_lr": {
 			"distribution": "log_uniform",
-			"min": 0.00001,
-			"max": 0.001
+			"min": -5,
+			"max": -3
 		},
 		"decoder_lr": {
 			"distribution": "log_uniform",
-			"min": 0.00001,
-			"max": 0.001
+			"min": -5,
+			"max": -1
 		},
 	}
 }
