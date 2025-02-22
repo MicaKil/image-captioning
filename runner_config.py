@@ -25,6 +25,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 use_scheduler = None
 
 RUN_CONFIG = {
+	"model": "basic",
 	"encoder": "resnet50",
 	"decoder": "LSTM",
 	"batch_size": 64,
@@ -32,6 +33,7 @@ RUN_CONFIG = {
 	"hidden_size": 512,
 	"num_layers": 1,
 	"dropout": 0.5,
+	"encoder_dropout": 0.5,
 	"freeze_encoder": True,
 	"encoder_lr": 0.0001,
 	"decoder_lr": 0.0001,

@@ -17,7 +17,7 @@ from runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, R
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models.image_captioning import ImageCaptioning
+from scripts.models import intermediate, transformer
 from scripts.test import test
 from scripts.train import train
 from scripts.utils import date_str
@@ -45,6 +45,84 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 	else:
 		config = run_config
 
+	test_dataset, train_dataset, val_dataset, vocab = handle_ds(config, create_ds, date, save_ds, use_wandb)
+
+	pad_idx = vocab.to_idx(PAD)
+	model = get_model(config, vocab, pad_idx)
+
+	if saved_model is not None:
+		handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb)
+		return
+
+
+	if train_model:
+		parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+		if use_wandb:
+			wandb.run.summary["trainable_parameters"] = parameter_count
+		logger.info(f"Number of trainable parameters: {parameter_count}")
+		# dataloaders
+		train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+		val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+
+		criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
+		optimizer = Adam([
+			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
+			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
+		])
+		scheduler = None
+		if config["scheduler"] is not None:
+			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
+
+		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR,
+		                                         use_wandb, run_config)
+
+		if test_model:
+			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, run_config)
+			if use_wandb:
+				wandb.finish()
+			if best_val_model is not None:
+				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
+				best = get_model(config, vocab, pad_idx)
+				best.load_state_dict(torch.load(best_val_model, weights_only=True))
+				test(best, test_dataloader, DEVICE, save_dir, "best-model", use_wandb, run_config)
+				if use_wandb:
+					wandb.log(best_val_info)
+					wandb.log_model(path=best_val_model)
+
+	if use_wandb:
+		wandb.finish()
+
+
+def handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb):
+	# Load model from saved model
+	logger.info(f"Loading model from {saved_model}")
+	model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
+	if test_model:
+		test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+		test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, run_config)
+	if use_wandb:
+		wandb.finish()
+
+
+def get_model(config, vocab, pad_idx):
+	match config["model"]:
+		case "basic":
+			encoder = basic.Encoder(config["embed_size"], config["freeze_encoder"])
+			decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
+			return basic.BasicImageCaptioner(encoder, decoder)
+		case "intermediate":
+			encoder = intermediate.Encoder(config["embed_size"], config["freeze_encoder"], config["encoder_dropout"])
+			decoder = intermediate.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
+			return intermediate.ImageCaptioner(encoder, decoder)
+		case "transformer":
+			return transformer.ImageCaptioningTransformer(vocab, config["embed_size"], config["hidden_size"], config["num_layers"],
+			                                              config["num_heads"], config["max_caption_len"], config["dropout"], config["freeze_encoder"])
+		case _:
+			raise ValueError(f"Model {config['model']} not recognized")
+
+
+def handle_ds(config, create_ds, date, save_ds, use_wandb):
 	# create or load dataset
 	img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
 	if create_ds:
@@ -69,61 +147,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 		save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)  # save new datasets
 		if use_wandb:
 			log_datasets(date, False)
-
-	# Initialize model
-	pad_idx = vocab.to_idx(PAD)
-	encoder = basic.Encoder(config["embed_size"], config["freeze_encoder"])
-	decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
-	model = ImageCaptioning(encoder, decoder)
-
-	if saved_model is not None:
-		# Load model from saved model
-		logger.info(f"Loading model from {saved_model}")
-		model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
-		if test_model:
-			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-			test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, run_config)
-		if use_wandb:
-			wandb.finish()
-		return
-
-	parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-	if use_wandb:
-		wandb.run.summary["trainable_parameters"] = parameter_count
-	logger.info(f"Number of trainable parameters: {parameter_count}")
-
-	if train_model:
-		train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
-		optimizer = Adam([
-			{"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
-			{"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
-		])
-		scheduler = None
-		if config["scheduler"] is not None:
-			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
-		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler, CHECKPOINT_DIR,
-		                                         use_wandb, run_config)
-		if test_model:
-			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, run_config)
-			if use_wandb:
-				wandb.finish()
-			if best_val_model is not None:
-				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
-				best = ImageCaptioning(
-					basic.Encoder(config["embed_size"], config["freeze_encoder"]),
-					basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
-				)
-				best.load_state_dict(torch.load(best_val_model, weights_only=True))
-				test(best, test_dataloader, DEVICE, save_dir, "best-model", use_wandb, run_config)
-				if use_wandb:
-					wandb.log(best_val_info)
-					wandb.log_model(path=best_val_model)
-
-	if use_wandb:
-		wandb.finish()
+	return test_dataset, train_dataset, val_dataset, vocab
 
 
 def init_wandb_run(project: str, tags: list, config: dict) -> Run:
@@ -218,19 +242,6 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 	"""
 	artifact.add_file(dataset_path)
 	wandb.log_artifact(artifact)
-
-
-def state_dicts_equal(state_a, state_b) -> bool:
-	# Check keys match
-	if state_a.keys() != state_b.keys():
-		return False
-
-	# Check tensor values match
-	for key in state_a:
-		if not torch.equal(state_a[key], state_b[key]):
-			return False
-
-	return True
 
 
 if __name__ == "__main__":
