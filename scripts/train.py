@@ -130,9 +130,9 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	total_tokens = 0
 	vocab = get_vocab(train_loader)
 
-	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
 	for images, captions, images_id in batch_progress:
+		model.train()
 		images = images.to(device)
 		captions = captions.to(device)
 
