@@ -2,7 +2,7 @@ from collections import Counter
 
 from nltk import word_tokenize, TreebankWordDetokenizer
 
-from config import logger
+from configs.config import logger
 from constants import PAD, SOS, EOS, UNK
 
 

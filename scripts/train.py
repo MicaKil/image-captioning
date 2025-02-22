@@ -9,9 +9,9 @@ from nltk.translate.bleu_score import SmoothingFunction
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from config import logger
+from configs.config import logger
+from configs.runner_config import TRANSFORM
 from constants import ROOT, PAD, PATH_ALVARITO
-from runner_config import TRANSFORM
 from scripts import test
 from scripts.caption import gen_caption, preprocess_image
 from scripts.utils import time_str, get_vocab, get_dataset

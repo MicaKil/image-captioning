@@ -4,7 +4,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Subset
 
-from config import logger
+from configs.config import logger
 from constants import PAD
 from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.utils import get_vocab

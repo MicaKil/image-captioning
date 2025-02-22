@@ -9,7 +9,7 @@ from pycocoevalcap.cider.cider import Cider
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from config import logger
+from configs.config import logger
 from constants import ROOT
 from scripts.caption import gen_caption
 from scripts.dataset.vocabulary import Vocabulary

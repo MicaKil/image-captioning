@@ -5,9 +5,9 @@ import torch
 from torchvision.transforms import v2
 
 import scripts.models.basic as basic
-from config import logger
+from configs.config import logger
+from configs.runner_config import TRAIN_PATH
 from constants import ROOT, PAD
-from runner_config import TRAIN_PATH
 from scripts import utils
 from scripts.caption import gen_caption, preprocess_image
 from scripts.models.image_captioning import ImageCaptioner

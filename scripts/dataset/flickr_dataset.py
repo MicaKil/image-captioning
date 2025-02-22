@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
 
-from config import logger
+from configs.config import logger
 from constants import ROOT, EOS, SOS, FLICKR8K_CSV_FILE
 from scripts.dataset.vocabulary import Vocabulary
 
