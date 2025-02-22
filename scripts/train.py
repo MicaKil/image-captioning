@@ -12,6 +12,7 @@ from tqdm import tqdm
 from config import logger
 from constants import ROOT, PAD
 from scripts import test
+from scripts.caption import gen_caption
 from scripts.utils import time_str, get_vocab, get_dataset
 
 
@@ -131,7 +132,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 	model.train()
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
-	for images, captions, _ in batch_progress:
+	for images, captions, images_id in batch_progress:
 		images = images.to(device)
 		captions = captions.to(device)
 
@@ -147,6 +148,10 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 		train_loss += loss.item()
 		total_tokens += num_tokens
 		batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
+
+		# print sample caption
+		sample_caption = gen_caption(model, images[0].unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
+		logger.info(f"Image ID: {images_id[0]} | Sample caption: {sample_caption}")
 
 	return train_loss / total_tokens if total_tokens > 0 else 0
 
