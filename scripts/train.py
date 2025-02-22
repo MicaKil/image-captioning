@@ -43,7 +43,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
 	if config["validation"]["bleu4"] and (config["validation"]["bleu4_step"] is None or config["validation"]["bleu4_step"] < 1):
 		raise ValueError("eval_bleu4_step must be greater than 0 if eval_bleu4 is True")
 
-	logger.info(f"Start training model for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
+	logger.info(f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
 	avg_val_loss = -1
 	metric = dict()
