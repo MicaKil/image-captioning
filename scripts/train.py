@@ -157,7 +157,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 def sample_caption(config, device, model, vocab):
 	img = preprocess_image(os.path.join(ROOT, PATH_ALVARITO), TRANSFORM)
-	caption = gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"],
+	caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"],
 	                             config["beam_size"])
 	logger.info(f"Sample caption: {caption}")
 
