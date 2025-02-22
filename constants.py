@@ -21,3 +21,6 @@ PAD = "<PAD>"
 SOS = "<SOS>"
 EOS = "<EOS>"
 UNK = "<UNK>"
+
+# TEST_PIC
+PATH_ALVARITO = "datasets/mine/2025-02-21_22-33.png"

@@ -10,9 +10,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from config import logger
-from constants import ROOT, PAD
+from constants import ROOT, PAD, PATH_ALVARITO
+from runner_config import TRANSFORM
 from scripts import test
-from scripts.caption import gen_caption
+from scripts.caption import gen_caption, preprocess_image
 from scripts.utils import time_str, get_vocab, get_dataset
 
 
@@ -131,8 +132,8 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 	vocab = get_vocab(train_loader)
 
 	batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
+	model.train()
 	for images, captions, images_id in batch_progress:
-		model.train()
 		images = images.to(device)
 		captions = captions.to(device)
 
@@ -149,12 +150,16 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 		total_tokens += num_tokens
 		batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
-		# print sample caption
-		sample_caption = gen_caption(model, images[0].unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"],
-		                             config["beam_size"])
-		logger.info(f"Image ID: {images_id[0]} | Sample caption: {sample_caption}")
+	sample_caption(config, device, model, vocab)
 
 	return train_loss / total_tokens if total_tokens > 0 else 0
+
+
+def sample_caption(config, device, model, vocab):
+	img = preprocess_image(os.path.join(ROOT, PATH_ALVARITO), TRANSFORM)
+	caption = gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"],
+	                             config["beam_size"])
+	logger.info(f"Sample caption: {caption}")
 
 
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb,
