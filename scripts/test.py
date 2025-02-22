@@ -28,6 +28,10 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	:param run_config: Configuration for the run
 	:return:
 	"""
+	if use_wandb:
+		config = wandb.config
+	else:
+		config = run_config
 
 	logger.info("Start testing model")
 
@@ -42,7 +46,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
 	with torch.no_grad():
 		for images, _, image_ids in tqdm(test_loader):
 			# Generate captions
-			generated = gen_captions(model, vocab, device, images, use_wandb, run_config)
+			generated = gen_captions(model, vocab, device, images, use_wandb, config)
 			all_hypotheses.extend(generated)
 			# Get references
 			references = get_references(df, image_ids)
