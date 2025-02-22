@@ -4,32 +4,28 @@ from typing import Optional, Union
 import pandas as pd
 import torch
 import torch.nn as nn
+import wandb
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Subset
 from wandb.sdk.wandb_run import Run
 
-import scripts.models.basic as basic
-import wandb
 from configs.config import logger
 from configs.runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
 from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, TRAIN_CSV, VAL_CSV, TEST_CSV
 from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models import intermediate, transformer
+from scripts.models import basic, intermediate, transformer
 from scripts.test import test
 from scripts.train import train
 from scripts.utils import date_str
 
 
-def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool,
-        saved_model: Optional[tuple[str, str]]):
+def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool, saved_model: Optional[tuple[str, str]]):
 	"""
 	Run the training and testing pipeline
-	:param run_config: A dictionary the wandb run configuration
 	:param use_wandb: Whether to use wandb
-	:param run_tags: A list of tags to be added to the wandb run
 	:param create_ds: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
 	:param save_ds: Whether to save the datasets to disk
 	:param train_model: Whether to train the model
@@ -39,10 +35,10 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 	"""
 	date = date_str()
 	if use_wandb:
-		init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
+		init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=RUN_CONFIG)
 		config = wandb.config
 	else:
-		config = run_config
+		config = RUN_CONFIG
 
 	test_dataset, train_dataset, val_dataset, vocab = handle_ds(config, create_ds, date, save_ds, use_wandb)
 
@@ -51,7 +47,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 
 	save_dir = RESULTS_DIR + config["model"]
 	if saved_model is not None:
-		handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb)
+		handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb)
 		return
 
 	if train_model:
@@ -73,20 +69,20 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 			scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
 
 		best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
-		                                         CHECKPOINT_DIR + config["model"], use_wandb, run_config)
+		                                         CHECKPOINT_DIR + config["model"], use_wandb, config)
 
 		if test_model:
 			# test last model
 			test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, run_config)
+			test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, config)
 			if use_wandb:
 				wandb.finish()
 			# test best model
 			if best_val_model is not None:
-				init_wandb_run(project=PROJECT, tags=run_tags, config=run_config)
+				init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=config)
 				best = get_model(config, vocab, pad_idx)
 				best.load_state_dict(torch.load(best_val_model, weights_only=True))
-				test(best, test_dataloader, DEVICE, save_dir, "best-model", use_wandb, run_config)
+				test(best, test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
 				if use_wandb:
 					wandb.log(best_val_info)
 					wandb.log_model(path=best_val_model)
@@ -95,13 +91,13 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 		wandb.finish()
 
 
-def handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb):
+def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb):
 	# Load model from saved model
 	logger.info(f"Loading model from {saved_model}")
 	model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
 	if test_model:
 		test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-		test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, run_config)
+		test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
 	if use_wandb:
 		wandb.finish()
 
@@ -247,4 +243,4 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 
 if __name__ == "__main__":
 	wandb.teardown()
-	run(run_config=RUN_CONFIG, use_wandb=True, run_tags=RUN_TAGS, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None)
+	run(use_wandb=True, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None)

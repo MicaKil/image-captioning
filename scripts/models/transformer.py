@@ -2,7 +2,6 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
-# import torch.nn.functional as F
 from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
 
@@ -111,7 +110,6 @@ class ImageCaptioningTransformer(nn.Module):
 		self.vocab = vocab
 		vocab_size = len(vocab)
 
-		# Image encoder (using ResNet as in your original code)
 		self.encoder = Encoder(embed_size, freeze_encoder)
 
 		# Text embedding
