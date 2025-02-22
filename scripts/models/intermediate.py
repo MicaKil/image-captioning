@@ -11,13 +11,13 @@ class Encoder(nn.Module):
 	Encoder class that uses a pretrained ResNet-50 model to extract features from images.
 	"""
 
-	def __init__(self, embed_size: int, freeze: bool, dropout) -> None:
+	def __init__(self, embed_size: int, freeze: bool, dropout: float) -> None:
 		"""
 		Constructor for the EncoderResnet class
 
-		:param dropout:
 		:param freeze: Whether to freeze the weights of the ResNet-50 model during training
 		:param embed_size: Size of the embedding vector
+		:param dropout: Dropout probability
 		"""
 		super().__init__()
 		self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)

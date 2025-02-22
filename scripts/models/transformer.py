@@ -7,30 +7,31 @@ from torch.nn.functional import log_softmax, softmax
 
 from constants import SOS, EOS, UNK
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models.basic import Encoder
+from scripts.models.intermediate import Encoder
 
 
 class SeqEmbedding(nn.Module):
 	"""
-	Combines token embeddings with positional embeddings
+	Combines token embeddings with positional embeddings. In addition to a simple vector embedding for each token ID, the embedding layer also
+	includes an embedding for each position in the sequence.
 	"""
 
-	def __init__(self, vocab_size, max_length, depth):
+	def __init__(self, vocab_size, max_length, depth, padding_idx):
 		super().__init__()
-		self.token_embedding = nn.Embedding(vocab_size, depth, padding_idx=0)
+		self.token_embedding = nn.Embedding(vocab_size, depth, padding_idx=padding_idx)
 		self.pos_embedding = nn.Embedding(max_length, depth)
 
 	def forward(self, seq):
-		batch_size, seq_len = seq.size()
+		_, seq_len = seq.size()
 		positions = torch.arange(seq_len, device=seq.device).unsqueeze(0)
-		pos_emb = self.pos_embedding(positions)
-		tok_emb = self.token_embedding(seq)
-		return tok_emb + pos_emb
+		pos_emb = self.pos_embedding(positions)  # (1, seq_len, depth)
+		tok_emb = self.token_embedding(seq)  # (batch_size, seq_len, depth)
+		return tok_emb + pos_emb  # (batch_size, seq_len, depth)
 
 
 class CausalSelfAttention(nn.Module):
 	"""
-	Implements masked self-attention for autoregressive generation
+	Implements masked self-attention for autoregressive generation.
 	"""
 
 	def __init__(self, units, num_heads):
@@ -40,9 +41,10 @@ class CausalSelfAttention(nn.Module):
 
 	def forward(self, x):
 		attn_output, _ = self.mha(x, x, x, attn_mask=self.causal_mask(x))
-		x = x + attn_output
+		x = x + attn_output  # Residual connection
 		return self.layer_norm(x)
 
+	# TODO: Could be redundant. Possibly use is_causal=True in MultiheadAttention instead.
 	@staticmethod
 	def causal_mask(x):
 		"""
@@ -58,7 +60,7 @@ class CausalSelfAttention(nn.Module):
 
 class CrossAttention(nn.Module):
 	"""
-	Handles image-text attention
+	Handles image-text attention, connecting the encoder and decoder.
 	"""
 
 	def __init__(self, units, num_heads):
@@ -68,8 +70,8 @@ class CrossAttention(nn.Module):
 		self.attention_scores = None
 
 	def forward(self, x, y):
-		attn_output, attn_weights = self.mha(x, y, y)
-		self.attention_scores = attn_weights
+		attn_output, attn_weights = self.mha(x, y, y)  # Query: x (Decoder query), Key: y (Image features), Value: y (Image features)
+		self.attention_scores = attn_weights  # Save attention scores for visualization
 		x = x + attn_output
 		return self.layer_norm(x)
 
@@ -105,15 +107,16 @@ class DecoderLayer(nn.Module):
 
 
 class ImageCaptioningTransformer(nn.Module):
-	def __init__(self, vocab, embed_size=256, hidden_size=256, num_layers=2, num_heads=2, max_length=50, dropout=0.1, freeze_encoder=True):
+	def __init__(self, vocab, embed_size=256, hidden_size=256, num_layers=2, num_heads=2, max_length=50, dropout=0.1, encoder_dropout=0.1,
+	             freeze_encoder=True, padding_idx=0):
 		super().__init__()
 		self.vocab = vocab
 		vocab_size = len(vocab)
 
-		self.encoder = Encoder(embed_size, freeze_encoder)
+		self.encoder = Encoder(embed_size, freeze_encoder, encoder_dropout)
 
 		# Text embedding
-		self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size)
+		self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size, padding_idx)
 
 		# Decoder layers
 		self.decoder_layers = nn.ModuleList([
@@ -162,6 +165,29 @@ class ImageCaptioningTransformer(nn.Module):
 				return self.beam_search(img_features, vocab, max_length, beam_size)
 			else:
 				return self.temperature_sampling(img_features, vocab, max_length, temperature)
+
+	def temperature_sampling(self, img_features, vocab, max_length, temperature):
+		tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
+
+		for _ in range(max_length):
+			txt_emb = self.seq_embedding(tokens)
+			for layer in self.decoder_layers:
+				txt_emb = layer(img_features, txt_emb)
+			logits = self.output_layer(txt_emb[:, -1, :])
+
+			if temperature is None or temperature == 0:
+				next_token = logits.argmax(-1)
+			else:
+				probs = softmax(logits / temperature, dim=-1)
+				next_token = torch.multinomial(probs, 1)
+
+			tokens = torch.cat([tokens, next_token], dim=1)
+
+			if next_token.item() == vocab.to_idx(EOS):
+				break
+
+		# return tokens.squeeze().tolist()[1:-1]
+		return vocab.to_text(tokens.squeeze().tolist())
 
 	def beam_search(self, img_features, vocab, max_length, beam_size):
 		# Initialize beam search
@@ -213,26 +239,3 @@ class ImageCaptioningTransformer(nn.Module):
 		# Return best sequence
 		best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
 		return vocab.to_text(best_seq)
-
-	def temperature_sampling(self, img_features, vocab, max_length, temperature):
-		tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
-
-		for _ in range(max_length):
-			txt_emb = self.seq_embedding(tokens)
-			for layer in self.decoder_layers:
-				txt_emb = layer(img_features, txt_emb)
-			logits = self.output_layer(txt_emb[:, -1, :])
-
-			if temperature is None or temperature == 0:
-				next_token = logits.argmax(-1)
-			else:
-				probs = softmax(logits / temperature, dim=-1)
-				next_token = torch.multinomial(probs, 1)
-
-			tokens = torch.cat([tokens, next_token], dim=1)
-
-			if next_token.item() == vocab.to_idx(EOS):
-				break
-
-		# return tokens.squeeze().tolist()[1:-1]
-		return vocab.to_text(tokens.squeeze().tolist())
