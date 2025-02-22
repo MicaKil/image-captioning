@@ -17,7 +17,7 @@ SHUFFLE = True
 PIN_MEMORY = True
 
 # run
-PROJECT = "image-captioning-v0"
+PROJECT = "image-captioning-v1"
 TAGS = ["intermediate", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -29,8 +29,8 @@ DEFAULT_CONFIG = {
 	"decoder": "LSTM",
 	"batch_size": 64,
 	"embed_size": 256,
-	"hidden_size": 1024,
-	"num_layers": 2,
+	"hidden_size": 512,
+	"num_layers": 1,
 	"dropout": 0.5,
 	"encoder_dropout": 0.5,
 	"freeze_encoder": True,
@@ -38,9 +38,9 @@ DEFAULT_CONFIG = {
 	"decoder_lr": 0.0001,
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
-	"max_epochs": 2,
+	"max_epochs": 100,
 	"patience": 10,
-	"gradient_clip": None,
+	"gradient_clip": 2.0,
 	"dataset": {
 		"name": "flickr8k",
 		"version": "2025-02-16",

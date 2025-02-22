@@ -2,9 +2,9 @@ import os.path
 
 import pandas as pd
 import torch
+import wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-import wandb
 from configs.config import logger
 from configs.runner_config import TRANSFORM
 from configs.sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
@@ -69,4 +69,4 @@ def run_sweep():
 if __name__ == "__main__":
 	sweep_id = wandb.sweep(sweep=SWEEP_CONFIG, project=PROJECT)
 	print(f"Sweep id: {sweep_id}")
-	wandb.agent(sweep_id=sweep_id, function=run_sweep, count=2)
+	wandb.agent(sweep_id=sweep_id, function=run_sweep, count=20)
