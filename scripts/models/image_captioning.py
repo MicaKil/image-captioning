@@ -144,6 +144,5 @@ class ImageCaptioner(nn.Module):
 			best_sequence = beam_sequences[best_idx].tolist()
 		return vocab.to_text(best_sequence)
 
-
 	def calculate_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
 		raise NotImplementedError("calculate_loss method must be implemented in the subclass")

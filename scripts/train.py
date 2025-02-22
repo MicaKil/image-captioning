@@ -17,7 +17,7 @@ from scripts.utils import time_str, get_vocab, get_dataset
 
 
 def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-          scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict) -> tuple[str | None, dict[str, float | int | Any] | None, str | None]:
+          scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict) -> tuple[str | None, dict, str | None]:
 	"""
 	Training loop for the model.
 
@@ -150,13 +150,15 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 		batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
 		# print sample caption
-		sample_caption = gen_caption(model, images[0].unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
+		sample_caption = gen_caption(model, images[0].unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"],
+		                             config["beam_size"])
 		logger.info(f"Image ID: {images_id[0]} | Sample caption: {sample_caption}")
 
 	return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb, run_config) -> tuple[float | int | Any, float | None]:
+def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb,
+              run_config) -> tuple[float | int | Any, float | None]:
 	"""
 	Evaluates the model on the validation set for one epoch
 
@@ -225,7 +227,6 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 	"""
 	outputs = model(images, captions[:, :-1])  # Shape: (batch_size, seq_len, vocab_size)
 	targets = captions[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
-	# outputs = outputs[:, 1:, :]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1, vocab_size)
 
 	num_tokens = (targets != pad_idx).sum().item()
 	loss = model.calculate_loss(outputs, targets, criterion)

@@ -54,7 +54,6 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 		handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb)
 		return
 
-
 	if train_model:
 		parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 		if use_wandb:
@@ -97,7 +96,7 @@ def run(run_config: dict, use_wandb: bool, run_tags: list, create_ds: bool, save
 def handle_saved_model(config, model, run_config, save_dir, saved_model, test_dataset, test_model, use_wandb):
 	# Load model from saved model
 	logger.info(f"Loading model from {saved_model}")
-	model.load_state_dict(torch.load(os.path.join(ROOT, saved_model[0]), weights_only=True))
+	model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
 	if test_model:
 		test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 		test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, run_config)
