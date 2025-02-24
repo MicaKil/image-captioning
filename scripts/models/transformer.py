@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Optional
 
 import torch
@@ -112,29 +113,37 @@ class DecoderLayer(nn.Module):
 
 
 class Output(nn.Module):
-    def __init__(self, hidden_size, vocab_size, banned_indices):
+    def __init__(self, hidden_size, vocab, banned_indices):
         super().__init__()
-        self.linear = nn.Linear(hidden_size, vocab_size)
+        self.vocab = vocab
+        self.linear = nn.Linear(hidden_size, len(vocab))
         self.banned_indices = banned_indices
         # Initialize bias to zeros
         self.linear.bias.data.zero_()
         # Set banned tokens to -1e9 initially
         self.linear.bias.data[self.banned_indices] = -1e9
 
-    def adapt(self, counts):
-        """
-        Adjusts the bias based on token frequencies in the dataset.
-        :param counts: Counter containing token indices and their frequencies (excluding PAD)
-        """
-        total = sum(counts.values())
+    def adapt(self):
+        # Transform word counts to indices counts
+        idx_counts = Counter()
+        for word, count in self.vocab.word_counts.items():
+            idx_counts[self.vocab.to_idx(word)] = count
+
+        # Ensure banned tokens are not counted
+        for idx in self.banned_indices:
+            idx_counts[idx] = 0
+
+        # Compute log probabilities
+        total = sum(idx_counts.values())
         if total == 0:
             return
         log_probs = torch.full_like(self.linear.bias.data, -1e9, dtype=torch.float32)
-        for idx, count in counts.items():
+        for idx, count in idx_counts.items():
             if count == 0:
                 continue
             prob = count / total
             log_probs[idx] = torch.log(torch.tensor(prob))
+
         # Ensure banned tokens remain blocked
         log_probs[self.banned_indices] = -1e9
         self.linear.bias.data = log_probs
@@ -161,7 +170,7 @@ class ImageCaptioningTransformer(nn.Module):
         ])
 
         # Output layer with smart initialization
-        self.output_layer = Output(hidden_size, vocab_size, [vocab.to_idx(t) for t in [PAD, UNK, SOS]])
+        self.output_layer = Output(hidden_size, vocab, [vocab.to_idx(t) for t in [PAD, UNK, SOS]])
 
     def _init_output_bias(self):
         """
