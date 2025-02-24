@@ -11,12 +11,12 @@ class Encoder(nn.Module):
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
 
-    def __init__(self, embed_size: int, freeze: bool, dropout: float) -> None:
+    def __init__(self, embed_dim: int, freeze: bool, dropout: float) -> None:
         """
         Constructor for the EncoderResnet class
 
         :param freeze: Whether to freeze the weights of the ResNet-50 model during training
-        :param embed_size: Size of the embedding vector
+        :param embed_dim: Size of the embedding vector
         :param dropout: Dropout probability
         """
         super().__init__()
@@ -34,7 +34,7 @@ class Encoder(nn.Module):
 
         # Add a linear layer to transform the features to the embedding size
         self.linear = nn.Sequential(
-            nn.Linear(in_features, embed_size),
+            nn.Linear(in_features, embed_dim),
             nn.ReLU(),
             nn.Dropout(dropout)
         )
@@ -57,12 +57,12 @@ class Decoder(nn.Module):
     Decoder class that uses an LSTM to generate captions for images.
     """
 
-    def __init__(self, embed_size: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
+    def __init__(self, embed_dim: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
                  padding_idx: int) -> None:
         """
         Constructor for the DecoderLSTM class
 
-        :param embed_size: Size of the word embeddings
+        :param embed_dim: Size of the word embeddings
         :param hidden_size: Size of the hidden state of the LSTM
         :param vocab_size: Size of the vocabulary
         :param dropout: Dropout probability
@@ -74,12 +74,12 @@ class Decoder(nn.Module):
         self.hidden_size = hidden_size
 
         # Project image features to initialize hidden and cell states
-        self.init_h = nn.Linear(embed_size, num_layers * hidden_size)
-        self.init_c = nn.Linear(embed_size, num_layers * hidden_size)
+        self.init_h = nn.Linear(embed_dim, num_layers * hidden_size)
+        self.init_c = nn.Linear(embed_dim, num_layers * hidden_size)
 
-        self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=padding_idx)
+        self.embed = nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
         self.dropout = nn.Dropout(dropout)
-        self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
+        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.linear = nn.Linear(hidden_size, vocab_size)
 

@@ -11,12 +11,12 @@ class Encoder(nn.Module):
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
 
-    def __init__(self, embed_size: int, freeze: bool) -> None:
+    def __init__(self, embed_dim: int, freeze: bool) -> None:
         """
         Constructor for the EncoderResnet class
 
         :param freeze: Whether to freeze the weights of the ResNet-50 model during training
-        :param embed_size: Size of the embedding vector
+        :param embed_dim: Size of the embedding vector
         """
         super().__init__()
         self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
                 param.requires_grad = False
 
         # Add a linear layer to transform the features to the embedding size
-        self.linear = nn.Linear(in_features, embed_size)
+        self.linear = nn.Linear(in_features, embed_dim)
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         """
@@ -52,12 +52,12 @@ class Decoder(nn.Module):
     Decoder class that uses an LSTM to generate captions for images.
     """
 
-    def __init__(self, embed_size: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
+    def __init__(self, embed_dim: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
                  padding_idx: int) -> None:
         """
         Constructor for the DecoderLSTM class
 
-        :param embed_size: Size of the word embeddings
+        :param embed_dim: Size of the word embeddings
         :param hidden_size: Size of the hidden state of the LSTM
         :param vocab_size: Size of the vocabulary
         :param dropout: Dropout probability
@@ -65,8 +65,8 @@ class Decoder(nn.Module):
         :param padding_idx: Index of the padding token in the vocabulary
         """
         super().__init__()
-        self.embed = nn.Embedding(vocab_size, embed_size, padding_idx=padding_idx)
-        self.lstm = nn.LSTM(embed_size, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
+        self.embed = nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
+        self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.linear = nn.Linear(hidden_size, vocab_size)
         self.dropout = nn.Dropout(dropout)
 

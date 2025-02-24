@@ -16,16 +16,16 @@ class SeqEmbedding(nn.Module):
     includes an embedding for each position in the sequence.
     """
 
-    def __init__(self, vocab_size: int, max_length: int, depth: int, pad_idx: int):
+    def __init__(self, vocab_size: int, max_length: int, embed_dim: int, pad_idx: int):
         """
         :param vocab_size: Size of the vocabulary
         :param max_length: Maximum length of the sequence
-        :param depth: Depth of the embedding
+        :param embed_dim: Depth of the embedding
         :param pad_idx: Index of the padding token
         """
         super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size, depth, padding_idx=pad_idx)
-        self.pos_embedding = nn.Embedding(max_length, depth)
+        self.token_embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
+        self.pos_embedding = nn.Embedding(max_length, embed_dim)
 
     def forward(self, seq):
         _, seq_len = seq.size()
@@ -40,10 +40,10 @@ class CausalSelfAttention(nn.Module):
     Implements masked self-attention for autoregressive generation.
     """
 
-    def __init__(self, units, num_heads):
+    def __init__(self, hidden_size, num_heads):
         super().__init__()
-        self.mha = nn.MultiheadAttention(embed_dim=units, num_heads=num_heads)
-        self.layer_norm = nn.LayerNorm(units)
+        self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads)
+        self.layer_norm = nn.LayerNorm(hidden_size)
 
     def forward(self, x):
         attn_output, _ = self.mha(x, x, x, is_causal=True)
@@ -69,10 +69,10 @@ class CrossAttention(nn.Module):
     Handles image-text attention, connecting the encoder and decoder.
     """
 
-    def __init__(self, units, num_heads):
+    def __init__(self, hidden_size, num_heads):
         super().__init__()
-        self.mha = nn.MultiheadAttention(embed_dim=units, num_heads=num_heads)
-        self.layer_norm = nn.LayerNorm(units)
+        self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads)
+        self.layer_norm = nn.LayerNorm(hidden_size)
         self.attention_scores = None
 
     def forward(self, x, y):
@@ -83,15 +83,15 @@ class CrossAttention(nn.Module):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, units, dropout_rate=0.1):
+    def __init__(self, hidden_size, dropout=0.1):
         super().__init__()
         self.seq = nn.Sequential(
-            nn.Linear(units, 2 * units),
+            nn.Linear(hidden_size, 2 * hidden_size),
             nn.ReLU(),
-            nn.Linear(2 * units, units),
-            nn.Dropout(dropout_rate)
+            nn.Linear(2 * hidden_size, hidden_size),
+            nn.Dropout(dropout)
         )
-        self.layer_norm = nn.LayerNorm(units)
+        self.layer_norm = nn.LayerNorm(hidden_size)
 
     def forward(self, x):
         x = x + self.seq(x)  # Residual connection
@@ -99,11 +99,11 @@ class FeedForward(nn.Module):
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, units, num_heads=1, dropout_rate=0.1):
+    def __init__(self, hidden_size, num_heads=1, dropout=0.1):
         super().__init__()
-        self.self_attention = CausalSelfAttention(units, num_heads)  # Handles image-text attention
-        self.cross_attention = CrossAttention(units, num_heads)  # Aligns text with image features
-        self.ff = FeedForward(units, dropout_rate)  # Further processes representation
+        self.self_attention = CausalSelfAttention(hidden_size, num_heads)  # Handles image-text attention
+        self.cross_attention = CrossAttention(hidden_size, num_heads)  # Aligns text with image features
+        self.ff = FeedForward(hidden_size, dropout)  # Further processes representation
 
     def forward(self, img_features, txt_emb):
         txt_emb = self.self_attention(txt_emb)
