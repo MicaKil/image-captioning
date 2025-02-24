@@ -29,17 +29,17 @@ RUN_CONFIG = {
 	"decoder": "LSTM",
 	"batch_size": 64,
 	"embed_size": 256,
-	"hidden_size": 1024,
-	"num_layers": 2,
-	"dropout": 0.5,
-	"encoder_dropout": 0.5,
+	"hidden_size": 256,
+	"num_layers": 3,
+	"encoder_dropout": 0.2,
+	"dropout": 0.5,  # decoder dropout
 	"freeze_encoder": True,
-	"encoder_lr": 0.0001,
-	"decoder_lr": 0.0001,
+	"encoder_lr": 0.00001,
+	"decoder_lr": 0.00001,
 	"criterion": "CrossEntropyLoss",
 	"optimizer": "Adam",
 	"max_epochs": 100,
-	"patience": 10,
+	"patience": 30,
 	"gradient_clip": None,
 	"dataset": {
 		"name": "flickr8k",
@@ -59,7 +59,7 @@ RUN_CONFIG = {
 	"scheduler": {
 		"type": "ReduceLROnPlateau",
 		"factor": 0.5,
-		"patience": 5,
+		"patience": 10,
 	} if use_scheduler else None,
 	"validation": {
 		"bleu4": True,
