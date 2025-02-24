@@ -7,7 +7,6 @@ from torch.nn.functional import log_softmax, softmax
 
 from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models.intermediate import Encoder
 
 
 class SeqEmbedding(nn.Module):
@@ -16,9 +15,15 @@ class SeqEmbedding(nn.Module):
     includes an embedding for each position in the sequence.
     """
 
-    def __init__(self, vocab_size, max_length, depth, padding_idx):
+    def __init__(self, vocab_size: int, max_length: int, depth: int, pad_idx: int):
+        """
+        :param vocab_size: Size of the vocabulary
+        :param max_length: Maximum length of the sequence
+        :param depth: Depth of the embedding
+        :param pad_idx: Index of the padding token
+        """
         super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size, depth, padding_idx=padding_idx)
+        self.token_embedding = nn.Embedding(vocab_size, depth, padding_idx=pad_idx)
         self.pos_embedding = nn.Embedding(max_length, depth)
 
     def forward(self, seq):
@@ -106,17 +111,48 @@ class DecoderLayer(nn.Module):
         return txt_emb
 
 
+class Output(nn.Module):
+    def __init__(self, hidden_size, vocab_size, banned_indices):
+        super().__init__()
+        self.linear = nn.Linear(hidden_size, vocab_size)
+        self.banned_indices = banned_indices
+        # Initialize bias to zeros
+        self.linear.bias.data.zero_()
+        # Set banned tokens to -1e9 initially
+        self.linear.bias.data[self.banned_indices] = -1e9
+
+    def adapt(self, counts):
+        """
+        Adjusts the bias based on token frequencies in the dataset.
+        :param counts: Counter containing token indices and their frequencies (excluding PAD)
+        """
+        total = sum(counts.values())
+        if total == 0:
+            return
+        log_probs = torch.full_like(self.linear.bias.data, -1e9, dtype=torch.float32)
+        for idx, count in counts.items():
+            if count == 0:
+                continue
+            prob = count / total
+            log_probs[idx] = torch.log(torch.tensor(prob))
+        # Ensure banned tokens remain blocked
+        log_probs[self.banned_indices] = -1e9
+        self.linear.bias.data = log_probs
+
+    def forward(self, x):
+        return self.linear(x)
+
+
 class ImageCaptioningTransformer(nn.Module):
-    def __init__(self, vocab, embed_size=256, hidden_size=256, num_layers=2, num_heads=2, max_length=50, dropout=0.1, encoder_dropout=0.1,
-                 freeze_encoder=True, padding_idx=0):
+    def __init__(self, vocab, encoder, hidden_size=256, num_layers=2, num_heads=2, max_length=50, dropout=0.1, pad_idx=0):
         super().__init__()
         self.vocab = vocab
         vocab_size = len(vocab)
 
-        self.encoder = Encoder(embed_size, freeze_encoder, encoder_dropout)
+        self.encoder = encoder
 
         # Text embedding
-        self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size, padding_idx)
+        self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size, pad_idx)
 
         # Decoder layers
         self.decoder_layers = nn.ModuleList([
@@ -124,11 +160,8 @@ class ImageCaptioningTransformer(nn.Module):
             for _ in range(num_layers)
         ])
 
-        # Output layer
-        self.output_layer = nn.Linear(hidden_size, vocab_size)
-
-        # Initialize bias for banned tokens
-        self._init_output_bias()
+        # Output layer with smart initialization
+        self.output_layer = Output(hidden_size, vocab_size, [vocab.to_idx(t) for t in [PAD, UNK, SOS]])
 
     def _init_output_bias(self):
         """

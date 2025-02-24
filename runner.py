@@ -113,9 +113,9 @@ def get_model(config, vocab, pad_idx):
             decoder = intermediate.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
             return intermediate.IntermediateImageCaptioner(encoder, decoder)
         case "transformer":
-            return transformer.ImageCaptioningTransformer(vocab, config["embed_size"], config["hidden_size"], config["num_layers"],
-                                                          config["num_heads"], config["max_caption_len"], config["dropout"],
-                                                          config["encoder_dropout"], config["freeze_encoder"], pad_idx)
+            encoder = intermediate.Encoder(config["embed_size"], config["freeze_encoder"], config["encoder_dropout"])
+            return transformer.ImageCaptioningTransformer(vocab, encoder, config["hidden_size"], config["num_layers"], config["num_heads"],
+                                                          config["max_caption_len"], config["dropout"], pad_idx)
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
 
