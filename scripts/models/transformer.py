@@ -5,7 +5,7 @@ import torch.nn as nn
 from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
 
-from constants import SOS, EOS, UNK
+from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.intermediate import Encoder
 
@@ -40,7 +40,7 @@ class CausalSelfAttention(nn.Module):
 		self.layer_norm = nn.LayerNorm(units)
 
 	def forward(self, x):
-		attn_output, _ = self.mha(x, x, x, attn_mask=self.causal_mask(x))
+		attn_output, _ = self.mha(x, x, x, is_causal=True)
 		x = x + attn_output  # Residual connection
 		return self.layer_norm(x)
 
@@ -131,9 +131,14 @@ class ImageCaptioningTransformer(nn.Module):
 		self._init_output_bias()
 
 	def _init_output_bias(self):
-		banned = [self.vocab.to_idx(t) for t in ['', UNK, SOS, EOS]]
+		"""
+		The model will be generating text. It should never generate a pad, unknown, or start token.
+		So set the bias for these to a large negative value.
+		:return:
+		"""
+		banned = [self.vocab.to_idx(t) for t in [PAD, UNK, SOS]]
 		with torch.no_grad():
-			self.output_layer.bias[banned] = -10.0
+			self.output_layer.bias[banned] = -1e9
 
 	def forward(self, images, captions):
 		# Extract image features
