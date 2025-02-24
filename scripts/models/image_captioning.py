@@ -2,9 +2,12 @@ from typing import Optional
 
 import torch
 from torch import nn as nn
+from torch.utils.data import DataLoader
 
 from constants import SOS, EOS
 from scripts.dataset.vocabulary import Vocabulary
+from scripts.test import test
+from scripts.train import train
 
 
 class ImageCaptioner(nn.Module):
@@ -146,3 +149,35 @@ class ImageCaptioner(nn.Module):
 
     def calculate_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
         raise NotImplementedError("calculate_loss method must be implemented in the subclass")
+
+    def train_model(self, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
+                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
+                    run_config: dict) -> tuple[str | None, dict, str | None]:
+        """
+        Training loop for the model.
+
+        :param train_loader: DataLoader for the training set
+        :param val_loader: DataLoader for the validation set
+        :param device: Device to run the training on
+        :param criterion: Loss function
+        :param optimizer: Optimizer for training
+        :param scheduler: Learning rate scheduler
+        :param checkpoint_dir: Directory to save the best model
+        :param use_wandb: Whether to use Weights & Biases for logging
+        :param run_config: Configuration for the run
+        :return: Path to the best model
+        """
+        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config)
+
+    def test_model(self, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
+        """
+        Evaluate model on test set and log results
+        :param test_loader: Test data loader to use
+        :param device: Device to use (cpu or cuda)
+        :param save_dir: If not None, save results to this directory
+        :param tag: Tag to use for saving results
+        :param use_wandb: Whether to use Weights & Biases for logging
+        :param run_config: Configuration for the run if not using wandb
+        :return:
+        """
+        return test(self, test_loader, device, save_dir, tag, use_wandb, run_config)

@@ -16,7 +16,7 @@ from scripts.dataset.vocabulary import Vocabulary
 from scripts.utils import time_str, get_dataset, get_vocab
 
 
-def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb, run_config) -> tuple:
+def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
     """
     Evaluate model on test set and log results
     :param model: Model to evaluate
@@ -25,7 +25,7 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
     :param save_dir: If not None, save results to this directory
     :param tag: Tag to use for saving results
     :param use_wandb: Whether to use Weights & Biases for logging
-    :param run_config: Configuration for the run
+    :param run_config: Configuration for the run if not using wandb
     :return:
     """
     if use_wandb:
@@ -93,7 +93,7 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
     return references
 
 
-def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, use_wandb, run_config) -> list:
+def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, use_wandb: bool, run_config: dict) -> list:
     """
     Generate captions for a list of images
     :param model: Model to use for caption generation
@@ -101,7 +101,7 @@ def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, imag
     :param images: List of images to generate captions for
     :param vocab: Vocabulary of the dataset
     :param use_wandb: Whether to use Weights & Biases for logging
-    :param run_config: Configuration for the run
+    :param run_config: Configuration for the run if not using wandb
     :return: List of generated captions
     """
     if use_wandb:
@@ -156,7 +156,7 @@ def get_bleu4_score(all_hypotheses: list, all_references: list, smoothing) -> fl
     return corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 
 
-def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str, use_wandb) -> None:
+def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str, use_wandb: bool) -> None:
     """
     Log results and metrics to wandb and save them to disk
     :param metrics: Metrics to log and save

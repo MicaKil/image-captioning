@@ -17,8 +17,6 @@ from scripts.dataset.flickr_dataloader import FlickrDataLoader
 from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
-from scripts.test import test
-from scripts.train import train
 from scripts.utils import date_str
 
 
@@ -68,13 +66,13 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         if config["scheduler"] is not None:
             scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
 
-        best_val_model, best_val_info, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
-                                                 CHECKPOINT_DIR + config["model"], use_wandb, config)
+        best_val_model, best_val_info, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
+                                                             CHECKPOINT_DIR + config["model"], use_wandb, config)
 
         if test_model:
             # test last model
             test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-            test(model, test_dataloader, DEVICE, save_dir, "last-model", use_wandb, config)
+            model.test_model(test_dataloader, DEVICE, save_dir, "last-model", use_wandb, config)
             if use_wandb:
                 wandb.finish()
             # test best model
@@ -82,7 +80,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                 init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=config)
                 best = get_model(config, vocab, pad_idx)
                 best.load_state_dict(torch.load(best_val_model, weights_only=True))
-                test(best, test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
+                best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
                 if use_wandb:
                     wandb.log(best_val_info)
                     wandb.log_model(path=best_val_model)
@@ -97,7 +95,7 @@ def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_
     model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
     if test_model:
         test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-        test(model, test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
+        model.test_model(test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
     if use_wandb:
         wandb.finish()
 
