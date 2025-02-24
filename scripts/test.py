@@ -17,172 +17,172 @@ from scripts.utils import time_str, get_dataset, get_vocab
 
 
 def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb, run_config) -> tuple:
-	"""
-	Evaluate model on test set and log results
-	:param model: Model to evaluate
-	:param test_loader: Test data loader to use
-	:param device: Device to use (cpu or cuda)
-	:param save_dir: If not None, save results to this directory
-	:param tag: Tag to use for saving results
-	:param use_wandb: Whether to use Weights & Biases for logging
-	:param run_config: Configuration for the run
-	:return:
-	"""
-	if use_wandb:
-		config = wandb.config
-	else:
-		config = run_config
+    """
+    Evaluate model on test set and log results
+    :param model: Model to evaluate
+    :param test_loader: Test data loader to use
+    :param device: Device to use (cpu or cuda)
+    :param save_dir: If not None, save results to this directory
+    :param tag: Tag to use for saving results
+    :param use_wandb: Whether to use Weights & Biases for logging
+    :param run_config: Configuration for the run
+    :return:
+    """
+    if use_wandb:
+        config = wandb.config
+    else:
+        config = run_config
 
-	logger.info("Start testing model")
+    logger.info("Start testing model")
 
-	results = []
-	all_hypotheses = []
-	all_references = []
-	df = get_dataset(test_loader).df
-	vocab = get_vocab(test_loader)
-	smoothing = SmoothingFunction().method1
+    results = []
+    all_hypotheses = []
+    all_references = []
+    df = get_dataset(test_loader).df
+    vocab = get_vocab(test_loader)
+    smoothing = SmoothingFunction().method1
 
-	model.eval()
-	with torch.no_grad():
-		for images, _, image_ids in tqdm(test_loader):
-			# Generate captions
-			generated = gen_captions(model, vocab, device, images, use_wandb, config)
-			all_hypotheses.extend(generated)
-			# Get references
-			references = get_references(df, image_ids)
-			all_references.extend(references)
+    model.eval()
+    with torch.no_grad():
+        for images, _, image_ids in tqdm(test_loader):
+            # Generate captions
+            generated = gen_captions(model, vocab, device, images, use_wandb, config)
+            all_hypotheses.extend(generated)
+            # Get references
+            references = get_references(df, image_ids)
+            all_references.extend(references)
 
-			# Log results
-			for img_id, ref, gen in zip(image_ids, references, generated):
-				results.append({"image_id": img_id, "references": ref, "generated": gen})
+            # Log results
+            for img_id, ref, gen in zip(image_ids, references, generated):
+                results.append({"image_id": img_id, "references": ref, "generated": gen})
 
-	# BLEU scores
-	bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
+    # BLEU scores
+    bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
 
-	# CIDEr score
-	cider_score = get_cider_score(all_hypotheses, all_references)
+    # CIDEr score
+    cider_score = get_cider_score(all_hypotheses, all_references)
 
-	# Log time
-	logger.info(f"Finished testing model.")
-	logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
+    # Log time
+    logger.info(f"Finished testing model.")
+    logger.info(f"BLEU-1: {bleu_1:.4f}, BLEU-2: {bleu_2:.4f}, BLEU-4: {bleu_4:.4f}, CIDEr: {cider_score:.4f}")
 
-	# Log metrics
-	metrics = {
-		f"test_BLEU-1": bleu_1,
-		f"test_BLEU-2": bleu_2,
-		f"test_BLEU-4": bleu_4,
-		f"test_CIDEr": cider_score
-	}
-	results = pd.DataFrame(results)
+    # Log metrics
+    metrics = {
+        f"test_BLEU-1": bleu_1,
+        f"test_BLEU-2": bleu_2,
+        f"test_BLEU-4": bleu_4,
+        f"test_CIDEr": cider_score
+    }
+    results = pd.DataFrame(results)
 
-	log_and_save(metrics, results, save_dir, tag, use_wandb)
-	return results, metrics
+    log_and_save(metrics, results, save_dir, tag, use_wandb)
+    return results, metrics
 
 
 def get_references(df: pd.DataFrame, image_ids: list) -> list:
-	"""
-	Get references for a list of image ids
-	:param df: DataFrame containing image ids and its captions
-	:param image_ids: List of image ids to get references for
-	:return: List of references for each image id
-	"""
-	references = []
-	for img_id in image_ids:
-		refs = df[df["image_id"] == img_id]["caption"].values
-		references.append([ref for ref in refs])
-	return references
+    """
+    Get references for a list of image ids
+    :param df: DataFrame containing image ids and its captions
+    :param image_ids: List of image ids to get references for
+    :return: List of references for each image id
+    """
+    references = []
+    for img_id in image_ids:
+        refs = df[df["image_id"] == img_id]["caption"].values
+        references.append([ref for ref in refs])
+    return references
 
 
 def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: list, use_wandb, run_config) -> list:
-	"""
-	Generate captions for a list of images
-	:param model: Model to use for caption generation
-	:param device: Device to use
-	:param images: List of images to generate captions for
-	:param vocab: Vocabulary of the dataset
-	:param use_wandb: Whether to use Weights & Biases for logging
-	:param run_config: Configuration for the run
-	:return: List of generated captions
-	"""
-	if use_wandb:
-		config = wandb.config
-	else:
-		config = run_config
-	generated = [gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"]) for img in
-	             images]
-	return generated
+    """
+    Generate captions for a list of images
+    :param model: Model to use for caption generation
+    :param device: Device to use
+    :param images: List of images to generate captions for
+    :param vocab: Vocabulary of the dataset
+    :param use_wandb: Whether to use Weights & Biases for logging
+    :param run_config: Configuration for the run
+    :return: List of generated captions
+    """
+    if use_wandb:
+        config = wandb.config
+    else:
+        config = run_config
+    generated = [gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"]) for img in
+                 images]
+    return generated
 
 
 def get_cider_score(all_hypotheses: list, all_references: list) -> float:
-	"""
-	Calculate CIDEr score for a list of hypotheses and references
-	:param all_hypotheses: Hypotheses (generated captions) to evaluate
-	:param all_references: References (ground truth captions) to evaluate
-	:return: CIDEr score
-	"""
-	hyp_dict = {i: [hyp] for i, hyp in enumerate(all_hypotheses)}
-	ref_dict = {i: refs for i, refs in enumerate(all_references)}
-	cider_scorer = Cider()
-	cider_score, _ = cider_scorer.compute_score(ref_dict, hyp_dict)
-	return cider_score
+    """
+    Calculate CIDEr score for a list of hypotheses and references
+    :param all_hypotheses: Hypotheses (generated captions) to evaluate
+    :param all_references: References (ground truth captions) to evaluate
+    :return: CIDEr score
+    """
+    hyp_dict = {i: [hyp] for i, hyp in enumerate(all_hypotheses)}
+    ref_dict = {i: refs for i, refs in enumerate(all_references)}
+    cider_scorer = Cider()
+    cider_score, _ = cider_scorer.compute_score(ref_dict, hyp_dict)
+    return cider_score
 
 
 def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tuple:
-	"""
-	Calculate BLEU scores for a list of hypotheses and references
-	:param all_hypotheses: Hypotheses (generated captions) to evaluate
-	:param all_references: References (ground truth captions) to evaluate
-	:param smoothing: Smoothing function to use
-	:return: BLEU-1, BLEU-2, BLEU-4 scores
-	"""
-	tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
-	tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
-	bleu_1 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(1, 0, 0, 0), smoothing_function=smoothing)
-	bleu_2 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(0.5, 0.5, 0, 0), smoothing_function=smoothing)
-	bleu_4 = corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
-	return bleu_1, bleu_2, bleu_4
+    """
+    Calculate BLEU scores for a list of hypotheses and references
+    :param all_hypotheses: Hypotheses (generated captions) to evaluate
+    :param all_references: References (ground truth captions) to evaluate
+    :param smoothing: Smoothing function to use
+    :return: BLEU-1, BLEU-2, BLEU-4 scores
+    """
+    tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
+    tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
+    bleu_1 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(1, 0, 0, 0), smoothing_function=smoothing)
+    bleu_2 = corpus_bleu(tokenized_references, tokenized_hypotheses, weights=(0.5, 0.5, 0, 0), smoothing_function=smoothing)
+    bleu_4 = corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
+    return bleu_1, bleu_2, bleu_4
 
 
 def get_bleu4_score(all_hypotheses: list, all_references: list, smoothing) -> float:
-	"""
-	Calculate BLEU4 score for a list of hypotheses and references
-	:param all_hypotheses: Hypotheses (generated captions) to evaluate
-	:param all_references: References (ground truth captions) to evaluate
-	:param smoothing: Smoothing function to use
-	:return: BLEU-4 score
-	"""
-	tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
-	tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
-	return corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
+    """
+    Calculate BLEU4 score for a list of hypotheses and references
+    :param all_hypotheses: Hypotheses (generated captions) to evaluate
+    :param all_references: References (ground truth captions) to evaluate
+    :param smoothing: Smoothing function to use
+    :return: BLEU-4 score
+    """
+    tokenized_hypotheses = [hyp.split() for hyp in all_hypotheses]
+    tokenized_references = [[ref.split() for ref in refs] for refs in all_references]
+    return corpus_bleu(tokenized_references, tokenized_hypotheses, smoothing_function=smoothing)
 
 
 def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str, use_wandb) -> None:
-	"""
-	Log results and metrics to wandb and save them to disk
-	:param metrics: Metrics to log and save
-	:param results: Results to log and save
-	:param save_dir: If not None, save results to this directory
-	:param tag: Tag to use for saving results
-	:param use_wandb: Whether to use wandb for logging
-	:return:
-	"""
-	results_path = None
-	if save_dir is not None:
-		time_ = time_str()
-		# Save results
-		results_path = os.path.join(ROOT, save_dir, f"results_{tag}_{time_}.csv")
-		results.to_csv(results_path, index=False, header=True)
-		# Save metrics
-		metrics_pd = pd.DataFrame(metrics, index=[0])
-		metrics_pd.to_csv(os.path.join(ROOT, save_dir, f"metrics_{tag}_{time_}.csv"), index=False,
-		                  header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
-	# Log results and metrics
-	if use_wandb:
-		wandb.log(metrics)
-		results_table = wandb.Table(dataframe=results)
-		results_artifact = wandb.Artifact(f"test_results", type="evaluation", metadata={"metrics": metrics})
-		results_artifact.add(results_table, f"results")
-		if save_dir is not None:
-			results_artifact.add_file(results_path)
-		wandb.log({f"test_results": results_table})
-		wandb.log_artifact(results_artifact)
+    """
+    Log results and metrics to wandb and save them to disk
+    :param metrics: Metrics to log and save
+    :param results: Results to log and save
+    :param save_dir: If not None, save results to this directory
+    :param tag: Tag to use for saving results
+    :param use_wandb: Whether to use wandb for logging
+    :return:
+    """
+    results_path = None
+    if save_dir is not None:
+        time_ = time_str()
+        # Save results
+        results_path = os.path.join(ROOT, save_dir, f"results_{tag}_{time_}.csv")
+        results.to_csv(results_path, index=False, header=True)
+        # Save metrics
+        metrics_pd = pd.DataFrame(metrics, index=[0])
+        metrics_pd.to_csv(os.path.join(ROOT, save_dir, f"metrics_{tag}_{time_}.csv"), index=False,
+                          header=["test_BLEU-1", "test_BLEU-2", "test_BLEU-4", "test_CIDEr"])
+    # Log results and metrics
+    if use_wandb:
+        wandb.log(metrics)
+        results_table = wandb.Table(dataframe=results)
+        results_artifact = wandb.Artifact(f"test_results", type="evaluation", metadata={"metrics": metrics})
+        results_artifact.add(results_table, f"results")
+        if save_dir is not None:
+            results_artifact.add_file(results_path)
+        wandb.log({f"test_results": results_table})
+        wandb.log_artifact(results_artifact)
