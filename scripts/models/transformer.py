@@ -290,27 +290,28 @@ class ImageCaptioningTransformer(nn.Module):
     captions for input images.
     """
 
-    def __init__(self, vocab: Vocabulary, encoder: nn.Module, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2, max_length: int = 50,
-                 dropout: float = 0.1):
+    def __init__(self, vocab: Vocabulary, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2, max_length: int = 50,
+                 encoder_dropout=0.1, decoder_dropout: float = 0.5, fine_tune_encoder=False):
         """
         Sets up the vocabulary, assigns an external image encoder, creates the sequence embedding, a stack of decoder layers, and the output layer
         with banned token biases.
         :param vocab:
-        :param encoder:
         :param hidden_size:
         :param num_layers:
         :param num_heads:
         :param max_length:
-        :param dropout:
+        :param encoder_dropout:
+        :param decoder_dropout:
+        :param fine_tune_encoder:
         """
         super().__init__()
         self.vocab = vocab
-        self.encoder = encoder
+        self.encoder = Encoder(hidden_size, encoder_dropout, fine_tune_encoder)
 
         self.seq_embedding = SeqEmbedding(len(vocab), max_length, hidden_size, vocab.to_idx(PAD))
 
         self.decoder_layers = nn.ModuleList([
-            DecoderLayer(hidden_size, num_heads, dropout)
+            DecoderLayer(hidden_size, num_heads, decoder_dropout)
             for _ in range(num_layers)
         ])
 

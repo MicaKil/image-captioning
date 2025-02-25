@@ -136,6 +136,7 @@ def get_ds(config, create_ds, date, save_ds, use_wandb):
             log_datasets(date, False)
     return test_dataset, train_dataset, val_dataset, vocab
 
+
 def get_model(config, vocab, pad_idx):
     match config["model"]:
         case "basic":
@@ -147,9 +148,9 @@ def get_model(config, vocab, pad_idx):
             decoder = intermediate.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
             return intermediate.IntermediateImageCaptioner(encoder, decoder)
         case "transformer":
-            encoder = transformer.Encoder(config["embed_size"], config["encoder_dropout"], not config["freeze_encoder"])
-            return transformer.ImageCaptioningTransformer(vocab, encoder, config["hidden_size"], config["num_layers"], config["num_heads"],
-                                                          config["max_caption_len"], config["dropout"])
+            return transformer.ImageCaptioningTransformer(vocab, config["hidden_size"], config["num_layers"], config["num_heads"],
+                                                          config["max_caption_len"], config["encoder_dropout"], config["dropout"],
+                                                          not config["freeze_encoder"])
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
 
