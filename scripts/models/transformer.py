@@ -108,10 +108,10 @@ class CausalSelfAttention(nn.Module):
         self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
         self.layer_norm = nn.LayerNorm(hidden_size)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, txt_emb: torch.Tensor):
         """
         Computes self-attention using x as query, key, and value. It, then adds a residual connection and applies layer normalization.
-        :param x: (batch, seq, feature)
+        :param txt_emb: (batch, seq, feature)
         :return:
         """
         attn_output, _ = self.mha(x, x, x, is_causal=True)
