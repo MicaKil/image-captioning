@@ -225,12 +225,12 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
     targets = captions[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
 
     num_tokens = (targets != pad_idx).sum().item()
-    loss = model.calculate_loss(outputs, targets, criterion)
+    loss = model.calc_loss(outputs, targets, criterion)
     return loss, num_tokens
 
 
 def sample_caption(config, device, model, vocab):
-    img = preprocess_image(os.path.join(ROOT, PATH_ALVARITO), TRANSFORM)
+    img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
     caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"],
                           config["beam_size"])
     logger.info(f"Sample caption: {caption}")
