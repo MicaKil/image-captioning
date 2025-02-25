@@ -1,5 +1,4 @@
 import os.path
-from typing import Any
 
 import numpy as np
 import torch
@@ -11,9 +10,10 @@ from tqdm import tqdm
 
 from configs.config import logger
 from configs.runner_config import TRANSFORM
-from constants import ROOT, PAD, PATH_ALVARITO
+from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from scripts import test
 from scripts.caption import gen_caption, preprocess_image
+from scripts.dataset.vocabulary import Vocabulary
 from scripts.utils import time_str, get_vocab, get_dataset
 
 
@@ -138,7 +138,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
         captions = captions.to(device)
 
         # Forward pass
-        loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))
+        loss, num_tokens = forward_pass(model, images, captions, criterion, vocab)
         # Backward pass
         optimizer.zero_grad()
         loss.backward()
@@ -154,7 +154,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
 
 def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb,
-              run_config) -> tuple[float | int | Any, float | None]:
+              run_config) -> tuple[float | int, float | None]:
     """
     Evaluates the model on the validation set for one epoch
 
@@ -189,7 +189,7 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
         for images, captions, images_id in batch_progress:
             images = images.to(device)
             captions = captions.to(device)
-            loss, num_tokens = forward_pass(model, images, captions, criterion, vocab.to_idx(PAD))  # Forward pass
+            loss, num_tokens = forward_pass(model, images, captions, criterion, vocab)  # Forward pass
             val_loss += loss.item()
             total_tokens += num_tokens
 
@@ -210,29 +210,52 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
     return val_loss / total_tokens if total_tokens > 0 else 0, val_ble4
 
 
-def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module, pad_idx: int) -> tuple[torch.Tensor, int]:
+def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module, vocab: Vocabulary) -> tuple[torch.Tensor, int]:
     """
     Performs a forward pass through the model.
-
     :param model: The model to perform the forward pass.
     :param images: Batch of images. Shape: (batch_size, 3, 224, 224)
     :param captions: Batch of captions. Shape (batch_size, seq_len)
     :param criterion: Loss function.
-    :param pad_idx: Index of the padding token in the vocabulary.
+    :param vocab: Vocabulary of the training set.
     :return: The loss and the number of tokens.
     """
     outputs = model(images, captions[:, :-1])  # Shape: (batch_size, seq_len, vocab_size)
     targets = captions[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
 
-    num_tokens = (targets != pad_idx).sum().item()
-    loss = model.calc_loss(outputs, targets, criterion)
-    return loss, num_tokens
+    # Calculate loss per token (without reduction)
+    per_token_loss = model.calc_loss(outputs, targets, criterion)  # (batch*(seq_len-1))
+
+    # Create mask: 1 for valid tokens, 0 for banned tokens
+    targets_flat = targets.reshape(-1)
+    mask = torch.ones_like(targets_flat, dtype=torch.bool)
+    banned_indices = [vocab.to_idx(PAD), vocab.to_idx(UNK), vocab.to_idx(SOS)]
+    for banned_idx in banned_indices:
+        mask &= (targets_flat != banned_idx)
+
+    # Apply mask and compute mean loss
+    valid_losses = per_token_loss[mask]
+    num_valid = mask.sum().item()
+
+    if num_valid > 0:
+        loss = valid_losses.mean()
+    else:
+        loss = torch.tensor(0.0, device=images.device)  # Avoid division by zero
+
+    return loss, num_valid
 
 
-def sample_caption(config, device, model, vocab):
+def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: Vocabulary) -> None:
+    """
+    Generate a sample caption
+    :param config: Run configuration
+    :param device: Device to run the model
+    :param model: Model to generate the caption
+    :param vocab: Vocabulary of the training set
+    :return: Prints the sample caption
+    """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
-    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"],
-                          config["beam_size"])
+    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
     logger.info(f"Sample caption: {caption}")
 
 

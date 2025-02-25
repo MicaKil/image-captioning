@@ -58,7 +58,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
         val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
-        criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
+        criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="none")
         optimizer = Adam([
             {"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
             {"params": model.decoder.parameters(), "lr": config["decoder_lr"]}

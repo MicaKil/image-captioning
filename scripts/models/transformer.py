@@ -38,8 +38,7 @@ class SeqEmbedding(nn.Module):
         :param seq: Input sequence of token indices (shape: [batch_size, seq_len])
         :return: Embedded sequence with positional encoding
         """
-        _, seq_len = seq.size()
-        positions = torch.arange(seq_len, device=seq.device).unsqueeze(0)
+        positions = torch.arange(seq.size(1), device=seq.device).unsqueeze(0)
         pos_emb = self.pos_embedding(positions)  # (1, seq_len, depth)
         tok_emb = self.token_embedding(seq)  # (batch_size, seq_len, depth)
         return tok_emb + pos_emb  # (batch_size, seq_len, depth)
@@ -57,13 +56,13 @@ class CausalSelfAttention(nn.Module):
         :param num_heads: The number of attention heads
         """
         super().__init__()
-        self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads)
+        self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
         self.layer_norm = nn.LayerNorm(hidden_size)
 
     def forward(self, x: torch.Tensor):
         """
         Computes self-attention using x as query, key, and value. It, then adds a residual connection and applies layer normalization.
-        :param x:
+        :param x: (batch, seq, feature)
         :return:
         """
         attn_output, _ = self.mha(x, x, x, is_causal=True)
@@ -97,7 +96,7 @@ class CrossAttention(nn.Module):
         :param num_heads: The number of attention heads
         """
         super().__init__()
-        self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads)
+        self.mha = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.attention_scores = None
 
@@ -105,7 +104,7 @@ class CrossAttention(nn.Module):
         """
         Uses x as the decoder query and y as both key and value (image features), adds the attention output to x (residual connection), and normalizes
         the result.
-        :param x:
+        :param x: (batch, seq, feature)
         :param y:
         :return:
         """
@@ -308,6 +307,23 @@ class ImageCaptioningTransformer(nn.Module):
         # Final output
         logits = self.output_layer(txt_emb)
         return logits
+
+    @staticmethod
+    def calc_loss(outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
+        """
+        Calculate the loss for the given outputs and targets.
+
+        :param outputs: Predicted word indices (batch_size, padded_length, vocab_size)
+        :param targets: Target word indices (batch_size, padded_length)
+        :param criterion: Loss function
+        :return: Loss value
+        """
+        # Reshape for loss calculation
+        logits = outputs.reshape(-1, outputs.size(-1))  # (batch*(seq_len-1), vocab_size)
+        targets_flat = targets.reshape(-1)  # (batch*(seq_len-1))
+
+        # Calculate loss per token (without reduction)
+        return criterion(logits, targets_flat)  # (batch*(seq_len-1))
 
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
