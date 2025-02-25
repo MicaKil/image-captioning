@@ -7,7 +7,6 @@ from scripts.models.image_captioning import ImageCaptioner
 
 
 # TODO: Sequential Embedding
-# TODO: Penalize PAD, SOS and UNK tokens
 
 class Encoder(nn.Module):
     """
@@ -88,7 +87,10 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.layer_norm = nn.LayerNorm(hidden_size)
+
         self.linear = nn.Linear(hidden_size, vocab_size)
+        self.linear.bias.data.zero_()  # Initialize bias to zeros
+        self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
 
     def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
         """
