@@ -20,7 +20,7 @@ class Encoder(nn.Module):
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
 
-    def __init__(self, embed_dim: int, dropout: float, fine_tune: bool) -> None:
+    def __init__(self, embed_dim: int, dropout: float, fine_tune: bool):
         """
         Constructor for the EncoderResnet class
 
