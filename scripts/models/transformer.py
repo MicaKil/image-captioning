@@ -1,7 +1,6 @@
 from collections import Counter
 from typing import Optional
 
-import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision.models as models
@@ -306,14 +305,10 @@ class ImageCaptioningTransformer(nn.Module):
         """
         super().__init__()
         self.vocab = vocab
-        vocab_size = len(vocab)
-
         self.encoder = encoder
 
-        # Text embedding
-        self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size, vocab.to_idx(PAD))
+        self.seq_embedding = SeqEmbedding(len(vocab), max_length, hidden_size, vocab.to_idx(PAD))
 
-        # Decoder layers
         self.decoder_layers = nn.ModuleList([
             DecoderLayer(hidden_size, num_heads, dropout)
             for _ in range(num_layers)
@@ -521,11 +516,45 @@ class ImageCaptioningTransformer(nn.Module):
 
 
 if __name__ == '__main__':
+    import pandas as pd
+    import os.path
+    from constants import ROOT, TRAIN_CSV, FLICKR8K_IMG_DIR
+    from configs.runner_config import TRANSFORM
+    from scripts.dataset.flickr_dataset import FlickrDataset
+    from scripts.dataset.flickr_dataloader import FlickrDataLoader
+
     train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
     vocab_ = Vocabulary(3, train_df['caption'])
     img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
     train_ds = FlickrDataset(img_dir, train_df, vocab_, transform=TRANSFORM)
-    encoder_ = intermediate.Encoder(256, 0.2, True)
-    print(encoder_)
-    model_ = ImageCaptioningTransformer(vocab_, encoder_, 256, 2, 2, 50, 0.1, vocab_.to_idx(PAD))
-    print(model_)
+    encoder_ = Encoder(256, 0.2, True)
+    model_ = ImageCaptioningTransformer(vocab_, encoder_, 256, 2, 2, 40, 0.1)
+    train_dl = FlickrDataLoader(train_ds, batch_size=64, shuffle=True, num_workers=4)
+    images_, captions_, images_id = next(iter(train_dl))
+    outputs_ = model_(images_, captions_[:, :-1])  # Shape: (batch_size, seq_len, vocab_size)
+    targets_ = captions_[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
+
+    # Calculate loss per token (without reduction)
+    criterion_ = nn.CrossEntropyLoss(ignore_index=vocab_.to_idx(PAD), reduction="none")
+    optimizer_ = torch.optim.AdamW(model_.parameters(), lr=0.0001)
+    per_token_loss = model_.calc_loss(outputs_, targets_, criterion_)  # (batch*(seq_len-1))
+
+    # Create mask: 1 for valid tokens, 0 for banned tokens
+    targets_ = targets_.reshape(-1)
+    mask_ = torch.ones_like(targets_, dtype=torch.bool)
+    banned_indices_ = [vocab_.to_idx(token) for token in [PAD, UNK, SOS]]
+    for banned_idx in banned_indices_:
+        mask_ &= (targets_ != banned_idx)
+
+    # Apply mask and compute mean loss
+    valid_losses = per_token_loss[mask_]
+    num_valid = mask_.sum().item()
+
+    if num_valid > 0:
+        loss = valid_losses.mean()
+    else:
+        loss = torch.tensor(0.0, device=images_.device)  # Avoid division by zero
+
+    optimizer_.zero_grad()
+    loss.backward()
+    optimizer_.step()

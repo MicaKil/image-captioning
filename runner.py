@@ -38,7 +38,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
     else:
         config = RUN_CONFIG
 
-    test_dataset, train_dataset, val_dataset, vocab = handle_ds(config, create_ds, date, save_ds, use_wandb)
+    test_dataset, train_dataset, val_dataset, vocab = get_ds(config, create_ds, date, save_ds, use_wandb)
 
     pad_idx = vocab.to_idx(PAD)
     model = get_model(config, vocab, pad_idx)
@@ -59,13 +59,8 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
         criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="none")
-        optimizer = Adam([
-            {"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
-            {"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
-        ])
-        scheduler = None
-        if config["scheduler"] is not None:
-            scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
+        optimizer = get_optimizer(config, model)
+        scheduler = get_scheduler(config, optimizer)
 
         best_val_model, best_val_info, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
                                                              CHECKPOINT_DIR + config["model"], use_wandb, config)
@@ -122,8 +117,38 @@ def get_model(config, vocab, pad_idx):
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
 
+def get_optimizer(config, model):
+    match config["model"]:
+        case "basic", "intermediate":
+            params = [
+                {"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
+                {"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
+            ]
+        case "transformer":
+            params = [
+                {"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
+                {"params": model.seq_embedding.parameters(), "lr": config["decoder_lr"]},
+                {"params": model.decoder_layers.parameters(), "lr": config["decoder_lr"]},
+                {"params": model.output_layer.parameters(), "lr": config["decoder_lr"]}
+            ]
+        case _:
+            raise ValueError(f"Model {config['model']} not recognized")
 
-def handle_ds(config, create_ds, date, save_ds, use_wandb):
+    match config["optimizer"]:
+        case "Adam":
+            return Adam(params)
+        case "AdamW":
+            return Adam(params)
+
+
+def get_scheduler(config, optimizer):
+    scheduler = None
+    if config["scheduler"] is not None:
+        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
+    return scheduler
+
+
+def get_ds(config, create_ds, date, save_ds, use_wandb):
     # create or load dataset
     img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
     if create_ds:
