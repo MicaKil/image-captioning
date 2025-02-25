@@ -78,7 +78,11 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                 wandb.finish()
             # test best model
             if best_val_model is not None:
-                init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=config)
+                if use_wandb:
+                    init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=RUN_CONFIG)
+                    config = wandb.config
+                else:
+                    config = RUN_CONFIG
                 best = get_model(config, vocab, pad_idx)
                 best.load_state_dict(torch.load(best_val_model, weights_only=True))
                 best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
