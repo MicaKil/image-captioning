@@ -17,8 +17,8 @@ SHUFFLE = True
 PIN_MEMORY = True
 
 # run
-PROJECT = "image-captioning-v1"
-RUN_TAGS = ["intermediate", "flickr8k"]
+PROJECT = "image-captioning-v0"
+RUN_TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
@@ -26,7 +26,7 @@ use_scheduler = False
 RUN_CONFIG = {
     "model": RUN_TAGS[0],
     "encoder": "resnet50",
-    "decoder": "LSTM",
+    "decoder": "Attention",
     "batch_size": 64,
     "embed_size": 256,
     "hidden_size": 256,
@@ -37,8 +37,8 @@ RUN_CONFIG = {
     "encoder_lr": 0.00001,
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
-    "optimizer": "Adam",
-    "max_epochs": 200,
+    "optimizer": "AdamW",
+    "max_epochs": 1,
     "patience": 20,
     "gradient_clip": None,
     "dataset": {
