@@ -11,12 +11,12 @@ class Encoder(nn.Module):
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
 
-    def __init__(self, embed_dim: int, freeze: bool) -> None:
+    def __init__(self, embed_dim: int, fine_tune: bool):
         """
         Constructor for the EncoderResnet class
 
-        :param freeze: Whether to freeze the weights of the ResNet-50 model during training
         :param embed_dim: Size of the embedding vector
+        :param fine_tune:
         """
         super().__init__()
         self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
@@ -25,14 +25,20 @@ class Encoder(nn.Module):
             *list(self.resnet.children())[:-1]  # Remove the last FC layer (Classification layer)
         )
 
-        if freeze:
-            # Permanently mark the parameters so that gradients are not computed for them during the backward pass.
-            # This means that these parameters will not be updated during training.
-            for param in self.resnet.parameters():
-                param.requires_grad = False
+        # Permanently mark the parameters so that gradients are not computed for them during the backward pass.
+        # This means that these parameters will not be updated during training.
+        for param in self.resnet.parameters():
+            param.requires_grad = False
+        if fine_tune:
+            # Unfreeze the last two layers of the ResNet-50 model
+            for layer in list(self.resnet.children())[-2:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
 
         # Add a linear layer to transform the features to the embedding size
         self.linear = nn.Linear(in_features, embed_dim)
+        self.linear.bias.data.zero_()  # Initialize bias to zeros
+        self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         """
@@ -68,6 +74,8 @@ class Decoder(nn.Module):
         self.embed = nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.linear = nn.Linear(hidden_size, vocab_size)
+        self.linear.bias.data.zero_()  # Initialize bias to zeros
+        self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
