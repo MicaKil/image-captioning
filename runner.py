@@ -89,16 +89,52 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         wandb.finish()
 
 
-def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb):
-    # Load model from saved model
-    logger.info(f"Loading model from {saved_model}")
-    model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
-    if test_model:
-        test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-        model.test_model(test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
-    if use_wandb:
-        wandb.finish()
+def init_wandb_run(project: str, tags: list, config: dict) -> Run:
+    """
+    Initialize wandb run
+    :param project: Project name
+    :param tags: List of tags
+    :param config: Run configuration dictionary
+    :return: Wandb run
+    """
+    wandb_run = wandb.init(project=project, tags=tags, config=config)
+    wandb_run.define_metric("train_loss", summary="min")
+    wandb_run.define_metric("val_loss", summary="min")
+    wandb_run.define_metric("val_BLEU-4", summary="max")
+    wandb_run.define_metric("test_BLEU-1", summary="max")
+    wandb_run.define_metric("test_BLEU-2", summary="max")
+    wandb_run.define_metric("test_BLEU-4", summary="max")
+    wandb_run.define_metric("test_CIDEr", summary="max")
+    wandb_run.define_metric("epoch", summary="max")
+    return wandb_run
 
+
+def get_ds(config, create_ds, date, save_ds, use_wandb):
+    # create or load dataset
+    img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
+    if create_ds:
+        df_captions = load_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
+        total_size = len(df_captions["image_id"].unique())
+        train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
+        val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
+        test_size = total_size - train_size - val_size
+        train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
+    else:
+        train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
+        val_df = pd.read_csv(str(os.path.join(ROOT, VAL_CSV)))
+        test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
+
+    vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
+    train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
+    val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
+    test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
+
+    if save_ds:
+        save_df(config, date, test_df, train_df, val_df)
+        save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)  # save new datasets
+        if use_wandb:
+            log_datasets(date, False)
+    return test_dataset, train_dataset, val_dataset, vocab
 
 def get_model(config, vocab, pad_idx):
     match config["model"]:
@@ -116,6 +152,18 @@ def get_model(config, vocab, pad_idx):
                                                           config["max_caption_len"], config["dropout"])
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
+
+
+def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb):
+    # Load model from saved model
+    logger.info(f"Loading model from {saved_model}")
+    model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
+    if test_model:
+        test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+        model.test_model(test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
+    if use_wandb:
+        wandb.finish()
+
 
 def get_optimizer(config, model):
     match config["model"]:
@@ -146,54 +194,6 @@ def get_scheduler(config, optimizer):
     if config["scheduler"] is not None:
         scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
     return scheduler
-
-
-def get_ds(config, create_ds, date, save_ds, use_wandb):
-    # create or load dataset
-    img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-    if create_ds:
-        df_captions = load_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
-        total_size = len(df_captions["image_id"].unique())
-        train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
-        val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
-        test_size = total_size - train_size - val_size
-        train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
-    else:
-        train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
-        val_df = pd.read_csv(str(os.path.join(ROOT, VAL_CSV)))
-        test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
-
-    vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
-    train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
-    val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
-    test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
-
-    if save_ds:
-        save_df(config, date, test_df, train_df, val_df)
-        save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)  # save new datasets
-        if use_wandb:
-            log_datasets(date, False)
-    return test_dataset, train_dataset, val_dataset, vocab
-
-
-def init_wandb_run(project: str, tags: list, config: dict) -> Run:
-    """
-    Initialize wandb run
-    :param project: Project name
-    :param tags: List of tags
-    :param config: Run configuration dictionary
-    :return: Wandb run
-    """
-    wandb_run = wandb.init(project=project, tags=tags, config=config)
-    wandb_run.define_metric("train_loss", summary="min")
-    wandb_run.define_metric("val_loss", summary="min")
-    wandb_run.define_metric("val_BLEU-4", summary="max")
-    wandb_run.define_metric("test_BLEU-1", summary="max")
-    wandb_run.define_metric("test_BLEU-2", summary="max")
-    wandb_run.define_metric("test_BLEU-4", summary="max")
-    wandb_run.define_metric("test_CIDEr", summary="max")
-    wandb_run.define_metric("epoch", summary="max")
-    return wandb_run
 
 
 def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame):
