@@ -31,6 +31,7 @@ RUN_CONFIG = {
     "embed_size": 256,
     "hidden_size": 256,
     "num_layers": 1,
+    "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.2,
     "dropout": 0.5,  # decoder dropout
     "freeze_encoder": False,
@@ -53,7 +54,7 @@ RUN_CONFIG = {
     "vocab": {
         "freq_threshold": 3
     },
-    "max_caption_len": 30,
+    "max_caption_len": 40,
     "temperature": None,
     "beam_size": 5,
     "scheduler": {
