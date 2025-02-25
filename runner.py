@@ -108,7 +108,7 @@ def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_
 def get_model(config, vocab, pad_idx):
     match config["model"]:
         case "basic":
-            encoder = basic.Encoder(config["embed_size"], config["freeze_encoder"])
+            encoder = basic.Encoder(config["embed_size"], not config["freeze_encoder"])
             decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
             return basic.BasicImageCaptioner(encoder, decoder)
         case "intermediate":
@@ -118,7 +118,7 @@ def get_model(config, vocab, pad_idx):
         case "transformer":
             encoder = intermediate.Encoder(config["embed_size"], config["encoder_dropout"], not config["freeze_encoder"])
             return transformer.ImageCaptioningTransformer(vocab, encoder, config["hidden_size"], config["num_layers"], config["num_heads"],
-                                                          config["max_caption_len"], config["dropout"], pad_idx)
+                                                          config["max_caption_len"], config["dropout"])
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
 
