@@ -95,7 +95,7 @@ class BasicImageCaptioner(ImageCaptioner):
     def __init__(self, encoder: nn.Module, decoder: nn.Module):
         super().__init__(encoder, decoder)
 
-    def calculate_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
+    def calc_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
         """
         Calculate the loss for the given outputs and targets.
 

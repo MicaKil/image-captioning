@@ -309,6 +309,8 @@ class ImageCaptioningTransformer(nn.Module):
         logits = self.output_layer(txt_emb)
         return logits
 
+    # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
+
     def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
                  temperature: Optional[float] = None, beam_size: int = 1) -> str:
         """
