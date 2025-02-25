@@ -1,18 +1,67 @@
-import os.path
 from collections import Counter
 from typing import Optional
 
 import pandas as pd
 import torch
 import torch.nn as nn
+import torchvision.models as models
 from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
+from torch.utils.data import DataLoader
+from torchvision.models import ResNet50_Weights
 
-from configs.runner_config import TRANSFORM
-from constants import SOS, EOS, UNK, PAD, TRAIN_CSV, ROOT, FLICKR8K_IMG_DIR
-from scripts.dataset.flickr_dataset import FlickrDataset
+from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models import intermediate
+from scripts.test import test
+from scripts.train import train
+
+
+class Encoder(nn.Module):
+    """
+    Encoder class that uses a pretrained ResNet-50 model to extract features from images.
+    """
+
+    def __init__(self, embed_dim: int, dropout: float, fine_tune: bool) -> None:
+        """
+        Constructor for the EncoderResnet class
+
+        :param embed_dim: Size of the embedding vector
+        :param dropout: Dropout probability
+        :param fine_tune: Whether to fine-tune the last two layers of the ResNet-50 model
+        """
+        super().__init__()
+        self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+        in_features = self.resnet.fc.in_features
+        self.resnet = nn.Sequential(
+            *list(self.resnet.children())[:-1]  # Remove the last FC layer (Classification layer)
+        )  # Output shape: (batch, feature_dim, 1, 1)
+
+        # Permanently mark the parameters so that gradients are not computed for them during the backward pass.
+        # This means that these parameters will not be updated during training.
+        for param in self.resnet.parameters():
+            param.requires_grad = False
+        if fine_tune:
+            # Unfreeze the last two layers of the ResNet-50 model
+            for layer in list(self.resnet.children())[-2:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
+
+        self.projection = nn.Sequential(
+            nn.Conv2d(in_features, embed_dim, kernel_size=1),  # Reduce to embed_dim (Shape: (batch, embed_dim, 1, 1))
+            nn.ReLU(),
+            nn.Dropout2d(dropout)
+        )
+
+    def forward(self, image: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the encoder
+
+        :param image: Input image tensor of shape (batch_size, 3, 224, 224)
+        :return:
+        """
+        features = self.resnet(image)  # Shape: (batch_size, feature_dim, 1, 1)
+        features = self.projection(features)  # Shape: (batch_size, embed_size, 1, 1)
+        return features
 
 
 class SeqEmbedding(nn.Module):
@@ -433,6 +482,40 @@ class ImageCaptioningTransformer(nn.Module):
         # Return best sequence
         best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
         return vocab.to_text(best_seq)
+
+    # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
+
+    def train_model(self, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
+                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
+                    run_config: dict) -> tuple[str | None, dict, str | None]:
+        """
+        Training loop for the model.
+
+        :param train_loader: DataLoader for the training set
+        :param val_loader: DataLoader for the validation set
+        :param device: Device to run the training on
+        :param criterion: Loss function
+        :param optimizer: Optimizer for training
+        :param scheduler: Learning rate scheduler
+        :param checkpoint_dir: Directory to save the best model
+        :param use_wandb: Whether to use Weights & Biases for logging
+        :param run_config: Configuration for the run
+        :return: Path to the best model
+        """
+        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config)
+
+    def test_model(self, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
+        """
+        Evaluate model on test set and log results
+        :param test_loader: Test data loader to use
+        :param device: Device to use (cpu or cuda)
+        :param save_dir: If not None, save results to this directory
+        :param tag: Tag to use for saving results
+        :param use_wandb: Whether to use Weights & Biases for logging
+        :param run_config: Configuration for the run if not using wandb
+        :return:
+        """
+        return test(self, test_loader, device, save_dir, tag, use_wandb, run_config)
 
 
 if __name__ == '__main__':
