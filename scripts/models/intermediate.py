@@ -6,6 +6,9 @@ from torchvision.models import ResNet50_Weights
 from scripts.models.image_captioning import ImageCaptioner
 
 
+# TODO: Sequential Embedding
+# TODO: Penalize PAD, SOS and UNK tokens
+
 class Encoder(nn.Module):
     """
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
