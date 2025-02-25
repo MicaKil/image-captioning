@@ -33,7 +33,7 @@ RUN_CONFIG = {
     "num_layers": 3,
     "encoder_dropout": 0.2,
     "dropout": 0.5,  # decoder dropout
-    "freeze_encoder": True,
+    "freeze_encoder": False,
     "encoder_lr": 0.00001,
     "decoder_lr": 0.00001,
     "criterion": "CrossEntropyLoss",
