@@ -114,22 +114,24 @@ class CausalSelfAttention(nn.Module):
         :param txt_emb: (batch, seq, feature)
         :return:
         """
-        attn_output, _ = self.mha(x, x, x, is_causal=True)
-        x = x + attn_output  # Residual connection
-        return self.layer_norm(x)
+        # Generate causal mask on first forward pass
+        attn_output, _ = self.mha(txt_emb, txt_emb, txt_emb, attn_mask=self.create_causal_mask(txt_emb))
+        txt_emb = txt_emb + attn_output  # Residual connection
+        return self.layer_norm(txt_emb)
 
-    # TODO: Could be redundant. Possibly use is_causal=True in MultiheadAttention instead.
-    # @staticmethod
-    # def causal_mask(x):
-    #     """
-    #     Creates triangular mask to prevent looking at future tokens
-    #     :param x:
-    #     :return:
-    #     """
-    #     sz = x.size(0)
-    #     mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-    #     mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-    #     return mask.to(x.device)
+    @staticmethod
+    def create_causal_mask(txt_emb):
+        """
+        Creates triangular mask to prevent looking at future tokens
+        :param txt_emb:
+        :return:
+        """
+        seq_size = txt_emb.size(1)
+        mask = torch.triu(
+            torch.full((seq_size, seq_size), float('-inf')),
+            diagonal=1
+        ).to(txt_emb.device)
+        return mask.to(txt_emb.device)
 
 
 class CrossAttention(nn.Module):
