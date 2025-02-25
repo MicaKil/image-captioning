@@ -29,8 +29,8 @@ RUN_CONFIG = {
     "decoder": "LSTM",
     "batch_size": 64,
     "embed_size": 256,
-    "hidden_size": 512,
-    "num_layers": 2,
+    "hidden_size": 256,
+    "num_layers": 1,
     "encoder_dropout": 0.2,
     "dropout": 0.5,  # decoder dropout
     "freeze_encoder": False,
