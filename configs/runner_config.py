@@ -29,7 +29,7 @@ RUN_CONFIG = {
     "decoder": "Attention",
     "batch_size": 64,
     "embed_size": 256,
-    "hidden_size": 256,
+    "hidden_size": 512,
     "num_layers": 1,
     "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.2,

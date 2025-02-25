@@ -272,4 +272,4 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 
 if __name__ == "__main__":
     wandb.teardown()
-    run(use_wandb=True, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None)
+    run(use_wandb=False, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None)
