@@ -378,7 +378,7 @@ class ImageCaptioningTransformer(nn.Module):
         with torch.no_grad():
             image = image.to(device)
             # Encode image
-            img_features = self.encoder(image.unsqueeze(0))
+            img_features = self.encoder(image)
             img_features = rearrange(img_features, 'b c h w -> b (h w) c')
 
             if beam_size > 1:
