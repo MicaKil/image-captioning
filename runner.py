@@ -107,11 +107,11 @@ def get_model(config, vocab, pad_idx):
             decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
             return basic.BasicImageCaptioner(encoder, decoder)
         case "intermediate":
-            encoder = intermediate.Encoder(config["embed_size"], config["freeze_encoder"], config["encoder_dropout"])
+            encoder = intermediate.Encoder(config["embed_size"], config["encoder_dropout"], not config["freeze_encoder"])
             decoder = intermediate.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
             return intermediate.IntermediateImageCaptioner(encoder, decoder)
         case "transformer":
-            encoder = intermediate.Encoder(config["embed_size"], config["freeze_encoder"], config["encoder_dropout"])
+            encoder = intermediate.Encoder(config["embed_size"], config["encoder_dropout"], not config["freeze_encoder"])
             return transformer.ImageCaptioningTransformer(vocab, encoder, config["hidden_size"], config["num_layers"], config["num_heads"],
                                                           config["max_caption_len"], config["dropout"], pad_idx)
         case _:

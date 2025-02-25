@@ -11,13 +11,13 @@ class Encoder(nn.Module):
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
 
-    def __init__(self, embed_dim: int, freeze: bool, dropout: float) -> None:
+    def __init__(self, embed_dim: int, dropout: float, fine_tune: bool) -> None:
         """
         Constructor for the EncoderResnet class
 
-        :param freeze: Whether to freeze the weights of the ResNet-50 model during training
         :param embed_dim: Size of the embedding vector
         :param dropout: Dropout probability
+        :param fine_tune: Whether to fine-tune the last two layers of the ResNet-50 model
         """
         super().__init__()
         self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
@@ -26,11 +26,15 @@ class Encoder(nn.Module):
             *list(self.resnet.children())[:-1]  # Remove the last FC layer (Classification layer)
         )
 
-        if freeze:
-            # Permanently mark the parameters so that gradients are not computed for them during the backward pass.
-            # This means that these parameters will not be updated during training.
-            for param in self.resnet.parameters():
-                param.requires_grad = False
+        # Permanently mark the parameters so that gradients are not computed for them during the backward pass.
+        # This means that these parameters will not be updated during training.
+        for param in self.resnet.parameters():
+            param.requires_grad = False
+        if fine_tune:
+            # Unfreeze the last two layers of the ResNet-50 model
+            for layer in list(self.resnet.children())[-2:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
 
         # Add a linear layer to transform the features to the embedding size
         self.linear = nn.Sequential(
