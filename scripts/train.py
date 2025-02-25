@@ -229,7 +229,7 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
     # Create mask: 1 for valid tokens, 0 for banned tokens
     targets_flat = targets.reshape(-1)
     mask = torch.ones_like(targets_flat, dtype=torch.bool)
-    banned_indices = [vocab.to_idx(PAD), vocab.to_idx(UNK), vocab.to_idx(SOS)]
+    banned_indices = [vocab.to_idx(token) for token in [PAD, UNK, SOS]]
     for banned_idx in banned_indices:
         mask &= (targets_flat != banned_idx)
 
