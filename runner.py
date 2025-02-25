@@ -53,6 +53,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         if use_wandb:
             wandb.run.summary["trainable_parameters"] = parameter_count
         logger.info(f"Number of trainable parameters: {parameter_count}")
+
         # dataloaders
         train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
         val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)

@@ -1,13 +1,18 @@
+import os.path
 from collections import Counter
 from typing import Optional
 
+import pandas as pd
 import torch
 import torch.nn as nn
 from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
 
-from constants import SOS, EOS, UNK, PAD
+from configs.runner_config import TRANSFORM
+from constants import SOS, EOS, UNK, PAD, TRAIN_CSV, ROOT, FLICKR8K_IMG_DIR
+from scripts.dataset.flickr_dataset import FlickrDataset
 from scripts.dataset.vocabulary import Vocabulary
+from scripts.models import intermediate
 
 
 class SeqEmbedding(nn.Module):
@@ -422,3 +427,14 @@ class ImageCaptioningTransformer(nn.Module):
         # Return best sequence
         best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
         return vocab.to_text(best_seq)
+
+
+if __name__ == '__main__':
+    train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
+    vocab_ = Vocabulary(3, train_df['caption'])
+    img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
+    train_ds = FlickrDataset(img_dir, train_df, vocab_, transform=TRANSFORM)
+    encoder_ = intermediate.Encoder(256, 0.2, True)
+    print(encoder_)
+    model_ = ImageCaptioningTransformer(vocab_, encoder_, 256, 2, 2, 50, 0.1, vocab_.to_idx(PAD))
+    print(model_)
