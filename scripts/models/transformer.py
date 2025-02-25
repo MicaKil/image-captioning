@@ -100,18 +100,18 @@ class CrossAttention(nn.Module):
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.attention_scores = None
 
-    def forward(self, x, y):
+    def forward(self, txt_emb: torch.Tensor, img_features: torch.Tensor):
         """
         Uses x as the decoder query and y as both key and value (image features), adds the attention output to x (residual connection), and normalizes
         the result.
-        :param x: (batch, seq, feature)
-        :param y:
+        :param txt_emb: Decoder query, shape: (batch, seq, feature)
+        :param img_features: Key and value, shape: (batch, h*w, feature)
         :return:
         """
-        attn_output, attn_weights = self.mha(x, y, y)  # Query: x (Decoder query), Key: y (Image features), Value: y (Image features)
+        attn_output, attn_weights = self.mha(txt_emb, img_features, img_features)
         self.attention_scores = attn_weights  # Save attention scores for visualization
-        x = x + attn_output
-        return self.layer_norm(x)
+        txt_emb = txt_emb + attn_output
+        return self.layer_norm(txt_emb)
 
 
 class FeedForward(nn.Module):
@@ -134,14 +134,14 @@ class FeedForward(nn.Module):
         )
         self.layer_norm = nn.LayerNorm(hidden_size)
 
-    def forward(self, x):
+    def forward(self, txt_emb: torch.Tensor):
         """
         Applies the feedforward network to x, adds the input (residual connection), and normalizes the output.
-        :param x:
+        :param txt_emb:
         :return:
         """
-        x = x + self.seq(x)  # Residual connection
-        return self.layer_norm(x)
+        txt_emb = txt_emb + self.seq(txt_emb)  # Residual connection
+        return self.layer_norm(txt_emb)
 
 
 class DecoderLayer(nn.Module):
@@ -151,7 +151,7 @@ class DecoderLayer(nn.Module):
 
     def __init__(self, hidden_size: int, num_heads: int = 1, dropout: float = 0.1):
         """
-        Initializes the three sub-modules: self-attention, cross-attention, and feedforward network.
+        Initializes the three submodules: self-attention, cross-attention, and feedforward network.
         :param hidden_size:
         :param num_heads:
         :param dropout:
@@ -190,12 +190,10 @@ class Output(nn.Module):
         """
         super().__init__()
         self.vocab = vocab
-        self.linear = nn.Linear(hidden_size, len(vocab))
         self.banned_indices = banned_indices
-        # Initialize bias to zeros
-        self.linear.bias.data.zero_()
-        # Set banned tokens to -1e9 initially
-        self.linear.bias.data[self.banned_indices] = -1e9
+        self.linear = nn.Linear(hidden_size, len(vocab))
+        self.linear.bias.data.zero_()  # Initialize bias to zeros
+        self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
 
     def adapt(self):
         """
@@ -243,7 +241,7 @@ class ImageCaptioningTransformer(nn.Module):
     """
 
     def __init__(self, vocab: Vocabulary, encoder: nn.Module, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2, max_length: int = 50,
-                 dropout: float = 0.1, pad_idx: int = 0):
+                 dropout: float = 0.1):
         """
         Sets up the vocabulary, assigns an external image encoder, creates the sequence embedding, a stack of decoder layers, and the output layer
         with banned token biases.
@@ -254,7 +252,6 @@ class ImageCaptioningTransformer(nn.Module):
         :param num_heads:
         :param max_length:
         :param dropout:
-        :param pad_idx:
         """
         super().__init__()
         self.vocab = vocab
@@ -263,7 +260,7 @@ class ImageCaptioningTransformer(nn.Module):
         self.encoder = encoder
 
         # Text embedding
-        self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size, pad_idx)
+        self.seq_embedding = SeqEmbedding(vocab_size, max_length, hidden_size, vocab.to_idx(PAD))
 
         # Decoder layers
         self.decoder_layers = nn.ModuleList([
@@ -272,17 +269,8 @@ class ImageCaptioningTransformer(nn.Module):
         ])
 
         # Output layer with smart initialization
-        self.output_layer = Output(hidden_size, vocab, [vocab.to_idx(t) for t in [PAD, UNK, SOS]])
-
-    # def _init_output_bias(self):
-    #     """
-    #     The model will be generating text. It should never generate a pad, unknown, or start token.
-    #     So set the bias for these to a large negative value.
-    #     :return:
-    #     """
-    #     banned = [self.vocab.to_idx(t) for t in [PAD, UNK, SOS]]
-    #     with torch.no_grad():
-    #         self.output_layer.bias[banned] = -1e9
+        self.output_layer = Output(hidden_size, vocab, [vocab.to_idx(token) for token in [PAD, UNK, SOS]])
+        self.output_layer.adapt()  # Initialize output layer bias
 
     def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
         """
