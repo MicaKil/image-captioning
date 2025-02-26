@@ -226,7 +226,7 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
     # Calculate loss per token (without reduction)
     per_token_loss = model.calc_loss(outputs, targets, criterion)  # (batch*(seq_len-1))
 
-    # Create mask: 1 for valid tokens, 0 for banned tokens
+    # Create mask: True for valid tokens, False for banned tokens
     targets = targets.reshape(-1)
     mask = torch.ones_like(targets, dtype=torch.bool)
     banned_indices = [vocab.to_idx(token) for token in [PAD, SOS, UNK]]
@@ -241,6 +241,9 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
         loss = per_token_loss.sum()
     else:
         loss = torch.tensor(0.0, device=images.device)  # Avoid division by zero
+
+    if loss > 1000:
+        logger.warning(f"Loss is too high: {loss.item()}")
 
     return loss, num_tokens
 
