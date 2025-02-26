@@ -18,21 +18,21 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-RUN_TAGS = ["transformer", "flickr8k", "test"]
+RUN_TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-use_scheduler = False
+use_scheduler = True
 
 RUN_CONFIG = {
     "model": RUN_TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention",
     "batch_size": 64,
-    "embed_size": 256,
-    "hidden_size": 256,
-    "num_layers": 1,
+    "embed_size": 512,
+    "hidden_size": 512,
+    "num_layers": 2,
     "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.2,
+    "encoder_dropout": 0.1,
     "dropout": 0.5,  # decoder dropout
     "freeze_encoder": False,
     "encoder_lr": 0.00001,
@@ -40,8 +40,8 @@ RUN_CONFIG = {
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
     "max_epochs": 100,
-    "patience": 20,
-    "gradient_clip": None,
+    "patience": 30,
+    "gradient_clip": 2.0,
     "dataset": {
         "name": "flickr8k",
         "version": "2025-02-16",
