@@ -416,7 +416,6 @@ class ImageCaptioningTransformer(nn.Module):
             if next_token.item() == vocab.to_idx(EOS):
                 break
 
-        # return tokens.squeeze().tolist()[1:-1]
         return vocab.to_text(tokens.squeeze().tolist())
 
     def beam_search(self, img_features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> str:
@@ -430,10 +429,8 @@ class ImageCaptioningTransformer(nn.Module):
         :param beam_size:
         :return:
         """
-        # Initialize beam search
         sos_idx = vocab.to_idx(SOS)
         eos_idx = vocab.to_idx(EOS)
-        # vocab_size = len(vocab)
 
         # Expand features for beam search
         img_features = img_features.repeat(beam_size, 1, 1)
