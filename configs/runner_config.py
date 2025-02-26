@@ -28,11 +28,11 @@ RUN_CONFIG = {
     "encoder": "resnet50",
     "decoder": "Attention",
     "batch_size": 64,
-    "embed_size": 512,
-    "hidden_size": 512,
-    "num_layers": 2,
+    "embed_size": 1024,
+    "hidden_size": 1024,
+    "num_layers": 5,
     "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.1,
+    "encoder_dropout": 0.5,
     "dropout": 0.5,  # decoder dropout
     "freeze_encoder": False,
     "encoder_lr": 0.00001,
@@ -59,11 +59,11 @@ RUN_CONFIG = {
     "beam_size": 5,
     "scheduler": {
         "type": "ReduceLROnPlateau",
-        "factor": 0.5,
+        "factor": 0.9,
         "patience": 10,
     } if use_scheduler else None,
     "validation": {
-        "bleu4": True,
-        "bleu4_step": 10
+        "bleu4": False,
+        "bleu4_step": None
     }
 }
