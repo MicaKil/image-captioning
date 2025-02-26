@@ -222,27 +222,24 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
     """
     outputs = model(images, captions[:, :-1])  # Shape: (batch_size, seq_len, vocab_size)
     targets = captions[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
-
     # Calculate loss per token (without reduction)
     per_token_loss = model.calc_loss(outputs, targets, criterion)  # (batch*(seq_len-1))
-    print(f"per_token_loss: {per_token_loss}\n")
     # Create mask: 1 for valid tokens, 0 for banned tokens
     targets_flat = targets.reshape(-1)
     mask = torch.ones_like(targets_flat, dtype=torch.bool)
-    banned_indices = [vocab.to_idx(token) for token in [PAD, UNK, SOS]]
+    banned_indices = [vocab.to_idx(token) for token in [PAD, SOS, UNK]]
+    mask &= (per_token_loss < 1e8)
     for banned_idx in banned_indices:
         mask &= (targets_flat != banned_idx)
 
     # Apply mask and compute mean loss
     valid_losses = per_token_loss[mask]
     num_valid = mask.sum().item()
-    print(f"valid_losses: {valid_losses}\n")
     if num_valid > 0:
-        loss = valid_losses.mean()
+        loss = valid_losses.sum()
     else:
         loss = torch.tensor(0.0, device=images.device)  # Avoid division by zero
 
-    print(f"loss: {loss.item()}, num_valid: {num_valid}\n")
     return loss, num_valid
 
 

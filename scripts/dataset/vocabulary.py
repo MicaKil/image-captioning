@@ -50,6 +50,9 @@ class Vocabulary:
                 self.idx_to_str[idx] = word
                 idx += 1
 
+        self.word_counts[SOS] = len(text_list)
+        self.word_counts[EOS] = len(text_list)
+
     def to_idx_list(self, text: str) -> list[int]:
         """
         Convert a text to a list of word indices.

@@ -255,7 +255,6 @@ class Output(nn.Module):
         idx_counts = Counter()
         for word, count in self.vocab.word_counts.items():
             idx_counts[self.vocab.to_idx(word)] = count
-
         # Ensure banned tokens are not counted
         for idx in self.banned_indices:
             idx_counts[idx] = 0
@@ -316,7 +315,7 @@ class ImageCaptioningTransformer(nn.Module):
         ])
 
         # Output layer with smart initialization
-        self.output_layer = Output(hidden_size, vocab, [vocab.to_idx(token) for token in [PAD, UNK, SOS]])
+        self.output_layer = Output(hidden_size, vocab, [vocab.to_idx(token) for token in [PAD, SOS, UNK]])
         self.output_layer.adapt()  # Initialize output layer bias
 
     def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
