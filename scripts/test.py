@@ -93,7 +93,7 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
     return references
 
 
-def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: torch.Tensor, use_wandb: bool, run_config: dict) -> list:
+def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, images: torch.Tensor, use_wandb: bool, run_config: dict) -> list[str]:
     """
     Generate captions for a list of images
     :param model: Model to use for caption generation
@@ -109,11 +109,7 @@ def gen_captions(model: nn.Module, vocab: Vocabulary, device: torch.device, imag
     else:
         config = run_config
 
-    captions = []
-    for img in images:
-        caption = gen_caption(model, img.unsqueeze(0), vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
-        captions.append(caption)
-    return captions
+    return gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
 
 
 def get_cider_score(all_hypotheses: list, all_references: list) -> float:

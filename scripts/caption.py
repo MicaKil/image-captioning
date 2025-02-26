@@ -8,13 +8,13 @@ from torchvision.transforms import v2
 from scripts.dataset.vocabulary import Vocabulary
 
 
-def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
-                temperature: Optional[float] = None, beam_size: int = 1) -> str:
+def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
+                temperature: Optional[float] = None, beam_size: int = 1) -> list[str]:
     """
     Generate a caption for an image using greedy search, temperature-based sampling, or beam search.
 
     :param model: Trained model for image captioning
-    :param image: Preprocessed image tensor (B, C, H, W)
+    :param images: Preprocessed batch of image tensors (B, C, H, W)
     :param vocab: Vocabulary object with str_to_idx and idx_to_str mappings
     :param max_length: Maximum caption length
     :param device: Device to use
@@ -31,8 +31,8 @@ def gen_caption(model: nn.Module, image: torch.Tensor, vocab: Vocabulary, max_le
     model.eval()
 
     with torch.no_grad():
-        image = image.to(device)
-        return model.generate(image=image, vocab=vocab, max_length=max_length, device=device, temperature=temperature, beam_size=beam_size)
+        images = images.to(device)
+        return model.generate(image=images, vocab=vocab, max_length=max_length, device=device, temperature=temperature, beam_size=beam_size)
 
 
 def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:

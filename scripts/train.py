@@ -258,7 +258,7 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     :return: Prints the sample caption
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
-    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
+    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])[0]
     logger.info(f"Sample caption: {caption}")
 
 
