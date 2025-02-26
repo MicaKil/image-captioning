@@ -222,25 +222,27 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
     """
     outputs = model(images, captions[:, :-1])  # Shape: (batch_size, seq_len, vocab_size)
     targets = captions[:, 1:]  # Remove the <SOS> token | Shape: (batch_size, seq_len - 1)
+
     # Calculate loss per token (without reduction)
     per_token_loss = model.calc_loss(outputs, targets, criterion)  # (batch*(seq_len-1))
+
     # Create mask: 1 for valid tokens, 0 for banned tokens
-    targets_flat = targets.reshape(-1)
-    mask = torch.ones_like(targets_flat, dtype=torch.bool)
+    targets = targets.reshape(-1)
+    mask = torch.ones_like(targets, dtype=torch.bool)
     banned_indices = [vocab.to_idx(token) for token in [PAD, SOS, UNK]]
-    mask &= (per_token_loss < 1e8)
     for banned_idx in banned_indices:
-        mask &= (targets_flat != banned_idx)
+        mask &= (targets != banned_idx)
 
     # Apply mask and compute mean loss
-    valid_losses = per_token_loss[mask]
-    num_valid = mask.sum().item()
-    if num_valid > 0:
-        loss = valid_losses.sum()
+    per_token_loss = per_token_loss[mask]
+    num_tokens = mask.sum().item()
+
+    if num_tokens > 0:
+        loss = per_token_loss.sum()
     else:
         loss = torch.tensor(0.0, device=images.device)  # Avoid division by zero
 
-    return loss, num_valid
+    return loss, num_tokens
 
 
 def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: Vocabulary) -> None:
