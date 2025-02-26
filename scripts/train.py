@@ -242,7 +242,7 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
     else:
         loss = torch.tensor(0.0, device=images.device)  # Avoid division by zero
 
-    if loss > 1000:
+    if loss > 1e8:
         logger.warning(f"Loss is too high: {loss.item()}")
 
     return loss, num_tokens
