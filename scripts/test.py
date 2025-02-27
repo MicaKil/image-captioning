@@ -38,7 +38,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
     results = []
     all_hypotheses = []
     all_references = []
-    df = test_loader.df
+    df = test_loader.annotations
     vocab = test_loader.vocab
     smoothing = SmoothingFunction().method1
 

@@ -27,8 +27,8 @@ class CaptionDataset(Dataset):
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
-        self.df = df_captions
-        self.img_ids, self.captions = self.df["image_id"], self.df["caption"]
+        self.annotations = df_captions
+        self.file_names, self.captions = self.annotations["image_id"], self.annotations["caption"]
         self.vocab = vocab
 
     def __len__(self):
@@ -44,7 +44,7 @@ class CaptionDataset(Dataset):
         :param idx: Index of the sample to retrieve
         :return: Tuple containing the image tensor, caption tensor, and image ID
         """
-        img = decode_image(str(os.path.join(self.img_dir, self.img_ids[idx])), mode=ImageReadMode.RGB)
+        img = decode_image(str(os.path.join(self.img_dir, self.file_names[idx])), mode=ImageReadMode.RGB)
         if self.transform:
             img = self.transform(img)
 
@@ -54,4 +54,4 @@ class CaptionDataset(Dataset):
         if self.target_transform:
             caption = self.target_transform(caption)
 
-        return img, caption, self.img_ids[idx]
+        return img, caption, self.file_names[idx]

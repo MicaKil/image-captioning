@@ -177,7 +177,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
     val_ble4 = None
     all_hypotheses = []
     all_references = []
-    df = val_loader.df
+    df = val_loader.annotations
     smoothing = SmoothingFunction().method1
     calc_bleu4 = config["validation"]["bleu4"] and (epoch == 0 or (epoch + 1) % config["validation"]["bleu4_step"] == 0)
 

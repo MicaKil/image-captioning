@@ -26,7 +26,7 @@ class CaptionLoader(DataLoader):
         super().__init__(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory,
                          collate_fn=Collate(dataset.vocab.to_idx(PAD)))
         self.vocab = dataset.vocab
-        self.df = dataset.df
+        self.annotations = dataset.annotations
         logger.info(f"DataLoader initialized.")
 
 
