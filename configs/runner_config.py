@@ -43,16 +43,16 @@ RUN_CONFIG = {
     "patience": 30,
     "gradient_clip": 1.0,
     "dataset": {
-        "name": "flickr8k",
-        "version": "2025-02-16",
+        "name": "coco",
+        "version": "2025-02-26",
         "split": {
-            "train": 80,
-            "val": 10,
-            "test": 10
+            "train": 75,
+            "val": 15,
+            "test": 15
         }
     },
     "vocab": {
-        "freq_threshold": 3
+        "freq_threshold": 5
     },
     "max_caption_len": 50,
     "temperature": 0,

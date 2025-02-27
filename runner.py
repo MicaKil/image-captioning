@@ -321,9 +321,9 @@ if __name__ == "__main__":
 
     saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
 
-    run(use_wandb=True,
+    run(use_wandb=False,
         create_ds=False,
-        save_ds=True,
+        save_ds=False,
         train_model=True,
         test_model=True,
         saved_model=None,
