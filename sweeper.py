@@ -10,8 +10,8 @@ from configs.runner_config import TRANSFORM
 from configs.sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
 from constants import ROOT, PAD, CHECKPOINT_DIR, VAL_CSV, TRAIN_CSV, TEST_CSV, FLICKR8K_IMG_DIR, RESULTS_DIR
 from runner import init_wandb_run, get_model
-from scripts.dataset.flickr_dataloader import FlickrDataLoader
-from scripts.dataset.flickr_dataset import FlickrDataset
+from scripts.dataset.dataloader import FlickrDataLoader
+from scripts.dataset.dataset import FlickrDataset
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.test import test
 from scripts.train import train

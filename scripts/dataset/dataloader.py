@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, Subset
 
 from configs.config import logger
 from constants import PAD
-from scripts.dataset.flickr_dataset import FlickrDataset
+from scripts.dataset.dataset import FlickrDataset
 from scripts.utils import get_vocab
 
 

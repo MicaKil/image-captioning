@@ -13,8 +13,8 @@ from wandb.sdk.wandb_run import Run
 from configs.config import logger
 from configs.runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
 from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, TRAIN_CSV, VAL_CSV, TEST_CSV
-from scripts.dataset.flickr_dataloader import FlickrDataLoader
-from scripts.dataset.flickr_dataset import FlickrDataset, split_dataframe, load_captions
+from scripts.dataset.dataloader import FlickrDataLoader
+from scripts.dataset.dataset import FlickrDataset, split_dataframe, load_flickr_captions
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
 from scripts.utils import date_str
@@ -113,7 +113,7 @@ def get_ds(config, create_ds, date, save_ds, use_wandb):
     # create or load dataset
     img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
     if create_ds:
-        df_captions = load_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
+        df_captions = load_flickr_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
         total_size = len(df_captions["image_id"].unique())
         train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
         val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)

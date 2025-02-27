@@ -19,12 +19,12 @@ class FlickrDataset(Dataset):
     def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None, target_transform=None):
         """
         :param img_dir: Path to the directory containing the images
-        :param df_captions: DataFrame containing the image IDs and captions
+        :param df_captions: DataFrame containing the image IDs and captions. Headers must be "image_id" and "caption".
         :param vocab: Vocabulary object to use if provided
         :param transform: Transform to apply to the images
         :param target_transform: Transform to apply to the target captions
         """
-        logger.info("Initializing FlickerDataset.")
+        logger.info("Initializing Dataset.")
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
@@ -58,7 +58,7 @@ class FlickrDataset(Dataset):
         return img, caption, self.img_ids[idx]
 
 
-def load_captions(path: str, save_captions=False) -> pd.DataFrame:
+def load_flickr_captions(path: str, save_captions=False) -> pd.DataFrame:
     """
     Load the captions from the annotation file.
     :param path: Path to the annotation file
@@ -71,14 +71,14 @@ def load_captions(path: str, save_captions=False) -> pd.DataFrame:
         df = pd.read_csv(path)
     else:
         logger.info("Loading captions from annotation file.")
-        df = pd.DataFrame(extract_captions(path))  # Convert to DataFrame
+        df = pd.DataFrame(extract_flickr_captions(path))  # Convert to DataFrame
     if save_captions:
         logger.info("Saving captions to CSV file.")
         df.to_csv(str(os.path.join(ROOT, FLICKR8K_CSV_FILE)), header=True, index=False)
     return df
 
 
-def extract_captions(path: str) -> list[dict[str, str]]:
+def extract_flickr_captions(path: str) -> list[dict[str, str]]:
     """
     Extract the captions from the annotation file.
     Sample line:
@@ -98,7 +98,7 @@ def extract_captions(path: str) -> list[dict[str, str]]:
 def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataFrame]:
     """
     Split a DataFrame containing image IDs and captions into multiple DataFrames based on the specified lengths.
-    :param df: DataFrame containing the Flickr image IDs and captions
+    :param df: DataFrame containing the image IDs and captions. Headers must be "image_id" and "caption".
     :param split_lengths: List of integers specifying the lengths of the splits. Must sum to the number of unique images.
     :return: List of DataFrames containing the splits
     """
