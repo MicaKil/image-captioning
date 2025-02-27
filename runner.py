@@ -11,19 +11,21 @@ from wandb.sdk.wandb_run import Run
 
 from configs.config import logger
 from configs.runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
-from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, \
-    FLICKR_TEST_CSV
+from constants import ROOT, CHECKPOINT_DIR, PAD, RESULTS_DIR
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset
-from scripts.dataset.helper import load_flickr_captions, split_dataframe
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
 from scripts.utils import date_str
 
 
-def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool, saved_model: Optional[tuple[str, str]]):
+def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool, saved_model: Optional[tuple[str, str]], img_dir,
+        ds_splits, ds_dir):
     """
     Run the training and testing pipeline
+    :param ds_dir:
+    :param img_dir:
+    :param ds_splits:
     :param use_wandb: Whether to use wandb
     :param create_ds: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
     :param save_ds: Whether to save the datasets to disk
@@ -44,7 +46,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
     else:
         config = RUN_CONFIG
 
-    test_dataset, train_dataset, val_dataset, vocab = get_ds(config, create_ds, date, save_ds, use_wandb)
+    train_dataset, val_dataset, test_dataset, vocab = get_ds(config, create_ds, date, save_ds, use_wandb, img_dir, ds_splits, ds_dir)
 
     pad_idx = vocab.to_idx(PAD)
     model = get_model(config, vocab, pad_idx)
@@ -115,20 +117,21 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
     return wandb_run
 
 
-def get_ds(config, create_ds, date, save_ds, use_wandb):
+def get_ds(config: dict, create_ds: bool, date: str, save_ds: bool, use_wandb: bool, img_dir: str, ds_splits: tuple[str, str, str], ds_dir: str):
     # create or load dataset
-    img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
+    img_dir = str(os.path.join(ROOT, img_dir))
     if create_ds:
-        df_captions = load_flickr_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
-        total_size = len(df_captions["image_id"].unique())
-        train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
-        val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
-        test_size = total_size - train_size - val_size
-        train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
+        raise NotImplementedError("Creating new datasets is being refactored.")
+        # df_captions = load_flickr_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
+        # total_size = len(df_captions["image_id"].unique())
+        # train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
+        # val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
+        # test_size = total_size - train_size - val_size
+        # train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
+        # if save_ds:
+        #     save_df(config, date, test_df, train_df, val_df)  # save new dataframes to disk
     else:
-        train_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_TRAIN_CSV)))
-        val_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_VAL_CSV)))
-        test_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_TEST_CSV)))
+        train_df, val_df, test_df = get_dataframes(ds_splits)
 
     vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
     train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
@@ -136,11 +139,29 @@ def get_ds(config, create_ds, date, save_ds, use_wandb):
     test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
     if save_ds:
-        save_df(config, date, test_df, train_df, val_df)
-        save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)  # save new datasets
+        save_datasets(None, train_dataset, val_dataset, test_dataset, date, config, ds_dir)  # save datasets to disk
         if use_wandb:
-            log_datasets(date, False)
-    return test_dataset, train_dataset, val_dataset, vocab
+            log_datasets(date, False, ds_dir)
+    return train_dataset, val_dataset, test_dataset, vocab
+
+
+def get_dataframes(ds_splits):
+    match os.path.splitext(ds_splits[0])[1]:
+        case ".csv":
+            train_df = pd.read_csv(str(os.path.join(ROOT, ds_splits[0])))
+            val_df = pd.read_csv(str(os.path.join(ROOT, ds_splits[1])))
+            test_df = pd.read_csv(str(os.path.join(ROOT, ds_splits[2])))
+        case ".pkl":
+            train_df = pd.read_pickle(str(os.path.join(ROOT, ds_splits[0])))
+            val_df = pd.read_pickle(str(os.path.join(ROOT, ds_splits[1])))
+            test_df = pd.read_pickle(str(os.path.join(ROOT, ds_splits[2])))
+        case ".json":
+            train_df = pd.read_json(str(os.path.join(ROOT, ds_splits[0])))
+            val_df = pd.read_json(str(os.path.join(ROOT, ds_splits[1])))
+            test_df = pd.read_json(str(os.path.join(ROOT, ds_splits[2])))
+        case _:
+            raise ValueError("Dataframe file format not recognized")
+    return train_df, val_df, test_df
 
 
 def get_model(config, vocab, pad_idx):
@@ -203,9 +224,10 @@ def get_scheduler(config, optimizer):
     return scheduler
 
 
-def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame):
+def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame, ds_dir: str):
     """
     Save dataframes to disk
+    :param ds_dir:
     :param config: Run configuration
     :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
     :param test_df: Test dataframe to be saved
@@ -213,18 +235,19 @@ def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFra
     :param val_df: Validation dataframe to be saved
     :return:
     """
-    train_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"],
+    train_df.to_csv(str(os.path.join(ROOT, ds_dir, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"],
                     index=False)
-    val_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"],
+    val_df.to_csv(str(os.path.join(ROOT, ds_dir, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"],
                   index=False)
-    test_df.to_csv(str(os.path.join(ROOT, FLICKR8K_DIR, f"test_{date}_{config['dataset']['split']['test']}.csv")), header=["image_id", "caption"],
+    test_df.to_csv(str(os.path.join(ROOT, ds_dir, f"test_{date}_{config['dataset']['split']['test']}.csv")), header=["image_id", "caption"],
                    index=False)
 
 
 def save_datasets(full_dataset: Optional[CaptionDataset], train_dataset: CaptionDataset, val_dataset: CaptionDataset, test_dataset: CaptionDataset,
-                  date: str, config: dict):
+                  date: str, config: dict, ds_dir: str):
     """
     Save datasets to disk
+    :param ds_dir:
     :param full_dataset: Complete dataset
     :param test_dataset: Test dataset
     :param train_dataset: Training dataset
@@ -234,15 +257,16 @@ def save_datasets(full_dataset: Optional[CaptionDataset], train_dataset: Caption
     :return:
     """
     if full_dataset is not None:
-        torch.save(full_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt"))
-    torch.save(train_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/train_{date}_{config["dataset"]["split"]["train"]}.pt"))
-    torch.save(val_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/val_{date}_{config["dataset"]["split"]["val"]}.pt"))
-    torch.save(test_dataset, os.path.join(ROOT, f"{FLICKR8K_DIR}/test_{date}_{config["dataset"]["split"]["test"]}.pt"))
+        torch.save(full_dataset, os.path.join(ROOT, f"{ds_dir}/full_dataset_{date}.pt"))
+    torch.save(train_dataset, os.path.join(ROOT, f"{ds_dir}/train_{date}_{config["dataset"]["split"]["train"]}.pt"))
+    torch.save(val_dataset, os.path.join(ROOT, f"{ds_dir}/val_{date}_{config["dataset"]["split"]["val"]}.pt"))
+    torch.save(test_dataset, os.path.join(ROOT, f"{ds_dir}/test_{date}_{config["dataset"]["split"]["test"]}.pt"))
 
 
-def log_datasets(date: str, has_full_ds: bool):
+def log_datasets(date: str, has_full_ds: bool, ds_dir: str):
     """
     Log datasets to wandb
+    :param ds_dir:
     :param has_full_ds:
     :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
     :return:
@@ -251,19 +275,19 @@ def log_datasets(date: str, has_full_ds: bool):
     if has_full_ds:
         log_dataset(
             wandb.Artifact(f"{config["dataset"]["name"]}_full_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-            os.path.join(ROOT, f"{FLICKR8K_DIR}/full_dataset_{date}.pt")
+            os.path.join(ROOT, f"{ds_dir}/full_dataset_{date}.pt")
         )
     log_dataset(
         wandb.Artifact(f"{config["dataset"]["name"]}_train_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-        os.path.join(ROOT, f"{FLICKR8K_DIR}/train_{date}_{config["dataset"]["split"]["train"]}.pt")
+        os.path.join(ROOT, f"{ds_dir}/train_{date}_{config["dataset"]["split"]["train"]}.pt")
     )
     log_dataset(
         wandb.Artifact(f"{config["dataset"]["name"]}_val_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-        os.path.join(ROOT, f"{FLICKR8K_DIR}/val_{date}_{config["dataset"]["split"]["val"]}.pt")
+        os.path.join(ROOT, f"{ds_dir}/val_{date}_{config["dataset"]["split"]["val"]}.pt")
     )
     log_dataset(
         wandb.Artifact(f"{config["dataset"]["name"]}_test_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-        os.path.join(ROOT, f"{FLICKR8K_DIR}/test_{date}_{config["dataset"]["split"]["test"]}.pt")
+        os.path.join(ROOT, f"{ds_dir}/test_{date}_{config["dataset"]["split"]["test"]}.pt")
     )
 
 
@@ -278,6 +302,32 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 
 
 if __name__ == "__main__":
+    from constants import COCO_IMGS_DIR, COCO_TRAIN_PKL, COCO_VAL_PKL, COCO_TEST_PKL, FLICKR8K_DIR, FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV, \
+        FLICKR8K_IMG_DIR, COCO_DIR
+
     wandb.teardown()
+
+    match RUN_CONFIG["dataset"]["name"]:
+        case "flickr8k":
+            ds_dir_ = FLICKR8K_DIR
+            img_dir_ = FLICKR8K_IMG_DIR
+            ds_splits_ = (FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV)
+        case "coco":
+            ds_dir_ = COCO_DIR
+            img_dir_ = COCO_IMGS_DIR
+            ds_splits_ = (COCO_TRAIN_PKL, COCO_VAL_PKL, COCO_TEST_PKL)
+        case _:
+            raise ValueError("Dataset not recognized")
+
     saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
-    run(use_wandb=False, create_ds=False, save_ds=False, train_model=False, test_model=True, saved_model=saved_model_)
+
+    run(use_wandb=True,
+        create_ds=False,
+        save_ds=True,
+        train_model=True,
+        test_model=True,
+        saved_model=None,
+        img_dir=img_dir_,
+        ds_splits=ds_splits_,
+        ds_dir=ds_dir_
+        )

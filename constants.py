@@ -12,8 +12,7 @@ FLICKR8K_IMG_DIR = "data/flickr8k/images"
 COCO_DIR = "data/coco"
 COCO_TRAIN_ANN = "data/coco/annotations/captions_train2014.json"
 COCO_VAL_ANN = "data/coco/annotations/captions_val2014.json"
-COCO_TRAIN_IMG_DIR = "data/coco/train2014"
-COCO_VAL_IMG_DIR = "data/coco/val2014"
+COCO_IMGS_DIR = "data/coco/images"  # combined train and val images
 
 COCO_TRAIN_CSV = "data/coco/coco_train.csv"
 COCO_VAL_CSV = "data/coco/coco_val_15.csv"
