@@ -1,11 +1,7 @@
 from datetime import datetime
-from typing import Union
 
 import torch
 from matplotlib import pyplot as plt
-from torch.utils.data import Dataset, DataLoader, Subset
-
-from scripts.dataset.vocabulary import Vocabulary
 
 
 def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = None, batch_dim=False) -> None:
@@ -44,24 +40,3 @@ def date_str() -> str:
     :return: Current date as a string
     """
     return datetime.now().strftime("%Y-%m-%d")
-
-
-# def get_vocab(obj: Union[DataLoader, Dataset]) -> Vocabulary:
-#     """
-#     Get the vocabulary from a DataLoader or Dataset object.
-#     :param obj: DataLoader or Dataset object
-#     :return: Vocabulary object
-#     """
-#     obj = get_dataset(obj)
-#     return obj.vocab
-#
-#
-# def get_dataset(obj: Union[DataLoader, Dataset]) -> Dataset:
-#     """
-#     Get the vocabulary from a DataLoader or Dataset object.
-#     :param obj: DataLoader or Dataset object
-#     :return: Vocabulary object
-#     """
-#     while not isinstance(obj, Dataset) or isinstance(obj, Subset):
-#         obj = obj.dataset
-#     return obj

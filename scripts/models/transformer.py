@@ -377,7 +377,7 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         if max_length > self.max_length:
-            logger.warning(f"Max caption length {max_length} is greater than model's max sequence length {self.max_length}. Using model's max length.")
+            logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
             max_length = self.max_length
 
         self.eval()
@@ -432,7 +432,6 @@ class ImageCaptioningTransformer(nn.Module):
 
         return [vocab.to_text(seq.tolist()) for seq in tokens]
 
-
     def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> list[str]:
         """
         Implements beam search to generate the most likely caption sequence.
@@ -448,7 +447,7 @@ class ImageCaptioningTransformer(nn.Module):
         sos_idx = vocab.to_idx(SOS)
         eos_idx = vocab.to_idx(EOS)
 
-        final_outputs = []
+        captions = []
 
         # Process each image in batch separately
         for i in range(batch_size):
@@ -485,9 +484,9 @@ class ImageCaptioningTransformer(nn.Module):
                     break
 
             best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
-            final_outputs.append(vocab.to_text(best_seq))
+            captions.append(vocab.to_text(best_seq))
 
-        return final_outputs
+        return captions
 
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
 
