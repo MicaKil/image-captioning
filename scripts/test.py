@@ -88,7 +88,7 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
     """
     references = []
     for img_id in image_ids:
-        refs = df[df["image_id"] == img_id]["caption"].values
+        refs = df[df["file_name"] == img_id]["caption"].values
         references.append([ref for ref in refs])
     return references
 

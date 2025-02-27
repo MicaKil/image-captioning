@@ -12,7 +12,7 @@ class CaptionLoader(DataLoader):
     Custom DataLoader for the Flickr8k dataset.
     """
 
-    def __init__(self, dataset: CaptionDataset, batch_size=32, num_workers=4, shuffle=True, pin_memory=True):
+    def __init__(self, dataset: CaptionDataset, batch_size=64, num_workers=4, shuffle=True, pin_memory=True):
         """
         Initialize the DataLoader for the Flickr8k dataset.
 

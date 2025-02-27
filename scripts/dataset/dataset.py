@@ -18,7 +18,7 @@ class CaptionDataset(Dataset):
     def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None, target_transform=None):
         """
         :param img_dir: Path to the directory containing the images
-        :param df_captions: DataFrame containing the image IDs and captions. Headers must be "image_id" and "caption".
+        :param df_captions: DataFrame containing the images file name and captions. Header must have "file_name" and "caption".
         :param vocab: Vocabulary object to use if provided
         :param transform: Transform to apply to the images
         :param target_transform: Transform to apply to the target captions
@@ -28,7 +28,7 @@ class CaptionDataset(Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.annotations = df_captions
-        self.file_names, self.captions = self.annotations["image_id"], self.annotations["caption"]
+        self.file_names, self.captions = self.annotations["file_name"], self.annotations["caption"]
         self.vocab = vocab
 
     def __len__(self):
