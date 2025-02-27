@@ -28,18 +28,18 @@ RUN_CONFIG = {
     "encoder": "resnet50",
     "decoder": "Attention",
     "batch_size": 64,
-    "embed_size": 1024,
-    "hidden_size": 1024,
+    "embed_size": 256,
+    "hidden_size": 256,
     "num_layers": 2,
     "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.5,
     "dropout": 0.5,  # decoder dropout
-    "freeze_encoder": False,
+    "freeze_encoder": True,
     "encoder_lr": 0.00001,
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 100,
+    "max_epochs": 1,
     "patience": 30,
     "gradient_clip": 1.0,
     "dataset": {
@@ -54,7 +54,7 @@ RUN_CONFIG = {
     "vocab": {
         "freq_threshold": 3
     },
-    "max_caption_len": 40,
+    "max_caption_len": 50,
     "temperature": 0,
     "beam_size": 0,
     "scheduler": {

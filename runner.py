@@ -29,9 +29,14 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
     :param save_ds: Whether to save the datasets to disk
     :param train_model: Whether to train the model
     :param test_model: Whether to test the model
-    :param saved_model: Tuple containing the model path and the model tag. If not None, the model is loaded from the path.
+    :param saved_model: Tuple containing the model path and the model tag. If not None, a new model is created.
     :return:
     """
+    if train_model == test_model == False:
+        raise ValueError("At least one of train_model or test_model must be True")
+    if test_model and saved_model is None:
+        raise ValueError("If testing a model, a saved model must be provided")
+
     date = date_str()
     if use_wandb:
         init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=RUN_CONFIG)
@@ -158,7 +163,7 @@ def get_model(config, vocab, pad_idx):
 
 def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb):
     # Load model from saved model
-    logger.info(f"Loading model from {saved_model}")
+    logger.info(f"Loading model from {saved_model[0]}")
     model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
     if test_model:
         test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
@@ -274,4 +279,5 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
 
 if __name__ == "__main__":
     wandb.teardown()
-    run(use_wandb=True, create_ds=False, save_ds=False, train_model=True, test_model=True, saved_model=None)
+    saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
+    run(use_wandb=False, create_ds=False, save_ds=False, train_model=False, test_model=True, saved_model=saved_model_)
