@@ -30,7 +30,7 @@ RUN_CONFIG = {
     "batch_size": 64,
     "embed_size": 1024,
     "hidden_size": 1024,
-    "num_layers": 5,
+    "num_layers": 2,
     "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.5,
     "dropout": 0.5,  # decoder dropout
@@ -41,7 +41,7 @@ RUN_CONFIG = {
     "optimizer": "AdamW",
     "max_epochs": 100,
     "patience": 30,
-    "gradient_clip": 2.0,
+    "gradient_clip": 1.0,
     "dataset": {
         "name": "flickr8k",
         "version": "2025-02-16",
@@ -60,7 +60,7 @@ RUN_CONFIG = {
     "scheduler": {
         "type": "ReduceLROnPlateau",
         "factor": 0.9,
-        "patience": 10,
+        "patience": 2,
     } if use_scheduler else None,
     "validation": {
         "bleu4": False,
