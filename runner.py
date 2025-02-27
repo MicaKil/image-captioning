@@ -332,16 +332,16 @@ if __name__ == "__main__":
         case _:
             raise ValueError("Dataset not recognized")
 
-    print(calc_max_sequence_length(ds_splits_))
-    # saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
-    #
-    # run(use_wandb=False,
-    #     create_ds=False,
-    #     save_ds=False,
-    #     train_model=True,
-    #     test_model=True,
-    #     saved_model=None,
-    #     img_dir=img_dir_,
-    #     ds_splits=ds_splits_,
-    #     ds_dir=ds_dir_
-    #     )
+    # print(calc_max_sequence_length(ds_splits_))
+    saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
+
+    run(use_wandb=False,
+        create_ds=False,
+        save_ds=False,
+        train_model=True,
+        test_model=True,
+        saved_model=None,
+        img_dir=img_dir_,
+        ds_splits=ds_splits_,
+        ds_dir=ds_dir_
+        )
