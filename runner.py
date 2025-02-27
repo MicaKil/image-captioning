@@ -35,9 +35,9 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
     :return:
     """
     if train_model == test_model == False:
-        raise ValueError("At least one of train_model or test_model must be True")
-    if test_model and saved_model is None:
-        raise ValueError("If testing a model, a saved model must be provided")
+        raise ValueError("At least one of train_model or test_model must be True.")
+    if test_model and not train_model and saved_model is None:
+        raise ValueError("If only testing a model, a saved model must be provided.")
 
     date = date_str()
     if use_wandb:
