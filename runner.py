@@ -11,7 +11,8 @@ from wandb.sdk.wandb_run import Run
 
 from configs.config import logger
 from configs.runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
-from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, TRAIN_CSV, VAL_CSV, TEST_CSV
+from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, \
+    FLICKR_TEST_CSV
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset
 from scripts.dataset.helper import load_flickr_captions, split_dataframe
@@ -120,9 +121,9 @@ def get_ds(config, create_ds, date, save_ds, use_wandb):
         test_size = total_size - train_size - val_size
         train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
     else:
-        train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
-        val_df = pd.read_csv(str(os.path.join(ROOT, VAL_CSV)))
-        test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
+        train_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_TRAIN_CSV)))
+        val_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_VAL_CSV)))
+        test_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_TEST_CSV)))
 
     vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
     train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)

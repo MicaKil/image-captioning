@@ -136,7 +136,3 @@ def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataF
         df_splits.append(df_split)
 
     return df_splits
-
-
-if __name__ == "__main__":
-    process_coco("data/coco/annotations/captions_val2014.json", "data/coco/coco_train.csv", "data/coco/coco_train.json", "data/coco/coco_train.pkl", ROOT)

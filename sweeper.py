@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from configs.config import logger
 from configs.runner_config import TRANSFORM
 from configs.sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
-from constants import ROOT, PAD, CHECKPOINT_DIR, VAL_CSV, TRAIN_CSV, TEST_CSV, FLICKR8K_IMG_DIR, RESULTS_DIR
+from constants import ROOT, PAD, CHECKPOINT_DIR, FLICKR_VAL_CSV, FLICKR_TRAIN_CSV, FLICKR_TEST_CSV, FLICKR8K_IMG_DIR, RESULTS_DIR
 from runner import init_wandb_run, get_model
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset
@@ -32,9 +32,9 @@ def run_sweep():
 
     # Load datasets
     img_dir = str(os.path.join(ROOT, FLICKR8K_IMG_DIR))
-    train_df = pd.read_csv(str(os.path.join(ROOT, TRAIN_CSV)))
-    val_df = pd.read_csv(str(os.path.join(ROOT, VAL_CSV)))
-    test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
+    train_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_TRAIN_CSV)))
+    val_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_VAL_CSV)))
+    test_df = pd.read_csv(str(os.path.join(ROOT, FLICKR_TEST_CSV)))
     vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
     train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
     val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
