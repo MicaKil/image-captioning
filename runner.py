@@ -340,9 +340,9 @@ if __name__ == "__main__":
     # print(calc_max_sequence_length(ds_splits_))
     saved_model_ = "checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt"
 
-    run(use_wandb=False,
+    run(use_wandb=True,
         create_ds=False,
-        save_ds=False,
+        save_ds=True,
         train_model=True,
         test_model=True,
         checkpoint=None,

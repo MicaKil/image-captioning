@@ -6,7 +6,7 @@ STD = [0.229, 0.224, 0.225]
 
 TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((224, 224)),
+    v2.Resize((256, 256)),
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=MEAN, std=STD),
 ])
@@ -18,18 +18,18 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-RUN_TAGS = ["transformer", "flickr8k"]
+RUN_TAGS = ["transformer", "coco"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-use_scheduler = True
+use_scheduler = False
 
 RUN_CONFIG = {
     "model": RUN_TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention",
     "batch_size": 64,
-    "embed_size": 256,
-    "hidden_size": 256,
+    "embed_size": 512,
+    "hidden_size": 512,
     "num_layers": 2,
     "num_heads": 2 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.5,
@@ -39,9 +39,9 @@ RUN_CONFIG = {
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 1,
-    "patience": 30,
-    "gradient_clip": 1.0,
+    "max_epochs": 100,
+    "patience": 10,
+    "gradient_clip": 2.0,
     "dataset": {
         "name": "coco",
         "version": "2025-02-26",
