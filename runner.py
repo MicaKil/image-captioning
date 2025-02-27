@@ -49,7 +49,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
     train_dataset, val_dataset, test_dataset, vocab = get_ds(config, create_ds, date, save_ds, use_wandb, img_dir, ds_splits, ds_dir)
 
     pad_idx = vocab.to_idx(PAD)
-    model = get_model(config, vocab, pad_idx)
+    model = get_model(config, vocab, pad_idx, ds_splits)
 
     save_dir = RESULTS_DIR + config["model"]
     if saved_model is not None:
@@ -86,7 +86,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                     config = wandb.config
                 else:
                     config = RUN_CONFIG
-                best = get_model(config, vocab, pad_idx)
+                best = get_model(config, vocab, pad_idx, ds_splits)
                 best.load_state_dict(torch.load(best_val_model, weights_only=True))
                 best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
                 if use_wandb:
@@ -164,7 +164,7 @@ def get_dataframes(ds_splits):
     return train_df, val_df, test_df
 
 
-def get_model(config, vocab, pad_idx):
+def get_model(config, vocab, pad_idx, ds_splits):
     match config["model"]:
         case "basic":
             encoder = basic.Encoder(config["embed_size"], not config["freeze_encoder"])
@@ -176,7 +176,7 @@ def get_model(config, vocab, pad_idx):
             return intermediate.IntermediateImageCaptioner(encoder, decoder)
         case "transformer":
             return transformer.ImageCaptioningTransformer(vocab, config["hidden_size"], config["num_layers"], config["num_heads"],
-                                                          config["max_caption_len"], config["encoder_dropout"], config["dropout"],
+                                                          calc_max_sequence_length(ds_splits) + 2, config["encoder_dropout"], config["dropout"],
                                                           not config["freeze_encoder"])
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
@@ -301,6 +301,19 @@ def log_dataset(artifact: wandb.Artifact, dataset_path: str):
     wandb.log_artifact(artifact)
 
 
+def calc_max_sequence_length(ds_splits: tuple[str, str, str]):
+    """
+    Calculate the maximum sequence length in the dataset
+    :param ds_splits: Tuple containing the paths to the train, val, and test dataframes
+    :return: Maximum sequence length
+    """
+    train_df, val_df, test_df = get_dataframes(ds_splits)
+    max_len = max(train_df["caption"].apply(lambda x: len(x.split(" "))).max(),
+                  val_df["caption"].apply(lambda x: len(x.split(" "))).max(),
+                  test_df["caption"].apply(lambda x: len(x.split(" "))).max())
+    return max_len
+
+
 if __name__ == "__main__":
     from constants import COCO_IMGS_DIR, COCO_TRAIN_PKL, COCO_VAL_PKL, COCO_TEST_PKL, FLICKR8K_DIR, FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV, \
         FLICKR8K_IMG_DIR, COCO_DIR
@@ -319,15 +332,16 @@ if __name__ == "__main__":
         case _:
             raise ValueError("Dataset not recognized")
 
-    saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
-
-    run(use_wandb=False,
-        create_ds=False,
-        save_ds=False,
-        train_model=True,
-        test_model=True,
-        saved_model=None,
-        img_dir=img_dir_,
-        ds_splits=ds_splits_,
-        ds_dir=ds_dir_
-        )
+    print(calc_max_sequence_length(ds_splits_))
+    # saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
+    #
+    # run(use_wandb=False,
+    #     create_ds=False,
+    #     save_ds=False,
+    #     train_model=True,
+    #     test_model=True,
+    #     saved_model=None,
+    #     img_dir=img_dir_,
+    #     ds_splits=ds_splits_,
+    #     ds_dir=ds_dir_
+    #     )
