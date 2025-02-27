@@ -86,7 +86,11 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                 best.load_state_dict(torch.load(best_model, weights_only=True))
                 best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
                 if use_wandb:
-                    wandb.log(best_state)
+                    wandb.log({"epoch": best_state["epoch"],
+                               "train_loss": best_state["train_loss"],
+                               "val_loss": best_state["best_val_loss"],
+                               "encoder_lr": best_state["lr"][0],
+                               "decoder_lr": best_state["lr"][1]})
                     wandb.log_model(path=best_model)
         wandb.finish()
         return
