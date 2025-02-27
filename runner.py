@@ -13,7 +13,8 @@ from configs.config import logger
 from configs.runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
 from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, TRAIN_CSV, VAL_CSV, TEST_CSV
 from scripts.dataset.dataloader import CaptionLoader
-from scripts.dataset.dataset import CaptionDataset, split_dataframe, load_flickr_captions
+from scripts.dataset.dataset import CaptionDataset
+from scripts.dataset.helper import load_flickr_captions, split_dataframe
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
 from scripts.utils import date_str
