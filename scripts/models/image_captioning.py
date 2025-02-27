@@ -2,9 +2,9 @@ from typing import Optional
 
 import torch
 from torch import nn as nn
-from torch.utils.data import DataLoader
 
 from constants import SOS, EOS
+from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.test import test
 from scripts.train import train
@@ -150,7 +150,7 @@ class ImageCaptioner(nn.Module):
     def calc_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
         raise NotImplementedError("calculate_loss method must be implemented in the subclass")
 
-    def train_model(self, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
+    def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
                     scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
                     run_config: dict) -> tuple[str | None, dict, str | None]:
         """
@@ -169,7 +169,7 @@ class ImageCaptioner(nn.Module):
         """
         return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config)
 
-    def test_model(self, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
+    def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
         """
         Evaluate model on test set and log results
         :param test_loader: Test data loader to use
