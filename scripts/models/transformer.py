@@ -6,10 +6,11 @@ import torch.nn as nn
 import torchvision.models as models
 from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
-from torch.utils.data import DataLoader
 from torchvision.models import ResNet50_Weights
 
+from configs.config import logger
 from constants import SOS, EOS, UNK, PAD
+from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.test import test
 from scripts.train import train
@@ -305,6 +306,7 @@ class ImageCaptioningTransformer(nn.Module):
         """
         super().__init__()
         self.vocab = vocab
+        self.max_length = max_length
         self.encoder = Encoder(hidden_size, encoder_dropout, fine_tune_encoder)
 
         self.seq_embedding = SeqEmbedding(len(vocab), max_length, hidden_size, vocab.to_idx(PAD))
@@ -374,6 +376,10 @@ class ImageCaptioningTransformer(nn.Module):
         :param beam_size:
         :return:
         """
+        if max_length > self.max_length:
+            logger.warning(f"Max caption length {max_length} is greater than model's max sequence length {self.max_length}. Using model's max length.")
+            max_length = self.max_length
+
         self.eval()
         with torch.no_grad():
             image = image.to(device)
@@ -386,30 +392,30 @@ class ImageCaptioningTransformer(nn.Module):
             else:
                 return self.temperature_sampling(features, vocab, max_length, temperature)
 
-    def temperature_sampling(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> list[str]:
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> list[str]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
         max_length is reached.
-        :param images:
+        :param features:
         :param vocab:
         :param max_length:
         :param temperature:
         :return:
         """
         # tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
-        batch_size = images.size(0)
-        tokens = torch.full((batch_size, 1), vocab.to_idx(SOS), device=images.device)
-        finished = torch.zeros(batch_size, dtype=torch.bool, device=images.device)
+        batch_size = features.size(0)
+        tokens = torch.full((batch_size, 1), vocab.to_idx(SOS), device=features.device)
+        finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
 
         for _ in range(max_length):
             txt_emb = self.seq_embedding(tokens)
             for layer in self.decoder_layers:
-                txt_emb = layer(images, txt_emb)
+                txt_emb = layer(features, txt_emb)
             logits = self.output_layer(txt_emb[:, -1, :])
 
             if temperature is None or temperature == 0:
-                next_tokens = logits.argmax(-1)
+                next_tokens = logits.argmax(-1, keepdim=True)
             else:
                 probs = softmax(logits / temperature, dim=-1)
                 next_tokens = torch.multinomial(probs, 1)
@@ -426,18 +432,19 @@ class ImageCaptioningTransformer(nn.Module):
 
         return [vocab.to_text(seq.tolist()) for seq in tokens]
 
-    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> list[str]:
+
+    def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> list[str]:
         """
         Implements beam search to generate the most likely caption sequence.
         Repeats image features for each beam and, for each step, extends beams by considering the top probable next tokens, applying length
         normalization before choosing the best sequence
-        :param images:
+        :param features:
         :param vocab:
         :param max_length:
         :param beam_size:
         :return:
         """
-        batch_size = images.size(0)
+        batch_size = features.size(0)
         sos_idx = vocab.to_idx(SOS)
         eos_idx = vocab.to_idx(EOS)
 
@@ -445,7 +452,7 @@ class ImageCaptioningTransformer(nn.Module):
 
         # Process each image in batch separately
         for i in range(batch_size):
-            image = images[i].unsqueeze(0)  # (1, h*w, c)
+            image = features[i].unsqueeze(0)  # (1, h*w, c)
             beams = [(0.0, [sos_idx])]
 
             for _ in range(max_length):
@@ -484,7 +491,7 @@ class ImageCaptioningTransformer(nn.Module):
 
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
 
-    def train_model(self, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
+    def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
                     scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
                     run_config: dict) -> tuple[str | None, dict, str | None]:
         """
@@ -503,7 +510,7 @@ class ImageCaptioningTransformer(nn.Module):
         """
         return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config)
 
-    def test_model(self, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
+    def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
         """
         Evaluate model on test set and log results
         :param test_loader: Test data loader to use
