@@ -55,8 +55,8 @@ RUN_CONFIG = {
         "freq_threshold": 3
     },
     "max_caption_len": 40,
-    "temperature": None,
-    "beam_size": 5,
+    "temperature": 0,
+    "beam_size": 0,
     "scheduler": {
         "type": "ReduceLROnPlateau",
         "factor": 0.9,
