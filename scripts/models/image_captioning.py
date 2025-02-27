@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 from torch import nn as nn
 
-from constants import SOS, EOS
+from constants import SOS, EOS, PAD
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.test import test
@@ -38,18 +38,18 @@ class ImageCaptioner(nn.Module):
         return outputs
 
     def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
-                 temperature: Optional[float] = None, beam_size: int = 1) -> str:
+                 temperature: Optional[float] = None, beam_size: int = 1) -> list[str]:
         self.eval()
         with torch.no_grad():
             image = image.to(device)
-            features = self.encoder(image)  # Encode the image (1, embed_size)
+            features = self.encoder(image)  # Encode the image (batch_size, embed_size)
             if beam_size > 1:
                 return self.beam_search(vocab, device, features, max_length, beam_size)
             else:
                 return self.temperature_sampling(vocab, device, features, max_length, temperature)
 
     def temperature_sampling(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int,
-                             temperature: Optional[float]) -> str:
+                             temperature: Optional[float]) -> list[str]:
         """
         Generate a caption using temperature-based sampling if temperature is not None, otherwise use greedy search.
 
@@ -60,29 +60,35 @@ class ImageCaptioner(nn.Module):
         :param temperature: Temperature for sampling (None for greedy search)
         :return: Generated caption as a list of token indices
         """
-        caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
+        batch_size = features.size(0)
+        # caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
+        captions = torch.full((batch_size, 1), vocab.to_idx(SOS), dtype=torch.long, device=device)
+        finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+
         for _ in range(max_length):
-            caption_tensor = torch.tensor(caption, dtype=torch.long).unsqueeze(0).to(device)
-            outputs = self.decoder(features, caption_tensor)  # Get predictions (batch_size, seq_len+1, vocab_size)
+            outputs = self.decoder(features, captions)  # (batch_size, seq_len, vocab_size)
             logits = outputs[:, -1, :]  # Get last predicted token (batch_size, vocab_size)
 
             # Choose next token
             if temperature is None or temperature == 0.0:
                 # Greedy search
-                next_token = torch.argmax(logits, dim=-1).item()
+                next_tokens = torch.argmax(logits, dim=-1, keepdim=True)
             else:
                 # Temperature sampling
                 probs = torch.softmax(logits / temperature, dim=-1)
-                next_token = torch.multinomial(probs, 1).item()
+                next_tokens = torch.multinomial(probs, 1)
 
-            # Stop if we predict the end token
-            if next_token == vocab.to_idx(EOS):
+            # Mask finished sequences
+            next_tokens = torch.where(finished.unsqueeze(1), torch.full_like(next_tokens, vocab.to_idx(PAD)), next_tokens)
+            captions = torch.cat([captions, next_tokens], dim=1)
+
+            # Update finished flags
+            finished = finished | (next_tokens.squeeze() == vocab.to_idx(EOS))
+            if finished.all():
                 break
+        return [vocab.to_text(caption.tolist()) for caption in captions]
 
-            caption.append(next_token)
-        return vocab.to_text(caption)
-
-    def beam_search(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int, beam_size: int) -> str:
+    def beam_search(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int, beam_size: int) -> list[str]:
         """
         Generate a caption using beam search.
 
@@ -93,59 +99,49 @@ class ImageCaptioner(nn.Module):
         :param beam_size: Beam size for beam search
         :return: Generated caption as a list of token indices
         """
+        batch_size = features.size(0)
         sos_idx = vocab.to_idx(SOS)
         eos_idx = vocab.to_idx(EOS)
-        vocab_size = len(vocab)
-        # The image features are replicated beam_size times (one copy per beam/hypothesis)
-        features = features.expand(beam_size, -1)  # (beam_size, embed_size)
-        # Initialize beam
-        beam_scores = torch.zeros(beam_size).to(device)  # log probabilities
-        beam_sequences = torch.tensor([[sos_idx]] * beam_size, dtype=torch.long).to(device)  # all beams start with SOS
-        completed_sequences = []
-        completed_scores = []
-        for _ in range(max_length):
-            # Use the decoder to predict logits for the next token:
-            outputs = self.decoder(features, beam_sequences)  # (beam_size, seq_len, vocab_size)
-            # Extract the last token's logits and compute log probabilities
-            logits = outputs[:, -1, :]  # (beam_size, vocab_size)
-            log_probs = torch.log_softmax(logits, dim=-1)
+        captions = []
 
-            # Combine scores
-            scores = log_probs + beam_scores.unsqueeze(1)  # (beam_size, vocab_size)
-            scores_flat = scores.view(-1)  # (beam_size * vocab_size)
+        for i in range(batch_size):
+            # The image features are replicated beam_size times (one copy per beam/hypothesis)
+            img_features = features[i].expand(beam_size, -1)  # (beam_size, embed_size)
+            beams = [(0.0, [sos_idx])]
 
-            # Get top candidates
-            top_scores, top_indices = torch.topk(scores_flat, k=beam_size)
-            beam_indices = top_indices // vocab_size  # Which beam does this come from?
-            token_indices = top_indices % vocab_size  # Which token does this predict?
+            for _ in range(max_length):
+                candidates = []
+                for score, seq in beams:
+                    if seq[-1] == eos_idx:
+                        candidates.append((score, seq))
+                        continue
 
-            # Update sequences
-            beam_sequences = torch.cat([beam_sequences[beam_indices], token_indices.unsqueeze(1)], dim=1)
-            beam_scores = top_scores
+                    tokens = torch.tensor(seq, device=device).unsqueeze(0)
+                    outputs = self.decoder(img_features, tokens)  # (1, seq_len, vocab_size)
+                    logits = outputs[:, -1, :]  # (1, vocab_size)
 
-            # Check for completed sequences
-            eos_mask = token_indices == eos_idx
-            if eos_mask.any():
-                # If a beam predicts the EOS token, move it to the completed_sequences list and remove it from active beams
-                completed_sequences.extend(beam_sequences[eos_mask].tolist())
-                completed_scores.extend(beam_scores[eos_mask].tolist())
+                    log_probs = torch.log_softmax(logits, dim=-1)
+                    top_probs, top_indices = log_probs.topk(beam_size)
 
-                # Remove completed sequences from beam
-                keep_mask = ~eos_mask
-                beam_sequences = beam_sequences[keep_mask]
-                beam_scores = beam_scores[keep_mask]
-                features = features[keep_mask]
+                    for j in range(beam_size):
+                        candidates.append((
+                            score + top_probs[0, j].item(),
+                            seq + [top_indices[0, j].item()]
+                        ))
 
-                if beam_sequences.size(0) == 0:
-                    break  # All sequences completed
-        # Select best sequence
-        if completed_sequences:
-            best_idx = torch.argmax(torch.tensor(completed_scores)).item()
-            best_sequence = completed_sequences[best_idx]
-        else:
-            best_idx = torch.argmax(beam_scores).item()
-            best_sequence = beam_sequences[best_idx].tolist()
-        return vocab.to_text(best_sequence)
+                # Keep top-k candidates
+                candidates.sort(reverse=True, key=lambda x: x[0] / (len(x[1]) ** 0.5))
+                beams = candidates[:beam_size]
+
+                # Check if all beams are complete
+                if all(seq[-1] == eos_idx for _, seq in beams):
+                    break
+
+            # Get best sequence
+            best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
+            captions.append(vocab.to_text(best_seq))
+
+        return captions
 
     def calc_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
         raise NotImplementedError("calculate_loss method must be implemented in the subclass")
