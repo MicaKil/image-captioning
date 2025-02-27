@@ -6,8 +6,6 @@
         <entryData>
           <resourceRoots>
             <path value="file://$PROJECT_DIR$/datasets" />
-            <path value="file://$PROJECT_DIR$/datasets/flickr8k" />
-            <path value="file://$PROJECT_DIR$/datasets/flickr8k/images" />
           </resourceRoots>
         </entryData>
       </entry>

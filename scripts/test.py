@@ -6,17 +6,17 @@ import torch.nn as nn
 import wandb
 from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from pycocoevalcap.cider.cider import Cider
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from configs.config import logger
 from constants import ROOT
 from scripts.caption import gen_caption
+from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.utils import time_str, get_dataset, get_vocab
+from scripts.utils import time_str
 
 
-def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
+def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
     """
     Evaluate model on test set and log results
     :param model: Model to evaluate
@@ -38,8 +38,8 @@ def test(model: nn.Module, test_loader: DataLoader, device: torch.device, save_d
     results = []
     all_hypotheses = []
     all_references = []
-    df = get_dataset(test_loader).df
-    vocab = get_vocab(test_loader)
+    df = test_loader.df
+    vocab = test_loader.vocab
     smoothing = SmoothingFunction().method1
 
     model.eval()

@@ -1,5 +1,5 @@
 import os.path
-from typing import Optional, Union
+from typing import Optional
 
 import pandas as pd
 import torch
@@ -7,14 +7,13 @@ import torch.nn as nn
 import wandb
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.utils.data import Subset
 from wandb.sdk.wandb_run import Run
 
 from configs.config import logger
 from configs.runner_config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY, RUN_CONFIG, PROJECT, RUN_TAGS
 from constants import ROOT, FLICKR8K_IMG_DIR, CHECKPOINT_DIR, PAD, FLICKR8K_DIR, FLICKR8K_ANN_FILE, RESULTS_DIR, TRAIN_CSV, VAL_CSV, TEST_CSV
-from scripts.dataset.dataloader import FlickrDataLoader
-from scripts.dataset.dataset import FlickrDataset, split_dataframe, load_flickr_captions
+from scripts.dataset.dataloader import CaptionLoader
+from scripts.dataset.dataset import CaptionDataset, split_dataframe, load_flickr_captions
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
 from scripts.utils import date_str
@@ -55,8 +54,8 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         logger.info(f"Number of trainable parameters: {parameter_count}")
 
         # dataloaders
-        train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-        val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+        train_dataloader = CaptionLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+        val_dataloader = CaptionLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
         criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="none")
         optimizer = get_optimizer(config, model)
@@ -67,7 +66,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
 
         if test_model:
             # test last model
-            test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+            test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
             model.test_model(test_dataloader, DEVICE, save_dir, "last-model", use_wandb, config)
             if use_wandb:
                 wandb.finish()
@@ -125,9 +124,9 @@ def get_ds(config, create_ds, date, save_ds, use_wandb):
         test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
 
     vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
-    train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
-    val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
-    test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
+    train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
+    val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
+    test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
     if save_ds:
         save_df(config, date, test_df, train_df, val_df)
@@ -160,7 +159,7 @@ def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_
     logger.info(f"Loading model from {saved_model}")
     model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
     if test_model:
-        test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+        test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
         model.test_model(test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
     if use_wandb:
         wandb.finish()
@@ -215,14 +214,14 @@ def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFra
                    index=False)
 
 
-def save_datasets(full_dataset: Optional[FlickrDataset], train_dataset: Union[FlickrDataset | Subset], val_dataset: Union[FlickrDataset | Subset],
-                  test_dataset: Union[FlickrDataset | Subset], date: str, config: dict):
+def save_datasets(full_dataset: Optional[CaptionDataset], train_dataset: CaptionDataset, val_dataset: CaptionDataset, test_dataset: CaptionDataset,
+                  date: str, config: dict):
     """
     Save datasets to disk
     :param full_dataset: Complete dataset
-    :param test_dataset: Test dataset or subset
-    :param train_dataset: Training dataset or subset
-    :param val_dataset: Validation dataset or subset
+    :param test_dataset: Test dataset
+    :param train_dataset: Training dataset
+    :param val_dataset: Validation dataset
     :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
     :param config: Run configuration
     :return:

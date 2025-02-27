@@ -10,12 +10,11 @@ from configs.runner_config import TRANSFORM
 from configs.sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
 from constants import ROOT, PAD, CHECKPOINT_DIR, VAL_CSV, TRAIN_CSV, TEST_CSV, FLICKR8K_IMG_DIR, RESULTS_DIR
 from runner import init_wandb_run, get_model
-from scripts.dataset.dataloader import FlickrDataLoader
-from scripts.dataset.dataset import FlickrDataset
+from scripts.dataset.dataloader import CaptionLoader
+from scripts.dataset.dataset import CaptionDataset
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.test import test
 from scripts.train import train
-from scripts.utils import get_vocab
 
 default_config = DEFAULT_CONFIG
 sweep_tags = TAGS
@@ -37,16 +36,16 @@ def run_sweep():
     val_df = pd.read_csv(str(os.path.join(ROOT, VAL_CSV)))
     test_df = pd.read_csv(str(os.path.join(ROOT, TEST_CSV)))
     vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
-    train_dataset = FlickrDataset(img_dir, train_df, vocab, transform=TRANSFORM)
-    val_dataset = FlickrDataset(img_dir, val_df, vocab, transform=TRANSFORM)
-    test_dataset = FlickrDataset(img_dir, test_df, vocab, transform=TRANSFORM)
+    train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
+    val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
+    test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
-    vocab = get_vocab(train_dataset)
+    vocab = train_dataset.vocab
     pad_idx = vocab.to_idx(PAD)
 
-    train_dataloader = FlickrDataLoader(train_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
-    val_dataloader = FlickrDataLoader(val_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
-    test_dataloader = FlickrDataLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
+    train_dataloader = CaptionLoader(train_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
+    val_dataloader = CaptionLoader(val_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
+    test_dataloader = CaptionLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
 
     model = get_model(config, vocab, pad_idx)
     criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")

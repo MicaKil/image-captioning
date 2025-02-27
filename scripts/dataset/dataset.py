@@ -11,7 +11,7 @@ from constants import ROOT, EOS, SOS, FLICKR8K_CSV_FILE
 from scripts.dataset.vocabulary import Vocabulary
 
 
-class FlickrDataset(Dataset):
+class CaptionDataset(Dataset):
     """
     Custom Dataset for loading Flickr images and captions.
     """

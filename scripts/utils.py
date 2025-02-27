@@ -1,4 +1,3 @@
-import pickle
 from datetime import datetime
 from typing import Union
 
@@ -7,27 +6,6 @@ from matplotlib import pyplot as plt
 from torch.utils.data import Dataset, DataLoader, Subset
 
 from scripts.dataset.vocabulary import Vocabulary
-
-
-def dump(obj: any, path: str):
-    """
-    Dump an object to a file.
-    :param obj: The object to dump
-    :param path: Path to the file where the object will be dumped
-    :return:
-    """
-    with open(path, "wb") as f:
-        pickle.dump(obj, f)
-
-
-def load(path: str) -> any:
-    """
-    Load an object from a file.
-    :param path: Path to the file where the object is stored
-    :return: The object loaded from the file
-    """
-    with open(path, "rb") as f:
-        return pickle.load(f)
 
 
 def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = None, batch_dim=False) -> None:
@@ -68,22 +46,22 @@ def date_str() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
 
-def get_vocab(obj: Union[DataLoader, Dataset]) -> Vocabulary:
-    """
-    Get the vocabulary from a DataLoader or Dataset object.
-    :param obj: DataLoader or Dataset object
-    :return: Vocabulary object
-    """
-    obj = get_dataset(obj)
-    return obj.vocab
-
-
-def get_dataset(obj: Union[DataLoader, Dataset]) -> Dataset:
-    """
-    Get the vocabulary from a DataLoader or Dataset object.
-    :param obj: DataLoader or Dataset object
-    :return: Vocabulary object
-    """
-    while not isinstance(obj, Dataset) or isinstance(obj, Subset):
-        obj = obj.dataset
-    return obj
+# def get_vocab(obj: Union[DataLoader, Dataset]) -> Vocabulary:
+#     """
+#     Get the vocabulary from a DataLoader or Dataset object.
+#     :param obj: DataLoader or Dataset object
+#     :return: Vocabulary object
+#     """
+#     obj = get_dataset(obj)
+#     return obj.vocab
+#
+#
+# def get_dataset(obj: Union[DataLoader, Dataset]) -> Dataset:
+#     """
+#     Get the vocabulary from a DataLoader or Dataset object.
+#     :param obj: DataLoader or Dataset object
+#     :return: Vocabulary object
+#     """
+#     while not isinstance(obj, Dataset) or isinstance(obj, Subset):
+#         obj = obj.dataset
+#     return obj

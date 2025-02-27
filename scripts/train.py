@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import wandb
 from nltk.translate.bleu_score import SmoothingFunction
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from configs.config import logger
@@ -13,12 +12,14 @@ from configs.runner_config import TRANSFORM
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from scripts import test
 from scripts.caption import gen_caption, preprocess_image
+from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.utils import time_str, get_vocab, get_dataset
+from scripts.utils import time_str
 
 
-def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-          scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict) -> tuple[str | None, dict, str | None]:
+def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module,
+          optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
+          run_config: dict) -> tuple[str | None, dict, str | None]:
     """
     Training loop for the model.
 
@@ -107,8 +108,8 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, de
     return best_val_model, best_val_info, last_model_pth
 
 
-def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim, use_wandb,
-               run_config) -> float:
+def train_load(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
+               use_wandb: bool, run_config: dict) -> float:
     """
     Trains the model on the training set for one epoch
 
@@ -129,7 +130,7 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
 
     train_loss = 0.
     total_tokens = 0
-    vocab = get_vocab(train_loader)
+    vocab = train_loader.vocab
 
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Train]")
     model.train()
@@ -153,8 +154,8 @@ def train_load(model: nn.Module, train_loader: DataLoader, device: torch.device,
     return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb,
-              run_config) -> tuple[float | int, float | None]:
+def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb: bool,
+              run_config: dict) -> tuple[float | int, float | None]:
     """
     Evaluates the model on the validation set for one epoch
 
@@ -176,13 +177,13 @@ def eval_load(model: nn.Module, val_loader: DataLoader, device: torch.device, ep
     val_ble4 = None
     all_hypotheses = []
     all_references = []
-    df = get_dataset(val_loader).df
+    df = val_loader.df
     smoothing = SmoothingFunction().method1
     calc_bleu4 = config["validation"]["bleu4"] and (epoch == 0 or (epoch + 1) % config["validation"]["bleu4_step"] == 0)
 
     val_loss = 0.0
     total_tokens = 0
-    vocab = get_vocab(val_loader)
+    vocab = val_loader.vocab
     model.eval()
     with torch.no_grad():
         batch_progress = tqdm(val_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [Val]")
