@@ -19,7 +19,7 @@ from scripts.models import basic, intermediate, transformer
 from scripts.utils import date_str
 
 
-def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool, saved_model: Optional[tuple[str, str]], img_dir,
+def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool, checkpoint: Optional[str], img_dir,
         ds_splits, ds_dir):
     """
     Run the training and testing pipeline
@@ -31,13 +31,13 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
     :param save_ds: Whether to save the datasets to disk
     :param train_model: Whether to train the model
     :param test_model: Whether to test the model
-    :param saved_model: Tuple containing the model path and the model tag. If not None, a new model is created.
+    :param checkpoint: Tuple containing the model path and the model tag. If not None, a new model is created.
     :return:
     """
     if train_model == test_model == False:
         raise ValueError("At least one of train_model or test_model must be True.")
-    if test_model and not train_model and saved_model is None:
-        raise ValueError("If only testing a model, a saved model must be provided.")
+    if test_model and not train_model and checkpoint is None:
+        raise ValueError("If only testing a model, a saved model (checkpoint) must be provided.")
 
     date = date_str()
     if use_wandb:
@@ -47,14 +47,9 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         config = RUN_CONFIG
 
     train_dataset, val_dataset, test_dataset, vocab = get_ds(config, create_ds, date, save_ds, use_wandb, img_dir, ds_splits, ds_dir)
-
     pad_idx = vocab.to_idx(PAD)
     model = get_model(config, vocab, pad_idx, ds_splits)
-
     save_dir = RESULTS_DIR + config["model"]
-    if saved_model is not None:
-        handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb)
-        return
 
     if train_model:
         parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -70,8 +65,8 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         optimizer = get_optimizer(config, model)
         scheduler = get_scheduler(config, optimizer)
 
-        best_val_model, best_val_info, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
-                                                             CHECKPOINT_DIR + config["model"], use_wandb, config, resume_checkpoint)
+        best_model, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
+                                                      CHECKPOINT_DIR + config["model"], use_wandb, config, checkpoint)
 
         if test_model:
             # test last model
@@ -79,19 +74,29 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
             model.test_model(test_dataloader, DEVICE, save_dir, "last-model", use_wandb, config)
             if use_wandb:
                 wandb.finish()
+
             # test best model
-            if best_val_model is not None:
+            if best_model is not None:
                 if use_wandb:
                     init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=RUN_CONFIG)
                     config = wandb.config
                 else:
                     config = RUN_CONFIG
                 best = get_model(config, vocab, pad_idx, ds_splits)
-                best.load_state_dict(torch.load(best_val_model, weights_only=True))
+                best.load_state_dict(torch.load(best_model, weights_only=True))
                 best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
                 if use_wandb:
-                    wandb.log(best_val_info)
-                    wandb.log_model(path=best_val_model)
+                    wandb.log(best_state)
+                    wandb.log_model(path=best_model)
+        wandb.finish()
+        return
+
+    if test_model and checkpoint is not None:
+        logger.info(f"Testing model from checkpoint.")
+        checkpoint = torch.load(checkpoint)
+        model.load_state_dict(checkpoint['model_state'])
+        test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+        model.test_model(test_dataloader, DEVICE, save_dir, "checkpoint", use_wandb, config)
 
     if use_wandb:
         wandb.finish()
@@ -333,14 +338,14 @@ if __name__ == "__main__":
             raise ValueError("Dataset not recognized")
 
     # print(calc_max_sequence_length(ds_splits_))
-    saved_model_ = ("checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt", "test")
+    saved_model_ = "checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt"
 
     run(use_wandb=False,
         create_ds=False,
         save_ds=False,
         train_model=True,
         test_model=True,
-        saved_model=None,
+        checkpoint=None,
         img_dir=img_dir_,
         ds_splits=ds_splits_,
         ds_dir=ds_dir_

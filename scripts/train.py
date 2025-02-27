@@ -120,8 +120,8 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         # Log last model
         if avg_val_loss != -1:
             last_pth = os.path.join(ROOT, f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt")
-            last_state = save_checkpoint(model, last_pth, optimizer, scheduler, metrics["train_loss"], avg_val_loss, cur_lr, metrics["epoch"],
-                                         epochs_no_improve)
+            save_checkpoint(model, last_pth, optimizer, scheduler, metrics["train_loss"], avg_val_loss, cur_lr, metrics["epoch"],
+                            epochs_no_improve)
             if use_wandb:
                 wandb.log_model(path=last_pth)
         logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
