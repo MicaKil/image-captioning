@@ -491,11 +491,12 @@ class ImageCaptioningTransformer(nn.Module):
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
 
     def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
-                    run_config: dict) -> tuple[str | None, dict, str | None]:
+                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict,
+                    resume_checkpoint: str) -> tuple:
         """
         Training loop for the model.
 
+        :param resume_checkpoint:
         :param train_loader: DataLoader for the training set
         :param val_loader: DataLoader for the validation set
         :param device: Device to run the training on
@@ -507,7 +508,7 @@ class ImageCaptioningTransformer(nn.Module):
         :param run_config: Configuration for the run
         :return: Path to the best model
         """
-        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config)
+        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config, resume_checkpoint)
 
     def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
         """

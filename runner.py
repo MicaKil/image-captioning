@@ -71,7 +71,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         scheduler = get_scheduler(config, optimizer)
 
         best_val_model, best_val_info, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
-                                                             CHECKPOINT_DIR + config["model"], use_wandb, config)
+                                                             CHECKPOINT_DIR + config["model"], use_wandb, config, resume_checkpoint)
 
         if test_model:
             # test last model

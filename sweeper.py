@@ -61,7 +61,8 @@ def run_sweep():
     wandb.run.summary["trainable_parameters"] = parameter_count
     logger.info(f"Number of trainable parameters: {parameter_count}")
 
-    train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR + config["model"], True, config)
+    train(model, train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR + config["model"], True, config,
+          resume_checkpoint)
     test(model, test_dataloader, device, RESULTS_DIR + config["model"], "last-model", True, config)
 
 

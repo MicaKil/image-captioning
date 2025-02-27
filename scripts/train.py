@@ -18,8 +18,8 @@ from scripts.utils import time_str
 
 
 def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module,
-          optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool,
-          run_config: dict) -> tuple[str | None, dict, str | None]:
+          optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict,
+          resume_checkpoint: str) -> tuple:
     """
     Training loop for the model.
 
@@ -33,6 +33,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     :param checkpoint_dir: Directory to save the best model
     :param use_wandb: Whether to use Weights & Biases for logging
     :param run_config: Configuration for the run
+    :param resume_checkpoint: Path to a checkpoint to resume training from
     :return: Path to the best model
     """
     if use_wandb:
@@ -47,27 +48,41 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     logger.info(f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
     avg_val_loss = -1
-    metric = dict()
+    metrics = dict()
     cur_lr = (config["encoder_lr"], config["decoder_lr"])
     best_val_loss = np.inf
-    best_val_info = None
-    best_val_model = None
-    last_model_pth = None
+    best_state = None
+    best_path = None
+    last_pth = None
     epochs_no_improve = 0
 
+    start_epoch = 0
+    if resume_checkpoint:
+        checkpoint = torch.load(resume_checkpoint)
+        model.load_state_dict(checkpoint['model_state'])
+        optimizer.load_state_dict(checkpoint['optimizer_state'])
+        if scheduler and checkpoint['scheduler_state']:
+            scheduler.load_state_dict(checkpoint['scheduler_state'])
+        start_epoch = checkpoint['epoch']
+        best_val_loss = checkpoint['best_val_loss']
+        epochs_no_improve = checkpoint['epochs_no_improve']
+        logger.info(f"Resuming training from epoch {start_epoch} with val loss {best_val_loss:.4f}")
+
     model = model.to(device)
-    for epoch in range(config["max_epochs"]):
+    for epoch in range(start_epoch, config["max_epochs"]):
         avg_train_loss = train_load(model, train_loader, device, epoch, criterion, optimizer, use_wandb, run_config)
         avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, use_wandb, run_config)
+
         if val_bleu4 is not None:
             logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}")
         else:
             logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
-        metric = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
+
+        metrics = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
         if config["validation"]["bleu4"]:
-            metric["val_BLEU-4"] = val_bleu4
+            metrics["val_BLEU-4"] = val_bleu4
         if use_wandb:
-            wandb.log(metric)
+            wandb.log(metrics)
 
         if scheduler is not None:
             scheduler.step(avg_val_loss)
@@ -79,7 +94,10 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
-            best_val_info, best_val_model = checkpoint(model, checkpoint_dir, best_val_loss, best_val_model, cur_lr, epoch)
+            if best_path is not None:
+                os.remove(best_path)
+            best_path = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt")
+            best_state = save_checkpoint(model, best_path, optimizer, scheduler, avg_train_loss, best_val_loss, cur_lr, epoch, epochs_no_improve)
             logger.info(f"New best validation loss: {best_val_loss:.4f}")
         else:
             epochs_no_improve += 1
@@ -91,21 +109,24 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 if (epochs_no_improve - 1) > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
                     logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
-    # Log last model
-    if avg_val_loss != -1:
-        last_model_pth = os.path.join(ROOT, f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt")
-        torch.save(model.state_dict(), last_model_pth)
-        if use_wandb:
-            wandb.log_model(path=last_model_pth)
-    logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
-
     # check best_val_model != last_model
-    if best_val_info["epoch"] == metric["epoch"]:
+    if best_state["epoch"] == metrics["epoch"]:
         # if they are the same, then the best model is the last model
         logger.info("Best model is the last model")
-        best_val_model = None
-        best_val_info = None
-    return best_val_model, best_val_info, last_model_pth
+        last_pth = best_path
+        best_path = None
+        best_state = None
+    else:
+        # Log last model
+        if avg_val_loss != -1:
+            last_pth = os.path.join(ROOT, f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt")
+            last_state = save_checkpoint(model, last_pth, optimizer, scheduler, metrics["train_loss"], avg_val_loss, cur_lr, metrics["epoch"],
+                                         epochs_no_improve)
+            if use_wandb:
+                wandb.log_model(path=last_pth)
+        logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
+
+    return best_path, best_state, last_pth
 
 
 def train_load(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
@@ -263,22 +284,30 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     logger.info(f"Sample caption: {caption}")
 
 
-def checkpoint(model: nn.Module, checkpoint_dir: str, best_val_loss: float, best_val_model: str, cur_lr: tuple, epoch: int):
+def save_checkpoint(model: nn.Module, new_path: str, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler, train_loss: float,
+                    val_loss: float, cur_lr: tuple, epoch: int, epochs_no_improve: int) -> dict:
     """
     Checkpoint the model
     :param model: Current model
-    :param checkpoint_dir: Path to directory to save the model
-    :param best_val_loss: Current best validation loss
-    :param best_val_model: Current best model path
+    :param new_path:
+    :param optimizer:
+    :param scheduler:
+    :param train_loss:
+    :param val_loss: Current best validation loss
     :param cur_lr: Current learning rate
     :param epoch: Current epoch
+    :param epochs_no_improve:
     :return:
     """
-    # delete previous best model
-    if best_val_model is not None:
-        os.remove(best_val_model)
-    # save new best model
-    best_val_model = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt")
-    best_val_info = {"epoch": epoch + 1, "val_loss": best_val_loss, "encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]}
-    torch.save(model.state_dict(), best_val_model)
-    return best_val_info, best_val_model
+    state = {
+        'epoch': epoch + 1,
+        'model_state': model.state_dict(),
+        'optimizer_state': optimizer.state_dict(),
+        'scheduler_state': scheduler.state_dict() if scheduler else None,
+        'best_val_loss': val_loss,
+        'train_loss': train_loss,
+        'epochs_no_improve': epochs_no_improve,
+        'lr': cur_lr
+    }
+    torch.save(state, new_path)
+    return state
