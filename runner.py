@@ -65,7 +65,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         optimizer = get_optimizer(config, model)
         scheduler = get_scheduler(config, optimizer)
 
-        best_model, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
+        best_path, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
                                                       CHECKPOINT_DIR + config["model"], use_wandb, config, checkpoint)
 
         if test_model:
@@ -76,14 +76,15 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                 wandb.finish()
 
             # test best model
-            if best_model is not None:
+            if best_path is not None:
                 if use_wandb:
                     init_wandb_run(project=PROJECT, tags=RUN_TAGS, config=RUN_CONFIG)
                     config = wandb.config
                 else:
                     config = RUN_CONFIG
                 best = get_model(config, vocab, pad_idx, ds_splits)
-                best.load_state_dict(torch.load(best_model, weights_only=True))
+                best_checkpoint = torch.load(best_path)
+                best.load_state_dict(best_checkpoint["model_state"])
                 best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
                 if use_wandb:
                     wandb.log({"epoch": best_state["epoch"],
@@ -91,7 +92,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                                "val_loss": best_state["best_val_loss"],
                                "encoder_lr": best_state["lr"][0],
                                "decoder_lr": best_state["lr"][1]})
-                    wandb.log_model(path=best_model)
+                    wandb.log_model(path=best_path)
         wandb.finish()
         return
 
