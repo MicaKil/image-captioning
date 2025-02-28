@@ -58,7 +58,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
     start_epoch = 0
     if resume_checkpoint:
-        checkpoint = torch.load(resume_checkpoint)
+        checkpoint = torch.load(os.path.join(ROOT, resume_checkpoint))
         model.load_state_dict(checkpoint['model_state'])
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         if scheduler and checkpoint['scheduler_state']:

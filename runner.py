@@ -66,7 +66,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
         scheduler = get_scheduler(config, optimizer)
 
         best_path, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
-                                                      CHECKPOINT_DIR + config["model"], use_wandb, config, checkpoint)
+                                                     CHECKPOINT_DIR + config["model"], use_wandb, config, checkpoint)
 
         if test_model:
             # test last model
@@ -83,7 +83,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
                 else:
                     config = RUN_CONFIG
                 best = get_model(config, vocab, pad_idx, ds_splits)
-                best_checkpoint = torch.load(best_path)
+                best_checkpoint = torch.load(os.path.join(ROOT, best_path))
                 best.load_state_dict(best_checkpoint["model_state"])
                 best.test_model(test_dataloader, DEVICE, save_dir, "best-model", use_wandb, config)
                 if use_wandb:
@@ -98,7 +98,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
 
     if test_model and checkpoint is not None:
         logger.info(f"Testing model from checkpoint.")
-        checkpoint = torch.load(checkpoint)
+        checkpoint = torch.load(os.path.join(ROOT, checkpoint))
         model.load_state_dict(checkpoint['model_state'])
         test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
         model.test_model(test_dataloader, DEVICE, save_dir, "checkpoint", use_wandb, config)
@@ -129,7 +129,7 @@ def init_wandb_run(project: str, tags: list, config: dict) -> Run:
 
 def get_ds(config: dict, create_ds: bool, date: str, save_ds: bool, use_wandb: bool, img_dir: str, ds_splits: tuple[str, str, str], ds_dir: str):
     # create or load dataset
-    img_dir = str(os.path.join(ROOT, img_dir))
+    img_dir = os.path.join(ROOT, img_dir)
     if create_ds:
         raise NotImplementedError("Creating new datasets is being refactored.")
         # df_captions = load_flickr_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
@@ -158,17 +158,17 @@ def get_ds(config: dict, create_ds: bool, date: str, save_ds: bool, use_wandb: b
 def get_dataframes(ds_splits):
     match os.path.splitext(ds_splits[0])[1]:
         case ".csv":
-            train_df = pd.read_csv(str(os.path.join(ROOT, ds_splits[0])))
-            val_df = pd.read_csv(str(os.path.join(ROOT, ds_splits[1])))
-            test_df = pd.read_csv(str(os.path.join(ROOT, ds_splits[2])))
+            train_df = pd.read_csv(os.path.join(ROOT, ds_splits[0]))
+            val_df = pd.read_csv(os.path.join(ROOT, ds_splits[1]))
+            test_df = pd.read_csv(os.path.join(ROOT, ds_splits[2]))
         case ".pkl":
-            train_df = pd.read_pickle(str(os.path.join(ROOT, ds_splits[0])))
-            val_df = pd.read_pickle(str(os.path.join(ROOT, ds_splits[1])))
-            test_df = pd.read_pickle(str(os.path.join(ROOT, ds_splits[2])))
+            train_df = pd.read_pickle(os.path.join(ROOT, ds_splits[0]))
+            val_df = pd.read_pickle(os.path.join(ROOT, ds_splits[1]))
+            test_df = pd.read_pickle(os.path.join(ROOT, ds_splits[2]))
         case ".json":
-            train_df = pd.read_json(str(os.path.join(ROOT, ds_splits[0])))
-            val_df = pd.read_json(str(os.path.join(ROOT, ds_splits[1])))
-            test_df = pd.read_json(str(os.path.join(ROOT, ds_splits[2])))
+            train_df = pd.read_json(os.path.join(ROOT, ds_splits[0]))
+            val_df = pd.read_json(os.path.join(ROOT, ds_splits[1]))
+            test_df = pd.read_json(os.path.join(ROOT, ds_splits[2]))
         case _:
             raise ValueError("Dataframe file format not recognized")
     return train_df, val_df, test_df
@@ -190,17 +190,6 @@ def get_model(config, vocab, pad_idx, ds_splits):
                                                           not config["freeze_encoder"])
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
-
-
-def handle_saved_model(config, model, save_dir, saved_model, test_dataset, test_model, use_wandb):
-    # Load model from saved model
-    logger.info(f"Loading model from {saved_model[0]}")
-    model.load_state_dict(torch.load(str(os.path.join(ROOT, saved_model[0])), weights_only=True))
-    if test_model:
-        test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-        model.test_model(test_dataloader, DEVICE, save_dir, saved_model[1], use_wandb, config)
-    if use_wandb:
-        wandb.finish()
 
 
 def get_optimizer(config, model):
@@ -245,11 +234,11 @@ def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFra
     :param val_df: Validation dataframe to be saved
     :return:
     """
-    train_df.to_csv(str(os.path.join(ROOT, ds_dir, f"train_{date}_{config['dataset']['split']['train']}.csv")), header=["image_id", "caption"],
+    train_df.to_csv(os.path.join(ROOT, ds_dir, f"train_{date}_{config['dataset']['split']['train']}.csv"), header=["image_id", "caption"],
                     index=False)
-    val_df.to_csv(str(os.path.join(ROOT, ds_dir, f"val_{date}_{config['dataset']['split']['val']}.csv")), header=["image_id", "caption"],
+    val_df.to_csv(os.path.join(ROOT, ds_dir, f"val_{date}_{config['dataset']['split']['val']}.csv"), header=["image_id", "caption"],
                   index=False)
-    test_df.to_csv(str(os.path.join(ROOT, ds_dir, f"test_{date}_{config['dataset']['split']['test']}.csv")), header=["image_id", "caption"],
+    test_df.to_csv(os.path.join(ROOT, ds_dir, f"test_{date}_{config['dataset']['split']['test']}.csv"), header=["image_id", "caption"],
                    index=False)
 
 
@@ -342,16 +331,14 @@ if __name__ == "__main__":
         case _:
             raise ValueError("Dataset not recognized")
 
-    # print(calc_max_sequence_length(ds_splits_))
-    saved_model_ = "checkpoints/transformer/best_val_2025-02-27_03-13_3-6759.pt"
+    saved_model_ = "checkpoints/transformer/best_val_2025-02-28_10-28_2-2131.pt"
 
     run(use_wandb=True,
         create_ds=False,
-        save_ds=True,
-        train_model=True,
+        save_ds=False,
+        train_model=False,
         test_model=True,
-        checkpoint=None,
+        checkpoint=saved_model_,
         img_dir=img_dir_,
         ds_splits=ds_splits_,
-        ds_dir=ds_dir_
-        )
+        ds_dir=ds_dir_)
