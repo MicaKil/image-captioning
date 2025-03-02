@@ -132,7 +132,7 @@ def get_ds(config: dict, create_ds: bool, date: str, save_ds: bool, use_wandb: b
     img_dir = os.path.join(ROOT, img_dir)
     if create_ds:
         raise NotImplementedError("Creating new datasets is being refactored.")
-        # df_captions = load_flickr_captions(str(os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
+        # df_captions = load_flickr_captions( (os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
         # total_size = len(df_captions["image_id"].unique())
         # train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
         # val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)

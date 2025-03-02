@@ -47,12 +47,11 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
     logger.info(f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
-    avg_val_loss = -1
     metrics = dict()
     cur_lr = (config["encoder_lr"], config["decoder_lr"])
     best_val_loss = np.inf
     best_state = None
-    best_path = None
+    best_pth = None
     last_pth = None
     epochs_no_improve = 0
 
@@ -91,13 +90,17 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
         # Early stopping and checkpointing
+        if last_pth is not None:
+            os.remove(last_pth)
+        last_pth = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt")
+        last_state = save_checkpoint(model, last_pth, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config)
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
-            if best_path is not None:
-                os.remove(best_path)
-            best_path = os.path.join(ROOT, f"{checkpoint_dir}/best_val_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt")
-            best_state = save_checkpoint(model, best_path, optimizer, scheduler, avg_train_loss, best_val_loss, cur_lr, epoch, epochs_no_improve)
+            if best_pth is not None:
+                os.remove(best_pth)
+            best_pth = last_pth
+            best_state = last_state
             logger.info(f"New best validation loss: {best_val_loss:.4f}")
         else:
             epochs_no_improve += 1
@@ -109,24 +112,15 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 if (epochs_no_improve - 1) > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
                     logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
 
+    logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
+
     # check best_val_model != last_model
     if best_state["epoch"] == metrics["epoch"]:
         # if they are the same, then the best model is the last model
         logger.info("Best model is the last model")
-        last_pth = best_path
-        best_path = None
-        best_state = None
-    else:
-        # Log last model
-        if avg_val_loss != -1:
-            last_pth = os.path.join(ROOT, f"{checkpoint_dir}/last_model_{time_str()}_{str(round(avg_val_loss, 4)).replace('.', '-')}.pt")
-            save_checkpoint(model, last_pth, optimizer, scheduler, metrics["train_loss"], avg_val_loss, cur_lr, metrics["epoch"],
-                            epochs_no_improve)
-            if use_wandb:
-                wandb.log_model(path=last_pth)
-        logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
+        return last_pth, best_state, last_pth
 
-    return best_path, best_state, last_pth
+    return best_pth, best_state, last_pth
 
 
 def train_load(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
@@ -284,12 +278,12 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     logger.info(f"Sample caption: {caption}")
 
 
-def save_checkpoint(model: nn.Module, new_path: str, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler, train_loss: float,
-                    val_loss: float, cur_lr: tuple, epoch: int, epochs_no_improve: int) -> dict:
+def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler, train_loss: float,
+                    val_loss: float, cur_lr: tuple, epoch: int, epochs_no_improve: int, config: dict) -> dict:
     """
     Checkpoint the model
     :param model: Current model
-    :param new_path:
+    :param path:
     :param optimizer:
     :param scheduler:
     :param train_loss:
@@ -297,6 +291,7 @@ def save_checkpoint(model: nn.Module, new_path: str, optimizer: torch.optim.Opti
     :param cur_lr: Current learning rate
     :param epoch: Current epoch
     :param epochs_no_improve:
+    :param config:
     :return:
     """
     state = {
@@ -307,7 +302,8 @@ def save_checkpoint(model: nn.Module, new_path: str, optimizer: torch.optim.Opti
         'best_val_loss': val_loss,
         'train_loss': train_loss,
         'epochs_no_improve': epochs_no_improve,
-        'lr': cur_lr
+        'lr': cur_lr,
+        'config': config
     }
-    torch.save(state, new_path)
+    torch.save(state, path)
     return state
