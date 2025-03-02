@@ -16,6 +16,7 @@ from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
+from scripts.scheduler import SchedulerWrapper
 from scripts.utils import date_str
 
 
@@ -63,7 +64,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
 
         criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="none")
         optimizer = get_optimizer(config, model)
-        scheduler = get_scheduler(config, optimizer)
+        scheduler = get_scheduler(config, optimizer, config["encoder_lr"])
 
         best_path, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
                                                      CHECKPOINT_DIR + config["model"], use_wandb, config, checkpoint)
@@ -232,11 +233,11 @@ def get_optimizer(config, model):
             return Adam(params)
 
 
-def get_scheduler(config, optimizer):
-    scheduler = None
+def get_scheduler(config, optimizer, encoder_lr):
     if config["scheduler"] is not None:
         scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
-    return scheduler
+        return SchedulerWrapper(scheduler, encoder_lr)
+    return None
 
 
 def save_df(config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame, ds_dir: str):
