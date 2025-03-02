@@ -98,7 +98,7 @@ def run(use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test
 
     if test_model and checkpoint is not None:
         logger.info(f"Testing model from checkpoint.")
-        checkpoint = torch.load(os.path.join(ROOT, checkpoint))
+        checkpoint = torch.load(os.path.join(ROOT, checkpoint), weights_only=False)
         model.load_state_dict(checkpoint['model_state'])
         test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
         model.test_model(test_dataloader, DEVICE, save_dir, "checkpoint", use_wandb, config)
