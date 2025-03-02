@@ -86,6 +86,17 @@ class Vocabulary:
         """
         return self.idx_to_str.get(idx, UNK)
 
+    def load_dict(self, state_dict: dict):
+        """
+        Load the state dictionary.
+        :param state_dict: State dictionary
+        :return: None
+        """
+        self.str_to_idx = state_dict["str_to_idx"]
+        self.idx_to_str = state_dict["idx_to_str"]
+        self.word_counts = state_dict["word_counts"]
+        self.freq_threshold = state_dict["freq_threshold"]
+
     def __str__(self):
         """
         Return a string representation of the vocabulary.
