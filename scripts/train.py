@@ -47,12 +47,12 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
     logger.info(f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
-    metrics = dict()
+    cur_metrics = dict()
     cur_lr = (config["encoder_lr"], config["decoder_lr"])
     best_val_loss = np.inf
-    best_state = None
     best_pth = None
-    last_pth = None
+    best_state = None
+    cur_path = None
     epochs_no_improve = 0
 
     start_epoch = 0
@@ -69,11 +69,11 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         else:
             logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 
-        metrics = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
+        cur_metrics = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
         if config["validation"]["bleu4"]:
-            metrics["val_BLEU-4"] = val_bleu4
+            cur_metrics["val_BLEU-4"] = val_bleu4
         if use_wandb:
-            wandb.log(metrics)
+            wandb.log(cur_metrics)
 
         if scheduler is not None:
             scheduler.step(avg_val_loss)
@@ -82,24 +82,23 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
         # Early stopping and checkpointing
-        if last_pth is not None:
-            os.remove(last_pth)
-        last_pth = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(best_val_loss, 4)).replace(".", "-")}.pt")
-        last_state = save_checkpoint(model, last_pth, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config)
+        if cur_path is not None:
+            os.remove(cur_path)
+        cur_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
+        cur_state = save_checkpoint(model, cur_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config)
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
             if best_pth is not None:
                 os.remove(best_pth)
-            best_pth = last_pth
-            best_state = last_state
+            best_pth = cur_path
+            best_state = cur_state
             logger.info(f"New best validation loss: {best_val_loss:.4f}")
         else:
             epochs_no_improve += 1
-            if config["patience"] is not None:
-                if epochs_no_improve >= config["patience"]:
-                    logger.info(f"Early stopping after {epoch + 1} epochs")
-                    break
+            if config["patience"] is not None and epochs_no_improve >= config["patience"]:
+                logger.info(f"Early stopping after {epoch + 1} epochs")
+                break
             if scheduler is not None:
                 if (epochs_no_improve - 1) > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
                     logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
@@ -107,12 +106,12 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
 
     # check best_val_model != last_model
-    if best_state["epoch"] == metrics["epoch"]:
+    if best_state is not None and best_state["epoch"] == cur_metrics["epoch"]:
         # if they are the same, then the best model is the last model
         logger.info("Best model is the last model")
-        return last_pth, best_state, last_pth
+        return None, None, cur_path
 
-    return best_pth, best_state, last_pth
+    return best_pth, best_state, cur_path
 
 
 def resume(model, device, optimizer, scheduler, checkpoint_path):
