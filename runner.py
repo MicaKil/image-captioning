@@ -331,12 +331,12 @@ if __name__ == "__main__":
         case _:
             raise ValueError("Dataset not recognized")
 
-    saved_model_ = "checkpoints/transformer/best_val_2025-02-28_10-28_2-2131.pt"
+    saved_model_ = "checkpoints/transformer/last_model_2025-02-28_20-43_2-2577.pt"
 
     run(use_wandb=True,
         create_ds=False,
         save_ds=False,
-        train_model=False,
+        train_model=True,
         test_model=True,
         checkpoint=saved_model_,
         img_dir=img_dir_,

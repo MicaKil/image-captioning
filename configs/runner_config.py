@@ -40,7 +40,7 @@ RUN_CONFIG = {
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
     "max_epochs": 100,
-    "patience": 10,
+    "patience": 20,
     "gradient_clip": 2.0,
     "dataset": {
         "name": "coco",
