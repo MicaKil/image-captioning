@@ -333,7 +333,7 @@ if __name__ == "__main__":
 
     saved_model_ = "checkpoints/transformer/last_model_2025-02-28_20-43_2-2577.pt"
 
-    run(use_wandb=False,
+    run(use_wandb=True,
         create_ds=False,
         save_ds=False,
         train_model=True,
