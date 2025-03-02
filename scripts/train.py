@@ -57,15 +57,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
     start_epoch = 0
     if resume_checkpoint:
-        checkpoint = torch.load(os.path.join(ROOT, resume_checkpoint))
-        model.load_state_dict(checkpoint['model_state'])
-        optimizer.load_state_dict(checkpoint['optimizer_state'])
-        if scheduler and checkpoint['scheduler_state']:
-            scheduler.load_state_dict(checkpoint['scheduler_state'])
-        start_epoch = checkpoint['epoch']
-        best_val_loss = checkpoint['best_val_loss']
-        epochs_no_improve = checkpoint['epochs_no_improve']
-        logger.info(f"Resuming training from epoch {start_epoch} with val loss {best_val_loss:.4f}")
+        best_val_loss, epochs_no_improve, start_epoch = resume(model, device, optimizer, scheduler, resume_checkpoint)
 
     model = model.to(device)
     for epoch in range(start_epoch, config["max_epochs"]):
@@ -121,6 +113,29 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         return last_pth, best_state, last_pth
 
     return best_pth, best_state, last_pth
+
+
+def resume(model, device, optimizer, scheduler, checkpoint_path):
+    checkpoint = torch.load(os.path.join(ROOT, checkpoint_path))
+    model.load_state_dict(checkpoint['model_state'])
+    optimizer.load_state_dict(checkpoint['optimizer_state'])
+    # Move optimizer states to current device
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
+    if scheduler and checkpoint['scheduler_state']:
+        scheduler.load_state_dict(checkpoint['scheduler_state'])
+        # Move scheduler states to current device
+        for state in scheduler.state_dict().values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.to(device)
+    start_epoch = checkpoint['epoch']
+    best_val_loss = checkpoint['best_val_loss']
+    epochs_no_improve = checkpoint['epochs_no_improve']
+    logger.info(f"Resuming training from epoch {start_epoch} with val loss {best_val_loss:.4f}")
+    return best_val_loss, epochs_no_improve, start_epoch
 
 
 def train_load(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
