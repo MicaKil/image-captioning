@@ -85,7 +85,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         if cur_path is not None:
             os.remove(cur_path)
         cur_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
-        cur_state = save_checkpoint(model, cur_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config)
+        cur_state = save_checkpoint(model, cur_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, run_config)
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
@@ -317,7 +317,7 @@ def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim.Optimize
         'train_loss': train_loss,
         'epochs_no_improve': epochs_no_improve,
         'lr': cur_lr,
-        'config': config
+        'config': dict(config)
     }
     torch.save(state, path)
     return state
