@@ -144,12 +144,28 @@ def get_ds(config: dict, create_ds: bool, date: str, save_ds: bool, use_wandb: b
         train_df, val_df, test_df = get_dataframes(ds_splits)
 
     vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
+    vocab_dict = {
+        "str_to_idx": vocab.str_to_idx,
+        "idx_to_str": vocab.idx_to_str,
+        "word_counts": vocab.word_counts,
+        "freq_threshold": vocab.freq_threshold
+    }
+    torch.save(vocab_dict, os.path.join(ROOT, f"{ds_dir}/vocab_freq-{date}.pt"))
     train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
     val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
     test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
     if save_ds:
-        save_datasets(None, train_dataset, val_dataset, test_dataset, date, config, ds_dir)  # save datasets to disk
+        # save datasets to disk
+        save_datasets(None, train_dataset, val_dataset, test_dataset, date, config, ds_dir)
+        # save vocab to disk
+        vocab_dict = {
+            "str_to_idx": vocab.str_to_idx,
+            "idx_to_str": vocab.idx_to_str,
+            "word_counts": vocab.word_counts,
+            "freq_threshold": vocab.freq_threshold
+        }
+        torch.save(vocab_dict, os.path.join(ROOT, f"{ds_dir}/vocab_freq-{date}.pt"))
         if use_wandb:
             log_datasets(date, False, ds_dir)
     return train_dataset, val_dataset, test_dataset, vocab
