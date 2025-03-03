@@ -82,7 +82,8 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
         # Early stopping and checkpointing
-        if cur_path is not None:
+        if cur_path is not None and cur_path != best_pth:
+            # Only remove the last checkpoint if it is not the best one
             os.remove(cur_path)
         cur_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
         cur_state = save_checkpoint(model, cur_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, run_config)
