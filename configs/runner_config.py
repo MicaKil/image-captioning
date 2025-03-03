@@ -31,7 +31,7 @@ RUN_CONFIG = {
     "embed_size": 512,
     "hidden_size": 512,
     "num_layers": 2,
-    "num_heads": 3 if RUN_TAGS[0] == "transformer" else None,
+    "num_heads": 4 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.4,
     "dropout": 0.5,  # decoder dropout
     "freeze_encoder": True,
