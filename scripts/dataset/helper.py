@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from configs.config import logger
+from config.config import logger
 from constants import ROOT, FLICKR8K_CSV_FILE
 
 

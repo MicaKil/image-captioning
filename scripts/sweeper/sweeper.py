@@ -5,14 +5,14 @@ import torch
 import wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from configs.config import logger
-from configs.sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
+from config.config import logger
 from constants import ROOT, PAD, CHECKPOINT_DIR, FLICKR_VAL_CSV, FLICKR_TRAIN_CSV, FLICKR_TEST_CSV, FLICKR8K_IMG_DIR, RESULTS_DIR
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.runner import init_wandb_run, get_model
 from scripts.runner.config import TRANSFORM
+from scripts.sweeper.sweeper_config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
 from scripts.test import test
 from scripts.train import train
 

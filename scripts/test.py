@@ -8,7 +8,7 @@ from nltk.translate.bleu_score import SmoothingFunction, corpus_bleu
 from pycocoevalcap.cider.cider import Cider
 from tqdm import tqdm
 
-from configs.config import logger
+from config.config import logger
 from constants import ROOT
 from scripts.caption import gen_caption
 from scripts.dataset.dataloader import CaptionLoader

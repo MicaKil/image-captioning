@@ -2,7 +2,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
-from configs.config import logger
+from config.config import logger
 from constants import PAD
 from scripts.dataset.dataset import CaptionDataset
 

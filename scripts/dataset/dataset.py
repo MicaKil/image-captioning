@@ -5,7 +5,6 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
 
-from configs.config import logger
 from constants import EOS, SOS
 from scripts.dataset.vocabulary import Vocabulary
 
@@ -23,7 +22,6 @@ class CaptionDataset(Dataset):
         :param transform: Transform to apply to the images
         :param target_transform: Transform to apply to the target captions
         """
-        logger.info("Initializing Dataset.")
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform

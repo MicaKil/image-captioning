@@ -9,7 +9,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from wandb.sdk.wandb_run import Run
 
-from configs.config import logger
+from config.config import logger
 from constants import ROOT, CHECKPOINT_DIR, PAD, RESULTS_DIR
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset

@@ -7,7 +7,7 @@ import wandb
 from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
-from configs.config import logger
+from config.config import logger
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from scripts import test
 from scripts.caption import gen_caption, preprocess_image
