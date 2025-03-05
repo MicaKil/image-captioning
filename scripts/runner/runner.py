@@ -141,7 +141,13 @@ class Runner:
         wandb_run.define_metric("epoch", summary="max")
         return wandb_run
 
-    def get_ds(self, config: dict, date: str):
+    def get_ds(self, config: dict, date: str) -> tuple[CaptionDataset, CaptionDataset, CaptionDataset, Vocabulary]:
+        """
+        Creates or loads the datasets.
+        :param config: The run configuration.
+        :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names.
+        :return: Tuple with the training, validation, and test datasets and the vocabulary.
+        """
         img_dir = os.path.join(ROOT, self.img_dir)
         if self.create_ds:
             raise NotImplementedError("Creating new datasets is being refactored.")
@@ -156,14 +162,13 @@ class Runner:
         else:
             train_df, val_df, test_df = self.get_dataframes()
 
-        vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
-        vocab_dict = {
-            "str_to_idx": vocab.str_to_idx,
-            "idx_to_str": vocab.idx_to_str,
-            "word_counts": vocab.word_counts,
-            "freq_threshold": vocab.freq_threshold
-        }
-        torch.save(vocab_dict, os.path.join(ROOT, f"{self.ds_dir}/vocab_freq-{vocab.freq_threshold}.pt"))
+        vocab_file = f"vocab_freq-{config["vocab"]["freq_threshold"]}.pt"
+        if vocab_file in os.listdir(os.path.join(ROOT, self.ds_dir)): # check if vocab file exists
+            vocab = Vocabulary(config["vocab"]["freq_threshold"])
+            vocab.load_dict(torch.load(os.path.join(ROOT, self.ds_dir, vocab_file)))
+        else:
+            vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
+
         train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
         val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
         test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
@@ -179,11 +184,16 @@ class Runner:
                 "freq_threshold": vocab.freq_threshold
             }
             torch.save(vocab_dict, os.path.join(ROOT, f"{self.ds_dir}/vocab_freq-{vocab.freq_threshold}.pt"))
+            # log datasets to wandb
             if self.use_wandb:
                 self.log_datasets(date, False)
         return train_dataset, val_dataset, test_dataset, vocab
 
-    def get_dataframes(self):
+    def get_dataframes(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Get the dataframes from the dataset splits based on the file extension
+        :return: Tuple with the training, validation, and test dataframes
+        """
         match os.path.splitext(self.ds_splits[0])[1]:
             case ".csv":
                 train_df = pd.read_csv(os.path.join(ROOT, self.ds_splits[0]))
@@ -201,7 +211,14 @@ class Runner:
                 raise ValueError("Dataframe file format not recognized")
         return train_df, val_df, test_df
 
-    def get_model(self, config, vocab, pad_idx):
+    def get_model(self, config: dict, vocab: Vocabulary, pad_idx: int) -> nn.Module:
+        """
+        Get the model based on the configuration
+        :param config: The run configuration
+        :param vocab: Vocabulary of the dataset
+        :param pad_idx: Index of the padding token
+        :return:
+        """
         match config["model"]:
             case "basic":
                 encoder = basic.Encoder(config["embed_size"], not config["freeze_encoder"])
@@ -302,14 +319,27 @@ class Runner:
         return max_len
 
 
-def get_scheduler(config, optimizer, encoder_lr):
+def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
+    """
+    Get the scheduler based on the configuration
+    :param config: The run configuration
+    :param optimizer: The optimizer to be used in training
+    :param encoder_lr: The initial learning rate for the encoder
+    :return:
+    """
     if config["scheduler"] is not None:
         scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
         return SchedulerWrapper(scheduler, encoder_lr)
     return None
 
 
-def get_optimizer(config, model):
+def get_optimizer(config: dict, model: nn.Module) -> torch.optim:
+    """
+    Get the optimizer based on the configuration.
+    :param config: The run configuration
+    :param model: The model to be trained
+    :return:
+    """
     match config["model"]:
         case "basic", "intermediate":
             params = [
