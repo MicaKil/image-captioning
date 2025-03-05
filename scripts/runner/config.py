@@ -28,7 +28,7 @@ RUN_CONFIG = {
     "encoder": "resnet50",
     "decoder": "Attention",
     "batch_size": 64,
-    "embed_size": 512,
+    "embed_size": None,
     "hidden_size": 512,
     "num_layers": 2,
     "num_heads": 4 if RUN_TAGS[0] == "transformer" else None,

@@ -6,7 +6,7 @@ STD = [0.229, 0.224, 0.225]
 
 TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((224, 224)),
+    v2.Resize((256, 256)),
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=MEAN, std=STD),
 ])
@@ -18,7 +18,7 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["intermediate", "flickr8k"]
+TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
@@ -28,16 +28,17 @@ DEFAULT_CONFIG = {
     "encoder": "resnet50",
     "decoder": "LSTM",
     "batch_size": 64,
-    "embed_size": 256,
+    "embed_size": None,
     "hidden_size": 512,
     "num_layers": 1,
-    "dropout": 0.5,
+    "num_heads": 2 if TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.5,
+    "dropout": 0.5,  # decoder dropout
     "freeze_encoder": True,
     "encoder_lr": 0.0001,
-    "decoder_lr": 0.0001,
+    "decoder_lr": 0.001,
     "criterion": "CrossEntropyLoss",
-    "optimizer": "Adam",
+    "optimizer": "AdamW",
     "max_epochs": 100,
     "patience": 10,
     "gradient_clip": 2.0,
@@ -53,17 +54,17 @@ DEFAULT_CONFIG = {
     "vocab": {
         "freq_threshold": 3
     },
-    "max_caption_len": 30,
-    "temperature": None,
-    "beam_size": 5,
+    "max_caption_len": 50,
+    "temperature": 0,
+    "beam_size": 0,
     "scheduler": {
         "type": "ReduceLROnPlateau",
         "factor": 0.5,
         "patience": 5,
     } if use_scheduler else None,
     "validation": {
-        "bleu4": True,
-        "bleu4_step": 10
+        "bleu4": False,
+        "bleu4_step": None
     }
 }
 
@@ -79,11 +80,11 @@ SWEEP_CONFIG = {
         "hidden_size": {
             "values": [256, 512, 1024]
         },
-        "embed_size": {
-            "values": [256, 512, 1024]
-        },
         "num_layers": {
             "values": [1, 2, 3]
+        },
+        "num_heads": {
+            "values": [2, 4, 8]
         },
         # regularisation
         "dropout": {
