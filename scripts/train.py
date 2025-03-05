@@ -36,11 +36,9 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     :param resume_checkpoint: Path to a checkpoint to resume training from
     :return: Path to the best model
     """
+    config = get_config(run_config, use_wandb)
     if use_wandb:
-        config = wandb.config
         wandb.watch(model, criterion=criterion, log="all")
-    else:
-        config = run_config
 
     if config["validation"]["bleu4"] and (config["validation"]["bleu4_step"] is None or config["validation"]["bleu4_step"] < 1):
         raise ValueError("eval_bleu4_step must be greater than 0 if eval_bleu4 is True")
@@ -86,7 +84,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             # Only remove the last checkpoint if it is not the best one
             os.remove(cur_path)
         cur_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
-        cur_state = save_checkpoint(model, cur_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, run_config)
+        cur_state = save_checkpoint(model, cur_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config)
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
@@ -115,7 +113,16 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     return best_pth, best_state, cur_path
 
 
-def resume(model, device, optimizer, scheduler, checkpoint_path):
+def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: torch.optim, checkpoint_path: str) -> tuple[float, int, int]:
+    """
+    Resume training from a checkpoint
+    :param model: The model to resume training
+    :param device: Device to run the training on
+    :param optimizer: Optimizer for training
+    :param scheduler: Scheduler for the optimizer
+    :param checkpoint_path: Path to the checkpoint
+    :return: The best validation loss, number of epochs without improvement, and the starting epoch
+    """
     checkpoint = torch.load(os.path.join(ROOT, checkpoint_path))
     model.load_state_dict(checkpoint['model_state'])
     optimizer.load_state_dict(checkpoint['optimizer_state'])
@@ -153,10 +160,7 @@ def train_load(model: nn.Module, train_loader: CaptionLoader, device: torch.devi
     :param run_config: Configuration for the run
     :return: Total training loss for the epoch
     """
-    if use_wandb:
-        config = wandb.config
-    else:
-        config = run_config
+    config = get_config(run_config, use_wandb)
 
     train_loss = 0.
     total_tokens = 0
@@ -198,10 +202,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
     :param run_config: Configuration for the run
     :return: Average validation loss and BLEU score (if calc_bleu is True)
     """
-    if use_wandb:
-        config = wandb.config
-    else:
-        config = run_config
+    config = get_config(run_config, use_wandb)
 
     # for BLEU score
     val_ble4 = None
@@ -293,21 +294,21 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     logger.info(f"Sample caption: {caption}")
 
 
-def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler, train_loss: float,
-                    val_loss: float, cur_lr: tuple, epoch: int, epochs_no_improve: int, config: dict) -> dict:
+def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, scheduler: torch.optim, train_loss: float, val_loss: float, cur_lr: tuple,
+                    epoch: int, epochs_no_improve: int, config: dict) -> dict:
     """
     Checkpoint the model
     :param model: Current model
-    :param path:
-    :param optimizer:
-    :param scheduler:
-    :param train_loss:
+    :param path: Path to save the checkpoint
+    :param optimizer: Current optimizer
+    :param scheduler: Scheduler for the optimizer
+    :param train_loss: Current training loss
     :param val_loss: Current best validation loss
-    :param cur_lr: Current learning rate
+    :param cur_lr: Current learning rate in the encoder and decoder
     :param epoch: Current epoch
-    :param epochs_no_improve:
-    :param config:
-    :return:
+    :param epochs_no_improve: Number of epochs without improvement
+    :param config: Run configuration
+    :return: Dictionary with the state of the saved checkpoint
     """
     state = {
         'epoch': epoch + 1,
@@ -322,3 +323,17 @@ def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim.Optimize
     }
     torch.save(state, path)
     return state
+
+
+def get_config(run_config: dict, use_wandb: bool):
+    """
+    Get the configuration for the run
+    :param run_config: Default configuration
+    :param use_wandb: Whether to use Weights & Biases
+    :return: The configuration for the run
+    """
+    if use_wandb:
+        config = wandb.config
+    else:
+        config = run_config
+    return config
