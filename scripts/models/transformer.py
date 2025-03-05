@@ -8,7 +8,7 @@ from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
 
-from configs.config import logger
+from config.config import logger
 from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
