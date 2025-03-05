@@ -8,12 +8,12 @@ from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
 from configs.config import logger
-from configs.runner_config import TRANSFORM
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from scripts import test
 from scripts.caption import gen_caption, preprocess_image
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
+from scripts.runner.config import TRANSFORM
 from scripts.utils import time_str
 
 
