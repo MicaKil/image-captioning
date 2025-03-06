@@ -231,7 +231,7 @@ class Runner:
                 return intermediate.IntermediateImageCaptioner(encoder, decoder)
             case "transformer":
                 return transformer.ImageCaptioningTransformer(vocab, config["hidden_size"], config["num_layers"], config["num_heads"],
-                                                              self.calc_max_sequence_length() + 2, config["encoder_dropout"],
+                                                              self.calc_max_sequence_length(vocab), config["encoder_dropout"],
                                                               config["dropout"], not config["freeze_encoder"])
             case _:
                 raise ValueError(f"Model {config['model']} not recognized")
@@ -307,16 +307,17 @@ class Runner:
         artifact.add_file(dataset_path)
         wandb.log_artifact(artifact)
 
-    def calc_max_sequence_length(self):
+    def calc_max_sequence_length(self, vocab):
         """
         Calculate the maximum sequence length in the dataset
+        :param vocab:
         :return: Maximum sequence length
         """
         train_df, val_df, test_df = self.get_dataframes()
-        max_len = max(train_df["caption"].apply(lambda x: len(x.split(" "))).max(),
-                      val_df["caption"].apply(lambda x: len(x.split(" "))).max(),
-                      test_df["caption"].apply(lambda x: len(x.split(" "))).max())
-        return max_len
+        max_len = max(train_df["caption"].apply(lambda x: len(vocab.tokenize_eng(x))).max(),
+                      val_df["caption"].apply(lambda x: len(vocab.tokenize_eng(x))).max(),
+                      test_df["caption"].apply(lambda x: len(vocab.tokenize_eng(x))).max())
+        return max_len + 2  # add 2 for start and end tokens
 
 
 def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
