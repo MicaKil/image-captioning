@@ -1,5 +1,6 @@
 import torch
 import wandb
+from torch.nn import CrossEntropyLoss
 
 from config.config import logger
 from constants import PAD, CHECKPOINT_DIR, RESULTS_DIR
@@ -30,7 +31,7 @@ class Sweeper(Runner):
         test_dataloader = CaptionLoader(test_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
 
         model = self.get_model(config, vocab, pad_idx)
-        criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="sum")
+        criterion = CrossEntropyLoss(ignore_index=pad_idx, reduction="none")
         optimizer = get_optimizer(config, model)
         scheduler = get_scheduler(config, optimizer, config["encoder_lr"])
 
