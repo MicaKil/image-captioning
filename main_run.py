@@ -21,17 +21,18 @@ match RUN_CONFIG["dataset"]["name"]:
 
 saved_model_ = "checkpoints/transformer/LAST_2025-03-02_14-22_2-2577.pt"
 
-run = Runner(use_wandb=False,
-             create_ds=False,
-             save_ds=False,
-             train_model=True,
-             test_model=True,
-             checkpoint_pth=None,
-             img_dir=img_dir_,
-             ds_splits=ds_splits_,
-             ds_dir=ds_dir_,
-             project=PROJECT,
-             run_tags=RUN_TAGS,
-             run_config=RUN_CONFIG)
+if __name__ == "__main__":
+    run = Runner(use_wandb=False,
+                 create_ds=False,
+                 save_ds=False,
+                 train_model=True,
+                 test_model=True,
+                 checkpoint_pth=None,
+                 img_dir=img_dir_,
+                 ds_splits=ds_splits_,
+                 ds_dir=ds_dir_,
+                 project=PROJECT,
+                 run_tags=RUN_TAGS,
+                 run_config=RUN_CONFIG)
 
-run.run()
+    run.run()
