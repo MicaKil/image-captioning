@@ -39,7 +39,7 @@ DEFAULT_CONFIG = {
     "decoder_lr": 0.001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 100,
+    "max_epochs": 1,
     "patience": 10,
     "gradient_clip": 2.0,
     "dataset": {
