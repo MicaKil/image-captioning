@@ -8,7 +8,6 @@ from einops import rearrange
 from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
 
-from config.config import logger
 from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
@@ -377,7 +376,7 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         if max_length > self.max_length:
-            logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
+            # logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
             max_length = self.max_length
 
         self.eval()
