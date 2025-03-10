@@ -17,7 +17,7 @@ SHUFFLE = True
 PIN_MEMORY = True
 
 # run
-PROJECT = "image-captioning-v0"
+PROJECT = "image-captioning-v1"
 TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -39,7 +39,7 @@ DEFAULT_CONFIG = {
     "decoder_lr": 0.001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 1,
+    "max_epochs": 100,
     "patience": 10,
     "gradient_clip": 2.0,
     "dataset": {

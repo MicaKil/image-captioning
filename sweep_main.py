@@ -10,5 +10,5 @@ if __name__ == "__main__":
     wandb.agent(
         sweep_id=sweep_id,
         function=Sweeper(FLICKR8K_IMG_DIR, (FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV), FLICKR8K_DIR, PROJECT, TAGS, DEFAULT_CONFIG),
-        count=2
+        count=30
     )
