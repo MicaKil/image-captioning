@@ -12,6 +12,9 @@ class Sweeper(Runner):
     def __init__(self, img_dir: str, ds_splits: tuple[str, str, str], ds_dir: str, project: str, run_tags: list[str], run_config: dict):
         super().__init__(True, False, False, True, True, None, img_dir, ds_splits, ds_dir, project, run_tags, run_config)
 
+    def __call__(self, *args, **kwargs):
+        self.run()
+
     def run(self):
         num_workers = 4
         shuffle = True

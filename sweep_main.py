@@ -7,5 +7,8 @@ from scripts.sweeper.sweeper import Sweeper
 if __name__ == "__main__":
     sweep_id = wandb.sweep(sweep=SWEEP_CONFIG, project=PROJECT)
     print(f"Sweep id: {sweep_id}")
-    sweeper = Sweeper(FLICKR8K_IMG_DIR, (FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV), FLICKR8K_DIR, PROJECT, TAGS, DEFAULT_CONFIG)
-    wandb.agent(sweep_id=sweep_id, function=sweeper.run(), count=2)
+    wandb.agent(
+        sweep_id=sweep_id,
+        function=Sweeper(FLICKR8K_IMG_DIR, (FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV), FLICKR8K_DIR, PROJECT, TAGS, DEFAULT_CONFIG),
+        count=2
+    )
