@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
     "num_heads": 2 if TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.5,
     "dropout": 0.5,  # decoder dropout
-    "freeze_encoder": True,
+    "fine_tune_encoder": "partial",
     "encoder_lr": 0.0001,
     "decoder_lr": 0.001,
     "criterion": "CrossEntropyLoss",

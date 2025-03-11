@@ -34,7 +34,7 @@ RUN_CONFIG = {
     "num_heads": 4 if RUN_TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.4,
     "dropout": 0.5,  # decoder dropout
-    "freeze_encoder": True,
+    "fine_tune_encoder": "partial",
     "encoder_lr": 0.00001,
     "decoder_lr": 0.001,
     "criterion": "CrossEntropyLoss",

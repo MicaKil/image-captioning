@@ -221,18 +221,18 @@ class Runner:
         """
         match config["model"]:
             case "basic":
-                encoder = basic.Encoder(config["embed_size"], not config["freeze_encoder"])
+                encoder = basic.Encoder(config["embed_size"], config["fine_tune_encoder"])
                 decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
                 return basic.BasicImageCaptioner(encoder, decoder)
             case "intermediate":
-                encoder = intermediate.Encoder(config["embed_size"], config["encoder_dropout"], not config["freeze_encoder"])
+                encoder = intermediate.Encoder(config["embed_size"], config["encoder_dropout"], config["fine_tune_encoder"])
                 decoder = intermediate.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"],
                                                pad_idx)
                 return intermediate.IntermediateImageCaptioner(encoder, decoder)
             case "transformer":
                 return transformer.ImageCaptioningTransformer(vocab, config["hidden_size"], config["num_layers"], config["num_heads"],
                                                               self.calc_max_sequence_length(vocab), config["encoder_dropout"],
-                                                              config["dropout"], not config["freeze_encoder"])
+                                                              config["dropout"], config["fine_tune_encoder"])
             case _:
                 raise ValueError(f"Model {config['model']} not recognized")
 

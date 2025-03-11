@@ -13,7 +13,7 @@ class Encoder(nn.Module):
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
 
-    def __init__(self, embed_dim: int, dropout: float, fine_tune: bool) -> None:
+    def __init__(self, embed_dim: int, dropout: float, fine_tune: str) -> None:
         """
         Constructor for the EncoderResnet class
 
@@ -28,15 +28,7 @@ class Encoder(nn.Module):
             *list(self.resnet.children())[:-1]  # Remove the last FC layer (Classification layer)
         )
 
-        # Permanently mark the parameters so that gradients are not computed for them during the backward pass.
-        # This means that these parameters will not be updated during training.
-        for param in self.resnet.parameters():
-            param.requires_grad = False
-        if fine_tune:
-            # Unfreeze the last two layers of the ResNet-50 model
-            for layer in list(self.resnet.children())[-2:]:
-                for param in layer.parameters():
-                    param.requires_grad = True
+        self.set_requires_grad(fine_tune)
 
         # Add a linear layer to transform the features to the embedding size
         self.linear = nn.Sequential(
@@ -44,6 +36,30 @@ class Encoder(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout)
         )
+
+    def set_requires_grad(self, fine_tune: str) -> None:
+        """
+        Set the requires_grad attribute of the parameters based on the fine_tune argument.
+        :param fine_tune: String indicating the fine-tuning strategy. Can be "full", "partial", or "none".
+        :return:
+        """
+        match fine_tune:
+            case "full":
+                return
+            case "partial":
+                # Freeze all layers except the last two layers of the ResNet-50 model
+                for param in self.resnet.parameters():
+                    param.requires_grad = False
+                if fine_tune:
+                    # Unfreeze the last two layers of the ResNet-50 model
+                    for layer in list(self.resnet.children())[-2:]:
+                        for param in layer.parameters():
+                            param.requires_grad = True
+                return
+            case _:
+                for param in self.resnet.parameters():
+                    param.requires_grad = False
+                return
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         """
