@@ -21,7 +21,7 @@ PROJECT = "image-captioning-v1"
 RUN_TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-use_scheduler = False
+use_scheduler = True
 
 RUN_CONFIG = {
     "model": RUN_TAGS[0],
