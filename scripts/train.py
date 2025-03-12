@@ -188,6 +188,64 @@ def train_load(model: nn.Module, train_loader: CaptionLoader, device: torch.devi
     return train_loss / total_tokens if total_tokens > 0 else 0
 
 
+def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
+             vocab: Vocabulary, use_wandb: bool, run_config: dict) -> float:
+    """
+    Reinforcement learning training with CIDEr optimization
+    :param model:
+    :param train_loader:
+    :param device:
+    :param epoch:
+    :param criterion:
+    :param optimizer:
+    :param vocab:
+    :param use_wandb:
+    :param run_config:
+    :return:
+    """
+    model.train()
+    running_reward = 0.0
+    running_loss = 0.0
+    config = get_config(run_config, use_wandb)
+
+    batch_progress = tqdm(train_loader, desc="RL Training")
+    for images, _, images_id in batch_progress:
+        images = images.to(device)
+        optimizer.zero_grad()
+
+        # Generate captions using beam search
+        with torch.no_grad():
+            # features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int
+            generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, None, config["beam_size"], True)
+            # Get references and compute CIDEr scores
+            references = metrics.get_references(train_loader.annotations, images_id)
+            rewards = metrics.get_cider_score(generated, references)
+
+        # Convert rewards to tensor
+        rewards = torch.tensor(rewards, device=device)
+
+        # Normalize rewards
+        if config['rl_baseline']:
+            rewards = rewards - rewards.mean()
+
+        # Calculate loss
+        loss = -torch.mean(log_probs * rewards)
+
+        # Backpropagation
+        loss.backward()
+        if config['gradient_clip'] is not None:
+            nn.utils.clip_grad_norm_(model.parameters(), config['gradient_clip'])
+        optimizer.step()
+
+        # Update metrics
+        running_loss += loss.item()
+        running_reward += rewards.mean().item()
+        batch_progress.set_postfix({'loss': running_loss / (batch_progress.n + 1),
+                                    'reward': running_reward / (batch_progress.n + 1)})
+
+    return running_loss / len(train_loader)
+
+
 def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb: bool,
               run_config: dict) -> tuple[float | int, float | None]:
     """
