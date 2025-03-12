@@ -90,7 +90,7 @@ class Runner:
             if self.test_model:
                 # test last model
                 test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-                model.test_model(test_dataloader, DEVICE, save_dir, "last-model", self.use_wandb, config)
+                model.test_model(test_dataloader, DEVICE, save_dir, "LAST", self.use_wandb, config)
                 if self.use_wandb:
                     wandb.finish()
 
@@ -102,9 +102,9 @@ class Runner:
                     else:
                         config = self.run_config
                     best = self.get_model(config, vocab, pad_idx)
-                    best_checkpoint = torch.load(os.path.join(ROOT, best_path))
+                    best_checkpoint = torch.load(best_path)
                     best.load_state_dict(best_checkpoint["model_state"])
-                    best.test_model(test_dataloader, DEVICE, save_dir, "best-model", self.use_wandb, config)
+                    best.test_model(test_dataloader, DEVICE, save_dir, "BEST", self.use_wandb, config)
                     if self.use_wandb:
                         wandb.log({"epoch": best_state["epoch"],
                                    "train_loss": best_state["train_loss"],
@@ -329,7 +329,7 @@ def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Op
     :return:
     """
     if config["scheduler"] is not None:
-        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"])
+        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"], min_lr=1e-6)
         return SchedulerWrapper(scheduler, encoder_lr)
     return None
 

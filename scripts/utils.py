@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import torch
+import wandb
 from matplotlib import pyplot as plt
 
 
@@ -40,3 +41,17 @@ def date_str() -> str:
     :return: Current date as a string
     """
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def get_config(run_config: dict, use_wandb: bool):
+    """
+    Get the configuration for the run
+    :param run_config: Default configuration
+    :param use_wandb: Whether to use Weights & Biases
+    :return: The configuration for the run
+    """
+    if use_wandb:
+        config = wandb.config
+    else:
+        config = run_config
+    return config
