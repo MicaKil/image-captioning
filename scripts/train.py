@@ -110,8 +110,11 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         logger.info("Best model is the last model")
         return None, None, last_path
 
-    best_pth = best_pth.replace("LAST", "BEST")
-    return best_pth, best_state, last_path
+    # rename the best model so it includes the prefix BEST
+    best_pth_new = best_pth.replace("LAST", "BEST")
+    os.rename(best_pth, best_pth_new)
+
+    return best_pth_new, best_state, last_path
 
 
 def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: torch.optim, checkpoint_path: str) -> tuple[float, int, int]:
