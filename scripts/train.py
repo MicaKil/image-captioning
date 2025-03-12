@@ -7,9 +7,9 @@ import wandb
 from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
+import scripts.metrics as metrics
 from config.config import logger
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
-from scripts import test
 from scripts.caption import gen_caption, preprocess_image
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
@@ -208,7 +208,6 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
     val_ble4 = None
     all_hypotheses = []
     all_references = []
-    df = val_loader.annotations
     smoothing = SmoothingFunction().method1
     calc_bleu4 = config["validation"]["bleu4"] and (epoch == 0 or (epoch + 1) % config["validation"]["bleu4_step"] == 0)
 
@@ -226,15 +225,15 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
             total_tokens += num_tokens
 
             if calc_bleu4:
-                generated = test.gen_captions(model, vocab, device, images, use_wandb, run_config)
+                generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
                 all_hypotheses.extend(generated)
-                references = test.get_references(df, images_id)
+                references = metrics.get_references(val_loader.annotations, images_id)
                 all_references.extend(references)
 
             batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
     if calc_bleu4:
-        val_ble4 = test.get_bleu4_score(all_hypotheses, all_references, smoothing)
+        val_ble4 = metrics.get_bleu4_score(all_hypotheses, all_references, smoothing)
         if use_wandb:
             wandb.log({"val_BLEU-4": val_ble4})
 
@@ -290,7 +289,7 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     :return: Prints the sample caption
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
-    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])[0]
+    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)[0]
     logger.info(f"Sample caption: {caption}")
 
 
