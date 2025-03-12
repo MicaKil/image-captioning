@@ -30,9 +30,9 @@ RUN_CONFIG = {
     "batch_size": 64,
     "embed_size": None,
     "hidden_size": 512,
-    "num_layers": 2,
+    "num_layers": 3,
     "num_heads": 4 if RUN_TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.4,
+    "encoder_dropout": 0.1,
     "dropout": 0.5,  # decoder dropout
     "fine_tune_encoder": "partial",
     "encoder_lr": 0.00001,
@@ -56,14 +56,14 @@ RUN_CONFIG = {
     },
     "max_caption_len": 40,
     "temperature": 0,
-    "beam_size": 0,
+    "beam_size": 3,
     "scheduler": {
         "type": "ReduceLROnPlateau",
-        "factor": 0.9,
-        "patience": 2,
+        "factor": 0.5,
+        "patience": 5,
     } if use_scheduler else None,
     "validation": {
-        "bleu4": False,
-        "bleu4_step": None
+        "bleu4": True,
+        "bleu4_step": 5
     }
 }
