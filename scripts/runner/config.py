@@ -39,7 +39,7 @@ RUN_CONFIG = {
     "decoder_lr": 0.001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 1,
+    "max_epochs": 100,
     "patience": 20,
     "gradient_clip": 2.0,
     "dataset": {
