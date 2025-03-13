@@ -41,8 +41,8 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     if use_wandb:
         wandb.watch(model, criterion=criterion, log="all")
 
-    if config["validation"]["bleu4"] and (config["validation"]["bleu4_step"] is None or config["validation"]["bleu4_step"] < 1):
-        raise ValueError("eval_bleu4_step must be greater than 0 if eval_bleu4 is True")
+    if config["eval_bleu4"] and (config["eval_bleu4"]["step"] is None or config["eval_bleu4"]["step"] < 1):
+        raise ValueError("The evaluation step for BLEU-4 must be greater than 0 if enabled")
 
     logger.info(f"Start training model {model.__class__.__name__} for {config["max_epochs"]} {"epoch" if config["max_epochs"] == 1 else "epochs"}")
 
@@ -69,7 +69,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 
         last_state = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
-        if config["validation"]["bleu4"]:
+        if config["eval_bleu4"]:
             last_state["val_BLEU-4"] = val_bleu4
         if use_wandb:
             wandb.log(last_state)
@@ -272,7 +272,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
     all_hypotheses = []
     all_references = []
     smoothing = SmoothingFunction().method1
-    calc_bleu4 = config["validation"]["bleu4"] and (epoch == 0 or (epoch + 1) % config["validation"]["bleu4_step"] == 0)
+    calc_bleu4 = config["eval_bleu4"] and (epoch == 0 or (epoch + 1) % config["eval_bleu4"]["step"] == 0)
 
     val_loss = 0.0
     total_tokens = 0

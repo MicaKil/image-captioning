@@ -22,6 +22,7 @@ RUN_TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = True
+eval_bleu4 = False
 
 RUN_CONFIG = {
     "model": RUN_TAGS[0],
@@ -64,8 +65,7 @@ RUN_CONFIG = {
         "factor": 0.5,
         "patience": 5,
     } if use_scheduler else None,
-    "validation": {
-        "bleu4": True,
-        "bleu4_step": 5
-    }
+    "eval_bleu4": {
+        "step": 5
+    } if eval_bleu4 else None
 }
