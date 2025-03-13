@@ -56,7 +56,7 @@ RUN_CONFIG = {
         "tokenizer": "sp-bpe",
         "vocab_size": 3500
     },
-    "max_caption_len": 40,
+    "max_caption_len": 50,
     "temperature": 0,
     "beam_size": 3,
     "scheduler": {
