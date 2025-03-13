@@ -1,5 +1,6 @@
 from collections import Counter
 
+import sentencepiece as spm
 from nltk import word_tokenize, TreebankWordDetokenizer
 
 from config.config import logger
@@ -11,11 +12,12 @@ class Vocabulary:
     Vocabulary class that builds a vocabulary from a list of texts.
     """
 
-    def __init__(self, tokenizer, freq_threshold: int, text_list: list[str] = None):
+    def __init__(self, tokenizer, freq_threshold: int, text: list[str] = None, sp_model_path=None):
         """
         :param tokenizer:
         :param freq_threshold: Minimum frequency of a word to be included in the vocabulary
-        :param text_list: List of texts to build the vocabulary from
+        :param text: List of texts to build the vocabulary from
+        :param sp_model_path:
         """
         self.tokenizer = tokenizer
         self.freq_threshold = freq_threshold
@@ -23,17 +25,25 @@ class Vocabulary:
         self.itos_dict = {0: PAD, 1: SOS, 2: EOS, 3: UNK}  # index to string
         self.word_counts = Counter()
 
-        if text_list is not None:
-            self.build_vocab(text_list)
+        if tokenizer == "word" and text is not None:
+            self.build_vocab(text)
+        if tokenizer == "sp-bpe" and sp_model_path is not None:
+            sp = spm.SentencePieceProcessor()
+            self.sp_model = sp.load(sp_model_path)
 
-    @staticmethod
-    def tokenize_eng(text: str) -> list[str]:
+    def tokenize(self, text: str) -> list[str]:
         """
         Tokenize an English text.
         :param text: English text
         :return: List of word tokens
         """
-        return word_tokenize(text.lower())
+        match self.tokenizer:
+            case "word":
+                return word_tokenize(text.lower())
+            case "sp-bpe":
+                return self.sp_model.encode_as_pieces(text)
+            case _:
+                raise ValueError("Invalid tokenizer type.")
 
     def build_vocab(self, text_list: list[str]):
         """
@@ -43,7 +53,7 @@ class Vocabulary:
         """
         logger.info("Building vocabulary.")
         for text in text_list:
-            self.word_counts.update(self.tokenize_eng(text))
+            self.word_counts.update(self.tokenize(text))
 
         idx = 4
         for word, count in self.word_counts.items():
@@ -61,7 +71,13 @@ class Vocabulary:
         :param text: Input text
         :return: A list of word indices
         """
-        return [self.str_to_idx(word) for word in self.tokenize_eng(text)]
+        match self.tokenizer:
+            case "word":
+                return [self.str_to_idx(word) for word in self.tokenize(text)]
+            case "sp-bpe":
+                return self.sp_model.encode_as_ids(text)
+            case _:
+                raise ValueError("Invalid tokenizer type.")
 
     def str_to_idx(self, word: str) -> int:
         """
@@ -69,7 +85,13 @@ class Vocabulary:
         :param word: Word to convert
         :return: Index of the word or the index of UNK if the word is not in the vocabulary
         """
-        return self.stoi_dict.get(word, self.stoi_dict[UNK])
+        match self.tokenizer:
+            case "word":
+                return self.stoi_dict.get(word, self.stoi_dict[UNK])
+            case "sp-bpe":
+                return self.sp_model.piece_to_id(word)
+            case _:
+                raise ValueError("Invalid tokenizer type.")
 
     def encode_as_words(self, idxs: list[int]) -> str:
         """
@@ -77,8 +99,13 @@ class Vocabulary:
         :param idxs: List of indices to convert
         :return: Text corresponding to the indices
         """
-        return TreebankWordDetokenizer().detokenize(
-            [self.idx_to_str(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
+        match self.tokenizer:
+            case "word":
+                return TreebankWordDetokenizer().detokenize([self.idx_to_str(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
+            case "sp-bpe":
+                return self.sp_model.decode_ids(idxs)
+            case _:
+                raise ValueError("Invalid tokenizer type.")
 
     def idx_to_str(self, idx: int) -> str:
         """
@@ -86,7 +113,23 @@ class Vocabulary:
         :param idx: Index to convert
         :return: Word corresponding to the index or UNK if the index is not in the vocabulary
         """
-        return self.itos_dict.get(idx, UNK)
+        match self.tokenizer:
+            case "word":
+                return self.itos_dict.get(idx, UNK)
+            case "sp-bpe":
+                return self.sp_model.id_to_piece(idx)
+            case _:
+                raise ValueError("Invalid tokenizer type.")
+
+    def get_state_dict(self) -> dict:
+        if self.tokenizer == "word":
+            return {
+                "str_to_idx": self.stoi_dict,
+                "idx_to_str": self.itos_dict,
+                "word_counts": self.word_counts,
+                "freq_threshold": self.freq_threshold
+            }
+        raise ValueError("Invalid tokenizer type.")
 
     def load_dict(self, state_dict: dict):
         """
@@ -94,6 +137,10 @@ class Vocabulary:
         :param state_dict: State dictionary
         :return: None
         """
+
+        if self.tokenizer != "word":
+            raise ValueError("Invalid tokenizer type.")
+
         self.stoi_dict = state_dict["str_to_idx"]
         self.itos_dict = state_dict["idx_to_str"]
         self.word_counts = state_dict["word_counts"]

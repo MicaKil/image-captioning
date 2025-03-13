@@ -314,9 +314,9 @@ class Runner:
         :return: Maximum sequence length
         """
         train_df, val_df, test_df = self.get_dataframes()
-        max_len = max(train_df["caption"].apply(lambda x: len(vocab.tokenize_eng(x))).max(),
-                      val_df["caption"].apply(lambda x: len(vocab.tokenize_eng(x))).max(),
-                      test_df["caption"].apply(lambda x: len(vocab.tokenize_eng(x))).max())
+        max_len = max(train_df["caption"].apply(lambda x: len(vocab.tokenize(x))).max(),
+                      val_df["caption"].apply(lambda x: len(vocab.tokenize(x))).max(),
+                      test_df["caption"].apply(lambda x: len(vocab.tokenize(x))).max())
         return max_len + 2  # add 2 for start and end tokens
 
 
