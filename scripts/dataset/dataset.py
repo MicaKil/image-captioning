@@ -46,7 +46,7 @@ class CaptionDataset(Dataset):
         if self.transform:
             img = self.transform(img)
 
-        caption = [self.vocab.to_idx(SOS)] + self.vocab.to_idx_list(self.captions[idx]) + [self.vocab.to_idx(EOS)]
+        caption = [self.vocab.str_to_idx(SOS)] + self.vocab.encode_as_ids(self.captions[idx]) + [self.vocab.str_to_idx(EOS)]
         caption = torch.tensor(caption, dtype=torch.long)
 
         if self.target_transform:

@@ -66,7 +66,7 @@ class Runner:
             config = self.run_config
 
         train_dataset, val_dataset, test_dataset, vocab = self.get_ds(config, date)
-        pad_idx = vocab.to_idx(PAD)
+        pad_idx = vocab.str_to_idx(PAD)
         model = self.get_model(config, vocab, pad_idx)
         save_dir = RESULTS_DIR + config["model"]
 
@@ -163,11 +163,11 @@ class Runner:
             train_df, val_df, test_df = self.get_dataframes()
 
         vocab_file = f"vocab_freq-{config["vocab"]["freq_threshold"]}.pt"
-        if vocab_file in os.listdir(os.path.join(ROOT, self.ds_dir)): # check if vocab file exists
-            vocab = Vocabulary(config["vocab"]["freq_threshold"])
+        if vocab_file in os.listdir(os.path.join(ROOT, self.ds_dir)):  # check if vocab file exists
+            vocab = Vocabulary("word", config["vocab"]["freq_threshold"])
             vocab.load_dict(torch.load(os.path.join(ROOT, self.ds_dir, vocab_file)))
         else:
-            vocab = Vocabulary(config["vocab"]["freq_threshold"], train_df["caption"])
+            vocab = Vocabulary("word", config["vocab"]["freq_threshold"], train_df["caption"])
 
         train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
         val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
@@ -178,8 +178,8 @@ class Runner:
             self.save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)
             # save vocab to disk
             vocab_dict = {
-                "str_to_idx": vocab.str_to_idx,
-                "idx_to_str": vocab.idx_to_str,
+                "str_to_idx": vocab.stoi_dict,
+                "idx_to_str": vocab.itos_dict,
                 "word_counts": vocab.word_counts,
                 "freq_threshold": vocab.freq_threshold
             }
@@ -329,7 +329,8 @@ def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Op
     :return:
     """
     if config["scheduler"] is not None:
-        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"], min_lr=1e-6)
+        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"],
+                                      min_lr=1e-6)
         return SchedulerWrapper(scheduler, encoder_lr)
     return None
 

@@ -271,7 +271,7 @@ class Output(nn.Module):
         # Transform word counts to indices counts
         idx_counts = Counter()
         for word, count in self.vocab.word_counts.items():
-            idx_counts[self.vocab.to_idx(word)] = count
+            idx_counts[self.vocab.str_to_idx(word)] = count
         # Ensure banned tokens are not counted
         for idx in self.banned_indices:
             idx_counts[idx] = 0
@@ -325,7 +325,7 @@ class ImageCaptioningTransformer(nn.Module):
         self.max_length = max_length
         self.encoder = Encoder(hidden_size, encoder_dropout, fine_tune_encoder)
 
-        self.seq_embedding = SeqEmbedding(len(vocab), max_length, hidden_size, vocab.to_idx(PAD))
+        self.seq_embedding = SeqEmbedding(len(vocab), max_length, hidden_size, vocab.str_to_idx(PAD))
 
         self.decoder_layers = nn.ModuleList([
             DecoderLayer(hidden_size, num_heads, decoder_dropout)
@@ -333,7 +333,7 @@ class ImageCaptioningTransformer(nn.Module):
         ])
 
         # Output layer with smart initialization
-        self.output_layer = Output(hidden_size, vocab, [vocab.to_idx(token) for token in [PAD, SOS, UNK]])
+        self.output_layer = Output(hidden_size, vocab, [vocab.str_to_idx(token) for token in [PAD, SOS, UNK]])
         self.output_layer.adapt()  # Initialize output layer bias
 
     def forward(self, images: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
@@ -422,7 +422,7 @@ class ImageCaptioningTransformer(nn.Module):
         """
         # tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
         batch_size = features.size(0)
-        tokens = torch.full((batch_size, 1), vocab.to_idx(SOS), device=features.device)
+        tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
 
         for _ in range(max_length):
@@ -438,16 +438,16 @@ class ImageCaptioningTransformer(nn.Module):
                 next_tokens = torch.multinomial(probs, 1)
 
             # Mask finished sequences
-            next_tokens = torch.where(finished.unsqueeze(-1), vocab.to_idx(PAD), next_tokens)
+            next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens)
             tokens = torch.cat([tokens, next_tokens], dim=1)
 
             # Update finished flags
-            finished = finished | (next_tokens.squeeze() == vocab.to_idx(EOS))
+            finished = finished | (next_tokens.squeeze() == vocab.str_to_idx(EOS))
 
             if finished.all():
                 break
 
-        return [vocab.to_text(seq.tolist()) for seq in tokens]
+        return [vocab.encode_as_words(seq.tolist()) for seq in tokens]
 
     def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int,
                     return_log_probs: bool = False) -> tuple[list[str], Tensor] | list[str]:
@@ -463,8 +463,8 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         batch_size = features.size(0)
-        sos_idx = vocab.to_idx(SOS)
-        eos_idx = vocab.to_idx(EOS)
+        sos_idx = vocab.str_to_idx(SOS)
+        eos_idx = vocab.str_to_idx(EOS)
 
         captions = []
         all_probs = []  # To store log probabilities for each sequence
@@ -506,7 +506,7 @@ class ImageCaptioningTransformer(nn.Module):
 
             # Select best beam
             best_beam = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))
-            captions.append(vocab.to_text(best_beam[1]))
+            captions.append(vocab.encode_as_words(best_beam[1]))
             all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
 
         if return_log_probs:

@@ -11,14 +11,16 @@ class Vocabulary:
     Vocabulary class that builds a vocabulary from a list of texts.
     """
 
-    def __init__(self, freq_threshold: int, text_list: list[str] = None):
+    def __init__(self, tokenizer, freq_threshold: int, text_list: list[str] = None):
         """
+        :param tokenizer:
         :param freq_threshold: Minimum frequency of a word to be included in the vocabulary
         :param text_list: List of texts to build the vocabulary from
         """
+        self.tokenizer = tokenizer
         self.freq_threshold = freq_threshold
-        self.str_to_idx = {PAD: 0, SOS: 1, EOS: 2, UNK: 3}
-        self.idx_to_str = {0: PAD, 1: SOS, 2: EOS, 3: UNK}
+        self.stoi_dict = {PAD: 0, SOS: 1, EOS: 2, UNK: 3}  # string to index
+        self.itos_dict = {0: PAD, 1: SOS, 2: EOS, 3: UNK}  # index to string
         self.word_counts = Counter()
 
         if text_list is not None:
@@ -46,45 +48,45 @@ class Vocabulary:
         idx = 4
         for word, count in self.word_counts.items():
             if count >= self.freq_threshold:
-                self.str_to_idx[word] = idx
-                self.idx_to_str[idx] = word
+                self.stoi_dict[word] = idx
+                self.itos_dict[idx] = word
                 idx += 1
 
         self.word_counts[SOS] = len(text_list)
         self.word_counts[EOS] = len(text_list)
 
-    def to_idx_list(self, text: str) -> list[int]:
+    def encode_as_ids(self, text: str) -> list[int]:
         """
         Convert a text to a list of word indices.
         :param text: Input text
         :return: A list of word indices
         """
-        return [self.to_idx(word) for word in self.tokenize_eng(text)]
+        return [self.str_to_idx(word) for word in self.tokenize_eng(text)]
 
-    def to_idx(self, word: str) -> int:
+    def str_to_idx(self, word: str) -> int:
         """
         Convert a string to its index.
         :param word: Word to convert
         :return: Index of the word or the index of UNK if the word is not in the vocabulary
         """
-        return self.str_to_idx.get(word, self.str_to_idx[UNK])
+        return self.stoi_dict.get(word, self.stoi_dict[UNK])
 
-    def to_text(self, idxs: list[int]) -> str:
+    def encode_as_words(self, idxs: list[int]) -> str:
         """
         Convert a list of indices to text.
         :param idxs: List of indices to convert
         :return: Text corresponding to the indices
         """
         return TreebankWordDetokenizer().detokenize(
-            [self.to_word(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
+            [self.idx_to_str(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
 
-    def to_word(self, idx: int) -> str:
+    def idx_to_str(self, idx: int) -> str:
         """
         Convert an index to its word.
         :param idx: Index to convert
         :return: Word corresponding to the index or UNK if the index is not in the vocabulary
         """
-        return self.idx_to_str.get(idx, UNK)
+        return self.itos_dict.get(idx, UNK)
 
     def load_dict(self, state_dict: dict):
         """
@@ -92,8 +94,8 @@ class Vocabulary:
         :param state_dict: State dictionary
         :return: None
         """
-        self.str_to_idx = state_dict["str_to_idx"]
-        self.idx_to_str = state_dict["idx_to_str"]
+        self.stoi_dict = state_dict["str_to_idx"]
+        self.itos_dict = state_dict["idx_to_str"]
         self.word_counts = state_dict["word_counts"]
         self.freq_threshold = state_dict["freq_threshold"]
 
@@ -102,11 +104,11 @@ class Vocabulary:
         Return a string representation of the vocabulary.
         :return: String representation of the vocabulary
         """
-        return str({word: self.word_counts[word] for _, word in self.idx_to_str.items()})
+        return str({word: self.word_counts[word] for _, word in self.itos_dict.items()})
 
     def __len__(self):
         """
         Return the size of the vocabulary.
         :return: Size of the vocabulary
         """
-        return len(self.str_to_idx)
+        return len(self.stoi_dict)

@@ -62,7 +62,7 @@ class ImageCaptioner(nn.Module):
         """
         batch_size = features.size(0)
         # caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
-        captions = torch.full((batch_size, 1), vocab.to_idx(SOS), dtype=torch.long, device=device)
+        captions = torch.full((batch_size, 1), vocab.str_to_idx(SOS), dtype=torch.long, device=device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
         for _ in range(max_length):
@@ -79,14 +79,14 @@ class ImageCaptioner(nn.Module):
                 next_tokens = torch.multinomial(probs, 1)
 
             # Mask finished sequences
-            next_tokens = torch.where(finished.unsqueeze(1), torch.full_like(next_tokens, vocab.to_idx(PAD)), next_tokens)
+            next_tokens = torch.where(finished.unsqueeze(1), torch.full_like(next_tokens, vocab.str_to_idx(PAD)), next_tokens)
             captions = torch.cat([captions, next_tokens], dim=1)
 
             # Update finished flags
-            finished = finished | (next_tokens.squeeze() == vocab.to_idx(EOS))
+            finished = finished | (next_tokens.squeeze() == vocab.str_to_idx(EOS))
             if finished.all():
                 break
-        return [vocab.to_text(caption.tolist()) for caption in captions]
+        return [vocab.encode_as_words(caption.tolist()) for caption in captions]
 
     def beam_search(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int, beam_size: int) -> list[str]:
         """
@@ -100,8 +100,8 @@ class ImageCaptioner(nn.Module):
         :return: Generated caption as a list of token indices
         """
         batch_size = features.size(0)
-        sos_idx = vocab.to_idx(SOS)
-        eos_idx = vocab.to_idx(EOS)
+        sos_idx = vocab.str_to_idx(SOS)
+        eos_idx = vocab.str_to_idx(EOS)
         captions = []
 
         for i in range(batch_size):
@@ -139,7 +139,7 @@ class ImageCaptioner(nn.Module):
 
             # Get best sequence
             best_seq = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))[1]
-            captions.append(vocab.to_text(best_seq))
+            captions.append(vocab.encode_as_words(best_seq))
 
         return captions
 
