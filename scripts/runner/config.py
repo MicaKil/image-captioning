@@ -52,7 +52,9 @@ RUN_CONFIG = {
         }
     },
     "vocab": {
-        "freq_threshold": 3
+        "freq_threshold": None,
+        "tokenizer": "sp-bpe",
+        "vocab_size": 3500
     },
     "max_caption_len": 40,
     "temperature": 0,

@@ -12,7 +12,7 @@ class Vocabulary:
     Vocabulary class that builds a vocabulary from a list of texts.
     """
 
-    def __init__(self, tokenizer, freq_threshold: int, text: list[str] = None, sp_model_path=None):
+    def __init__(self, tokenizer: str, freq_threshold: int, text: list[str] = None, sp_model_path: str = None):
         """
         :param tokenizer:
         :param freq_threshold: Minimum frequency of a word to be included in the vocabulary

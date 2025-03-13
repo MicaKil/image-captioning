@@ -162,12 +162,21 @@ class Runner:
         else:
             train_df, val_df, test_df = self.get_dataframes()
 
-        vocab_file = f"vocab_freq-{config["vocab"]["freq_threshold"]}.pt"
-        if vocab_file in os.listdir(os.path.join(ROOT, self.ds_dir)):  # check if vocab file exists
-            vocab = Vocabulary("word", config["vocab"]["freq_threshold"])
-            vocab.load_dict(torch.load(os.path.join(ROOT, self.ds_dir, vocab_file)))
-        else:
-            vocab = Vocabulary("word", config["vocab"]["freq_threshold"], train_df["caption"])
+        tokenizer = config["vocab"]["tokenizer"]
+        freq_threshold = config["vocab"]["freq_threshold"]
+        match tokenizer:
+            case "word":
+                vocab_file = f"vocab_freq-{freq_threshold}.pt"
+                if vocab_file in os.listdir(os.path.join(ROOT, self.ds_dir)):  # check if vocab file exists
+                    vocab = Vocabulary(tokenizer, freq_threshold, sp_model_path=None)
+                    vocab.load_dict(torch.load(os.path.join(ROOT, self.ds_dir, vocab_file)))
+                else:
+                    vocab = Vocabulary(tokenizer, freq_threshold, train_df["caption"], None)
+            case "sp-bpe":
+                sp_model = os.path.join(ROOT, self.ds_dir, f"{config["dataset"]["name"]}.model")
+                vocab = Vocabulary(tokenizer, freq_threshold, text=None, sp_model_path=sp_model)
+            case _:
+                raise ValueError("Invalid tokenizer type.")
 
         train_dataset = CaptionDataset(img_dir, train_df, vocab, transform=TRANSFORM)
         val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
