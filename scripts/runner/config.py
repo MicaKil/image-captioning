@@ -18,7 +18,7 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-RUN_TAGS = ["transformer", "flickr8k"]
+RUN_TAGS = ["transformer", "coco"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = True
