@@ -151,14 +151,6 @@ class Runner:
         img_dir = os.path.join(ROOT, self.img_dir)
         if self.create_ds:
             raise NotImplementedError("Creating new datasets is being refactored.")
-            # df_captions = load_flickr_captions( (os.path.join(ROOT, FLICKR8K_ANN_FILE)), True)
-            # total_size = len(df_captions["image_id"].unique())
-            # train_size = int((config["dataset"]["split"]["train"] / 100) * total_size)
-            # val_size = int((config["dataset"]["split"]["val"] / 100) * total_size)
-            # test_size = total_size - train_size - val_size
-            # train_df, val_df, test_df = split_dataframe(df_captions, [train_size, val_size, test_size])
-            # if save_ds:
-            #     save_df(config, date, test_df, train_df, val_df)  # save new dataframes to disk
         else:
             train_df, val_df, test_df = self.get_dataframes()
 
@@ -228,20 +220,26 @@ class Runner:
         :param pad_idx: Index of the padding token
         :return:
         """
+        embed_dim = config["embed_size"]
+        fine_tune = config["fine_tune_encoder"]
+        hidden_size = config["hidden_size"]
+        decoder_dropout = config["dropout"]
+        encoder_dropout = config["encoder_dropout"]
+        num_layers = config["num_layers"]
         match config["model"]:
             case "basic":
-                encoder = basic.Encoder(config["embed_size"], config["fine_tune_encoder"])
-                decoder = basic.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"], pad_idx)
+                encoder = basic.Encoder(embed_dim, fine_tune)
+                decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
                 return basic.BasicImageCaptioner(encoder, decoder)
             case "intermediate":
-                encoder = intermediate.Encoder(config["embed_size"], config["encoder_dropout"], config["fine_tune_encoder"])
-                decoder = intermediate.Decoder(config["embed_size"], config["hidden_size"], len(vocab), config["dropout"], config["num_layers"],
+                encoder = intermediate.Encoder(embed_dim, encoder_dropout, fine_tune)
+                decoder = intermediate.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers,
                                                pad_idx)
                 return intermediate.IntermediateImageCaptioner(encoder, decoder)
             case "transformer":
-                return transformer.ImageCaptioningTransformer(vocab, config["hidden_size"], config["num_layers"], config["num_heads"],
-                                                              self.calc_max_sequence_length(vocab), config["encoder_dropout"],
-                                                              config["dropout"], config["fine_tune_encoder"])
+                return transformer.ImageCaptioningTransformer(vocab, hidden_size, num_layers, config["num_heads"],
+                                                              self.calc_max_sequence_length(vocab), encoder_dropout,
+                                                              decoder_dropout, fine_tune)
             case _:
                 raise ValueError(f"Model {config['model']} not recognized")
 
@@ -255,11 +253,12 @@ class Runner:
         :param val_df: Validation dataframe to be saved
         :return:
         """
-        train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{config['dataset']['split']['train']}.csv"), header=["image_id", "caption"],
+        dataset_splits = config['dataset']['split']
+        train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{dataset_splits['train']}.csv"), header=["image_id", "caption"],
                         index=False)
-        val_df.to_csv(os.path.join(ROOT, self.ds_dir, f"val_{date}_{config['dataset']['split']['val']}.csv"), header=["image_id", "caption"],
+        val_df.to_csv(os.path.join(ROOT, self.ds_dir, f"val_{date}_{dataset_splits['val']}.csv"), header=["image_id", "caption"],
                       index=False)
-        test_df.to_csv(os.path.join(ROOT, self.ds_dir, f"test_{date}_{config['dataset']['split']['test']}.csv"), header=["image_id", "caption"],
+        test_df.to_csv(os.path.join(ROOT, self.ds_dir, f"test_{date}_{dataset_splits['test']}.csv"), header=["image_id", "caption"],
                        index=False)
 
     def save_datasets(self, full_dataset: Optional[CaptionDataset], train_dataset: CaptionDataset, val_dataset: CaptionDataset,
@@ -276,9 +275,10 @@ class Runner:
         """
         if full_dataset is not None:
             torch.save(full_dataset, os.path.join(ROOT, f"{self.ds_dir}/full_dataset_{date}.pt"))
-        torch.save(train_dataset, os.path.join(ROOT, f"{self.ds_dir}/train_{date}_{config["dataset"]["split"]["train"]}.pt"))
-        torch.save(val_dataset, os.path.join(ROOT, f"{self.ds_dir}/val_{date}_{config["dataset"]["split"]["val"]}.pt"))
-        torch.save(test_dataset, os.path.join(ROOT, f"{self.ds_dir}/test_{date}_{config["dataset"]["split"]["test"]}.pt"))
+        dataset_splits = config["dataset"]["split"]
+        torch.save(train_dataset, os.path.join(ROOT, f"{self.ds_dir}/train_{date}_{dataset_splits["train"]}.pt"))
+        torch.save(val_dataset, os.path.join(ROOT, f"{self.ds_dir}/val_{date}_{dataset_splits["val"]}.pt"))
+        torch.save(test_dataset, os.path.join(ROOT, f"{self.ds_dir}/test_{date}_{dataset_splits["test"]}.pt"))
 
     def log_datasets(self, date: str, has_full_ds: bool):
         """
@@ -288,22 +288,25 @@ class Runner:
         :return:
         """
         config = wandb.config
+        dataset_name = config["dataset"]["name"]
+        dataset_version = config["dataset"]["version"]
         if has_full_ds:
             self.log_dataset(
-                wandb.Artifact(f"{config["dataset"]["name"]}_full_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
+                wandb.Artifact(f"{dataset_name}_full_dataset", type="dataset", metadata={"version": dataset_version}),
                 os.path.join(ROOT, f"{self.ds_dir}/full_dataset_{date}.pt")
             )
+        dataset_splits = config["dataset"]["split"]
         self.log_dataset(
-            wandb.Artifact(f"{config["dataset"]["name"]}_train_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-            os.path.join(ROOT, f"{self.ds_dir}/train_{date}_{config["dataset"]["split"]["train"]}.pt")
+            wandb.Artifact(f"{dataset_name}_train_dataset", type="dataset", metadata={"version": dataset_version}),
+            os.path.join(ROOT, f"{self.ds_dir}/train_{date}_{dataset_splits["train"]}.pt")
         )
         self.log_dataset(
-            wandb.Artifact(f"{config["dataset"]["name"]}_val_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-            os.path.join(ROOT, f"{self.ds_dir}/val_{date}_{config["dataset"]["split"]["val"]}.pt")
+            wandb.Artifact(f"{dataset_name}_val_dataset", type="dataset", metadata={"version": dataset_version}),
+            os.path.join(ROOT, f"{self.ds_dir}/val_{date}_{dataset_splits["val"]}.pt")
         )
         self.log_dataset(
-            wandb.Artifact(f"{config["dataset"]["name"]}_test_dataset", type="dataset", metadata={"version": config["dataset"]["version"]}),
-            os.path.join(ROOT, f"{self.ds_dir}/test_{date}_{config["dataset"]["split"]["test"]}.pt")
+            wandb.Artifact(f"{dataset_name}_test_dataset", type="dataset", metadata={"version": dataset_version}),
+            os.path.join(ROOT, f"{self.ds_dir}/test_{date}_{dataset_splits["test"]}.pt")
         )
 
     @staticmethod
@@ -337,8 +340,9 @@ def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Op
     :param encoder_lr: The initial learning rate for the encoder
     :return:
     """
-    if config["scheduler"] is not None:
-        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=config["scheduler"]["factor"], patience=config["scheduler"]["patience"],
+    scheduler = config["scheduler"]
+    if scheduler is not None:
+        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=scheduler["factor"], patience=scheduler["patience"],
                                       min_lr=1e-6)
         return SchedulerWrapper(scheduler, encoder_lr)
     return None
@@ -351,18 +355,20 @@ def get_optimizer(config: dict, model: nn.Module) -> torch.optim:
     :param model: The model to be trained
     :return:
     """
+    encoder_lr = config["encoder_lr"]
+    decoder_lr = config["decoder_lr"]
     match config["model"]:
         case "basic", "intermediate":
             params = [
-                {"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
-                {"params": model.decoder.parameters(), "lr": config["decoder_lr"]}
+                {"params": model.encoder.parameters(), "lr": encoder_lr},
+                {"params": model.decoder.parameters(), "lr": decoder_lr}
             ]
         case "transformer":
             params = [
-                {"params": model.encoder.parameters(), "lr": config["encoder_lr"]},
-                {"params": model.seq_embedding.parameters(), "lr": config["decoder_lr"]},
-                {"params": model.decoder_layers.parameters(), "lr": config["decoder_lr"]},
-                {"params": model.output_layer.parameters(), "lr": config["decoder_lr"]}
+                {"params": model.encoder.parameters(), "lr": encoder_lr},
+                {"params": model.seq_embedding.parameters(), "lr": decoder_lr},
+                {"params": model.decoder_layers.parameters(), "lr": decoder_lr},
+                {"params": model.output_layer.parameters(), "lr": decoder_lr}
             ]
         case _:
             raise ValueError(f"Model {config['model']} not recognized")
