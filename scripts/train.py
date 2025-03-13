@@ -64,7 +64,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
         if not use_rl:
             avg_train_loss = train_xe(model, train_loader, device, epoch, criterion, optimizer, use_wandb, run_config)
         else:
-            avg_train_loss = train_rl(model, train_loader, device, epoch, criterion, optimizer, use_wandb, run_config)
+            avg_train_loss = train_rl(model, train_loader, device, epoch, optimizer, use_wandb, run_config)
         avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, use_wandb, run_config)
 
         if val_bleu4 is not None:
@@ -205,15 +205,14 @@ def train_xe(model: nn.Module, train_loader: CaptionLoader, device: torch.device
     return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
-             use_wandb: bool, run_config: dict) -> float:
+def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, optimizer: torch.optim, use_wandb: bool,
+             run_config: dict) -> float:
     """
     Reinforcement learning training with CIDEr optimization
     :param model:
     :param train_loader:
     :param device:
     :param epoch:
-    :param criterion:
     :param optimizer:
     :param use_wandb:
     :param run_config:
@@ -233,7 +232,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         # Generate captions using beam search
         with torch.no_grad():
             # features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int
-            generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, None, config["beam_size"], True)
+            generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1)
             # Get references and compute CIDEr scores
             references = metrics.get_references(train_loader.annotations, images_id)
             _, rewards = metrics.get_cider_score(generated, references)
@@ -257,8 +256,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         # Update metrics
         running_loss += loss.item()
         running_reward += rewards.mean().item()
-        batch_progress.set_postfix({'loss': running_loss / (batch_progress.n + 1),
-                                    'reward': running_reward / (batch_progress.n + 1)})
+        batch_progress.set_postfix({'loss': running_loss / (batch_progress.n + 1), 'reward': running_reward / (batch_progress.n + 1)})
 
     return running_loss / len(train_loader)
 
@@ -300,7 +298,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
             total_tokens += num_tokens
 
             if calc_bleu4:
-                generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
+                generated, _ = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
                 all_hypotheses.extend(generated)
                 references = metrics.get_references(val_loader.annotations, images_id)
                 all_references.extend(references)
@@ -364,7 +362,7 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     :return: Prints the sample caption
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
-    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)[0]
+    caption, _ = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])[0]
     logger.info(f"Sample caption: {caption}")
 
 
