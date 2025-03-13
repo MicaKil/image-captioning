@@ -40,7 +40,7 @@ RUN_CONFIG = {
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
     "max_epochs": 100,
-    "patience": 20,
+    "patience": 10,
     "gradient_clip": 2.0,
     "dataset": {
         "name": "flickr8k",
