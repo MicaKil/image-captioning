@@ -316,7 +316,7 @@ class Runner:
         artifact.add_file(dataset_path)
         wandb.log_artifact(artifact)
 
-    def calc_max_sequence_length(self, vocab):
+    def calc_max_sequence_length(self, vocab: Vocabulary):
         """
         Calculate the maximum sequence length in the dataset
         :param vocab:

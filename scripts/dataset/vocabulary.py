@@ -35,7 +35,7 @@ class Vocabulary:
 
     def tokenize(self, text: str) -> list[str]:
         """
-        Tokenize an English text.
+        Tokenize a text.
         :param text: English text
         :return: List of word tokens
         """
@@ -160,4 +160,10 @@ class Vocabulary:
         Return the size of the vocabulary.
         :return: Size of the vocabulary
         """
-        return len(self.stoi_dict)
+        match self.tokenizer:
+            case "word":
+                return len(self.stoi_dict)
+            case "sp-bpe":
+                return self.sp.get_piece_size()
+            case _:
+                raise ValueError("Invalid tokenizer type.")
