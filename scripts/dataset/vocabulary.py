@@ -24,12 +24,14 @@ class Vocabulary:
         self.stoi_dict = {PAD: 0, SOS: 1, EOS: 2, UNK: 3}  # string to index
         self.itos_dict = {0: PAD, 1: SOS, 2: EOS, 3: UNK}  # index to string
         self.word_counts = Counter()
+        self.sp = None
 
         if tokenizer == "word" and text is not None:
             self.build_vocab(text)
         if tokenizer == "sp-bpe" and sp_model_path is not None:
             sp = spm.SentencePieceProcessor()
-            self.sp_model = sp.load(sp_model_path)
+            sp.load(sp_model_path)
+            self.sp = sp
 
     def tokenize(self, text: str) -> list[str]:
         """
@@ -41,7 +43,7 @@ class Vocabulary:
             case "word":
                 return word_tokenize(text.lower())
             case "sp-bpe":
-                return self.sp_model.encode_as_pieces(text)
+                return self.sp.encode_as_pieces(text)
             case _:
                 raise ValueError("Invalid tokenizer type.")
 
@@ -75,7 +77,7 @@ class Vocabulary:
             case "word":
                 return [self.str_to_idx(word) for word in self.tokenize(text)]
             case "sp-bpe":
-                return self.sp_model.encode_as_ids(text)
+                return self.sp.encode_as_ids(text)
             case _:
                 raise ValueError("Invalid tokenizer type.")
 
@@ -89,7 +91,7 @@ class Vocabulary:
             case "word":
                 return self.stoi_dict.get(word, self.stoi_dict[UNK])
             case "sp-bpe":
-                return self.sp_model.piece_to_id(word)
+                return self.sp.piece_to_id(word)
             case _:
                 raise ValueError("Invalid tokenizer type.")
 
@@ -103,7 +105,7 @@ class Vocabulary:
             case "word":
                 return TreebankWordDetokenizer().detokenize([self.idx_to_str(int(idx)) for idx in idxs if int(idx) not in [0, 1, 2]])
             case "sp-bpe":
-                return self.sp_model.decode_ids(idxs)
+                return self.sp.decode_ids(idxs)
             case _:
                 raise ValueError("Invalid tokenizer type.")
 
@@ -117,7 +119,7 @@ class Vocabulary:
             case "word":
                 return self.itos_dict.get(idx, UNK)
             case "sp-bpe":
-                return self.sp_model.id_to_piece(idx)
+                return self.sp.id_to_piece(idx)
             case _:
                 raise ValueError("Invalid tokenizer type.")
 
