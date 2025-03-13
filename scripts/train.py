@@ -14,11 +14,12 @@ from scripts.caption import gen_caption, preprocess_image
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.runner.config import TRANSFORM
+from scripts.scheduler import SchedulerWrapper
 from scripts.utils import time_str, get_config
 
 
 def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module,
-          optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict,
+          optimizer: torch.optim, scheduler: SchedulerWrapper, checkpoint_dir: str, use_wandb: bool, run_config: dict,
           resume_checkpoint: str) -> tuple:
     """
     Training loop for the model.
@@ -75,7 +76,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
         if scheduler is not None:
             scheduler.step(avg_val_loss)
-            cur_lr = scheduler.get_last_lr()
+            cur_lr = scheduler.scheduler.get_last_lr()
             if use_wandb:
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
 
@@ -117,7 +118,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     return best_pth_new, best_state, last_path
 
 
-def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: torch.optim, checkpoint_path: str) -> tuple[float, int, int]:
+def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: SchedulerWrapper, checkpoint_path: str) -> tuple[float, int, int]:
     """
     Resume training from a checkpoint
     :param model: The model to resume training
@@ -136,9 +137,9 @@ def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, sched
             if isinstance(v, torch.Tensor):
                 state[k] = v.to(device)
     if scheduler and checkpoint['scheduler_state']:
-        scheduler.load_state_dict(checkpoint['scheduler_state'])
+        scheduler.scheduler.load_state_dict(checkpoint['scheduler_state'])
         # Move scheduler states to current device
-        for state in scheduler.state_dict().values():
+        for state in scheduler.scheduler.state_dict().values():
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
                     state[k] = v.to(device)
@@ -355,7 +356,7 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     logger.info(f"Sample caption: {caption}")
 
 
-def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, scheduler: torch.optim, train_loss: float, val_loss: float, cur_lr: tuple,
+def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, scheduler: SchedulerWrapper, train_loss: float, val_loss: float, cur_lr: tuple,
                     epoch: int, epochs_no_improve: int, config: dict) -> dict:
     """
     Checkpoint the model
@@ -375,7 +376,7 @@ def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, schedul
         'epoch': epoch + 1,
         'model_state': model.state_dict(),
         'optimizer_state': optimizer.state_dict(),
-        'scheduler_state': scheduler.state_dict() if scheduler else None,
+        'scheduler_state': scheduler.scheduler.state_dict() if scheduler else None,
         'best_val_loss': val_loss,
         'train_loss': train_loss,
         'epochs_no_improve': epochs_no_improve,
