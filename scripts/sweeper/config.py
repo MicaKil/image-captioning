@@ -22,6 +22,7 @@ TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
+eval_bleu4 = False
 
 DEFAULT_CONFIG = {
     "model": TAGS[0],
@@ -52,7 +53,9 @@ DEFAULT_CONFIG = {
         }
     },
     "vocab": {
-        "freq_threshold": 3
+        "freq_threshold": None,
+        "tokenizer": "sp-bpe",
+        "vocab_size": 3500
     },
     "max_caption_len": 50,
     "temperature": 0,
@@ -62,10 +65,9 @@ DEFAULT_CONFIG = {
         "factor": 0.5,
         "patience": 5,
     } if use_scheduler else None,
-    "validation": {
-        "bleu4": False,
-        "bleu4_step": None
-    }
+    "eval_bleu4": {
+        "step": 5
+    } if eval_bleu4 else None
 }
 
 SWEEP_CONFIG = {
