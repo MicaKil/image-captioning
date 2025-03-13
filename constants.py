@@ -13,6 +13,8 @@ FLICKR_TRAIN_CSV = "data/flickr8k/train_80_2025-02-16.csv"
 FLICKR_VAL_CSV = "data/flickr8k/val_10_2025-02-16.csv"
 FLICKR_TEST_CSV = "data/flickr8k/test_10_2025-02-16.csv"
 
+FLICKR_CORPUS = "data/flickr8k/corpus.txt"
+
 COCO_DIR = "data/coco"
 COCO_TRAIN_ANN = "data/coco/annotations/captions_train2014.json"
 COCO_VAL_ANN = "data/coco/annotations/captions_val2014.json"
@@ -25,6 +27,8 @@ COCO_TEST_CSV = "data/coco/coco_test_15.csv"
 COCO_TRAIN_PKL = "data/coco/coco_train.pkl"
 COCO_VAL_PKL = "data/coco/coco_val_15.pkl"
 COCO_TEST_PKL = "data/coco/coco_test_15.pkl"
+
+COCO_CORPUS =  "data/coco/corpus.txt"
 
 # checkpoints
 CHECKPOINT_DIR = "checkpoints/"
