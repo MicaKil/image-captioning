@@ -3,10 +3,11 @@ import os
 
 import numpy as np
 import pandas as pd
+import sentencepiece as spm
 from tqdm import tqdm
 
 from config.config import logger
-from constants import ROOT, FLICKR8K_CSV_FILE
+from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR_CORPUS, PAD, SOS, EOS, UNK, COCO_CORPUS
 
 
 def load_flickr_captions(ann_path: str, save_captions=False) -> pd.DataFrame:
@@ -16,7 +17,6 @@ def load_flickr_captions(ann_path: str, save_captions=False) -> pd.DataFrame:
     :param save_captions: If True, save to a CVS file or overwrite the existing CSV file
     :return: DataFrame containing the image filenames and corresponding captions
     """
-
     if os.path.splitext(ann_path)[1] == ".csv":
         logger.info("Loading captions from CSV file.")
         df = pd.read_csv(ann_path)
@@ -136,3 +136,15 @@ def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataF
         df_splits.append(df_split)
 
     return df_splits
+
+
+def flickr8k_sentence_piece():
+    spm.SentencePieceTrainer.Train(
+        f'--input={os.path.join(ROOT, FLICKR_CORPUS)} --model_prefix=flickr8k --vocab_size=3500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf')
+    spm.SentencePieceProcessor()
+
+
+def coco_sentence_piece():
+    spm.SentencePieceTrainer.Train(
+        f'--input={os.path.join(ROOT, COCO_CORPUS)} --model_prefix=coco --vocab_size=8500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf')
+    spm.SentencePieceProcessor()
