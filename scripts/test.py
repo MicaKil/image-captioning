@@ -55,7 +55,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
     bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
 
     # CIDEr score
-    cider_score = get_cider_score(all_hypotheses, all_references)
+    cider_score, _ = get_cider_score(all_hypotheses, all_references)
 
     # Log time
     logger.info(f"Finished testing model.")

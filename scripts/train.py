@@ -236,7 +236,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
             generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, None, config["beam_size"], True)
             # Get references and compute CIDEr scores
             references = metrics.get_references(train_loader.annotations, images_id)
-            rewards = metrics.get_cider_score(generated, references)
+            _, rewards = metrics.get_cider_score(generated, references)
 
         # Convert rewards to tensor
         rewards = torch.tensor(rewards, device=device)
