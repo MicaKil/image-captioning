@@ -27,7 +27,7 @@ RUN_CONFIG = {
     "model": RUN_TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention",
-    "batch_size": 64,
+    "batch_size": 128,
     "embed_size": None,
     "hidden_size": 512,
     "num_layers": 3,
@@ -36,27 +36,27 @@ RUN_CONFIG = {
     "dropout": 0.5,  # decoder dropout
     "fine_tune_encoder": "partial",
     "encoder_lr": 0.00001,
-    "decoder_lr": 0.001,
+    "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
     "max_epochs": 100,
     "patience": 10,
     "gradient_clip": 2.0,
     "dataset": {
-        "name": "flickr8k",
-        "version": "2025-02-16",
+        "name": "coco",
+        "version": "2025-02-26",
         "split": {
-            "train": 80,
-            "val": 10,
-            "test": 10
+            "train": 75,
+            "val": 15,
+            "test": 15
         }
     },
     "vocab": {
         "freq_threshold": None,
         "tokenizer": "sp-bpe",
-        "vocab_size": 3500
+        "vocab_size": 8500
     },
-    "max_caption_len": 50,
+    "max_caption_len": 60,
     "temperature": 0,
     "beam_size": 3,
     "scheduler": {
