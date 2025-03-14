@@ -12,13 +12,13 @@ TRANSFORM = v2.Compose([
 ])
 
 # dataloaders
-NUM_WORKERS = 4
+NUM_WORKERS = 8
 SHUFFLE = True
 PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["transformer", "coco"]
+TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = True
@@ -40,8 +40,8 @@ CONFIG = {
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 100,
-    "patience": 10,
+    "max_epochs": 2,
+    "patience": 0,
     "gradient_clip": 2.0,
     "dataset": {
         "name": "coco",
