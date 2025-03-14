@@ -1,6 +1,5 @@
 import pandas as pd
 from nltk.translate.bleu_score import corpus_bleu
-from numpy._core.multiarray import _SCT
 from pycocoevalcap.cider.cider import Cider
 
 

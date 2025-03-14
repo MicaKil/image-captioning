@@ -57,7 +57,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
     start_epoch = 0
     if resume_checkpoint:
-        best_val_loss, epochs_no_improve, start_epoch = resume(model, device, optimizer, scheduler, resume_checkpoint)
+        best_val_loss, epochs_no_improve, start_epoch, use_rl = resume(model, device, optimizer, scheduler, resume_checkpoint)
 
     model = model.to(device)
     for epoch in range(start_epoch, config["max_epochs"]):
@@ -83,14 +83,14 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             cur_lr = scheduler.scheduler.get_last_lr()
             if use_wandb:
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
+                logger.info(f"Current learning rates: Encoder = {cur_lr[0]}, Decoder = {cur_lr[1]}")
 
         # checkpointing
         if last_path is not None and last_path != best_pth:
             # Only remove the last checkpoint if it is not the best one
             os.remove(last_path)
         last_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
-        cur_state = save_checkpoint(model, last_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config,
-                                    use_rl)
+        cur_state = save_checkpoint(model, last_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config, use_rl)
 
         if avg_val_loss < best_val_loss:  # new best model
             best_val_loss = avg_val_loss
@@ -114,10 +114,6 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 logger.info(f"Early stopping after {epoch + 1} epochs")
                 break
 
-        if scheduler is not None:
-            if (epochs_no_improve - 1) > 0 and (epochs_no_improve - 1) % config["scheduler"]["patience"] == 0:
-                logger.info(f"Reducing learning rate. Encoder LR: {cur_lr[0]}, Decoder LR: {cur_lr[1]}")
-
     logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
 
     # check the best model is not the last model
@@ -133,7 +129,8 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     return best_pth_new, best_state, last_path
 
 
-def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: SchedulerWrapper, checkpoint_path: str) -> tuple[float, int, int]:
+def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: SchedulerWrapper,
+           checkpoint_path: str) -> tuple[float, int, int, bool]:
     """
     Resume training from a checkpoint
     :param model: The model to resume training
@@ -158,7 +155,7 @@ def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, sched
     epochs_no_improve = checkpoint['epochs_no_improve']
     use_rl = checkpoint['use_rl']
     logger.info(f"Resuming from epoch {start_epoch} with val loss {best_val_loss:.4f}")
-    return best_val_loss, epochs_no_improve, start_epoch
+    return best_val_loss, epochs_no_improve, start_epoch, use_rl
 
 
 def train_xe(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, optimizer: torch.optim,
