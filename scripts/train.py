@@ -133,8 +133,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     return best_pth_new, best_state, last_path
 
 
-def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: SchedulerWrapper, checkpoint_path: str) -> tuple[
-    float, int, int]:
+def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, scheduler: SchedulerWrapper, checkpoint_path: str) -> tuple[float, int, int]:
     """
     Resume training from a checkpoint
     :param model: The model to resume training

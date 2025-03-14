@@ -26,7 +26,7 @@ class Sweeper(Runner):
         config = wandb.config
 
         # Load datasets
-        train_dataset, val_dataset, test_dataset, vocab = self.get_ds(config, None)
+        train_dataset, val_dataset, test_dataset, vocab = self.get_datasets(config, None)
         pad_idx = vocab.str_to_idx(PAD)
 
         train_dataloader = CaptionLoader(train_dataset, config["batch_size"], num_workers, shuffle, pin_memory)
@@ -42,6 +42,5 @@ class Sweeper(Runner):
         wandb.run.summary["trainable_parameters"] = parameter_count
         logger.info(f"Number of trainable parameters: {parameter_count}")
 
-        model.train_model(train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR + config["model"], True, config,
-                          None)
+        model.train_model(train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR + config["model"], True, config, None)
         model.test_model(test_dataloader, device, RESULTS_DIR + config["model"], "LAST", True, config)
