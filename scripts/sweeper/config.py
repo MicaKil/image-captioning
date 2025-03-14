@@ -67,7 +67,8 @@ DEFAULT_CONFIG = {
     } if use_scheduler else None,
     "eval_bleu4": {
         "step": 5
-    } if eval_bleu4 else None
+    } if eval_bleu4 else None,
+    "rl_baseline": True
 }
 
 SWEEP_CONFIG = {
