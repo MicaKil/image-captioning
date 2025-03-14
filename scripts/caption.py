@@ -9,7 +9,7 @@ from scripts.dataset.vocabulary import Vocabulary
 
 
 def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
-                temperature: Optional[float] = None, beam_size: int = 1) -> tuple[list[str], Tensor]:
+                temperature: Optional[float] = None, beam_size: int = 1, no_grad=True) -> tuple[list[str], Tensor]:
     """
     Generate a caption for a batch of images using greedy search, temperature-based sampling, or beam search.
 
@@ -20,6 +20,7 @@ def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_l
     :param device: Device to use
     :param temperature: Temperature for sampling (None for greedy search)
     :param beam_size: Beam size for beam search (1 for greedy search/temperature sampling)
+    :param no_grad:
 
     :return: List of generated captions
     """
@@ -32,7 +33,8 @@ def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_l
 
     with torch.no_grad():
         images = images.to(device)
-        return model.generate(image=images, vocab=vocab, max_length=max_length, device=device, temperature=temperature, beam_size=beam_size)
+        return model.generate(images=images, vocab=vocab, max_length=max_length, device=device, temperature=temperature, beam_size=beam_size,
+                              no_grad=no_grad)
 
 
 def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:

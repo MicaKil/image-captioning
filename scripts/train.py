@@ -225,14 +225,11 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         images = images.to(device)
         optimizer.zero_grad()
 
-        # Generate captions using beam search
-        with torch.no_grad():
-            # features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int
-            generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1)
-            # Get references and compute CIDEr scores
-            references = metrics.get_references(train_loader.annotations, images_id)
-            _, rewards = metrics.get_cider_score(generated, references)
+        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1, False)
+        references = metrics.get_references(train_loader.annotations, images_id)
+        _, rewards = metrics.get_cider_score(generated, references)
 
+        model.train()
         # Convert rewards to tensor
         rewards = torch.tensor(rewards, device=device)
 
@@ -358,8 +355,8 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     :return: Prints the sample caption
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
-    caption, _ = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])[0]
-    logger.info(f"Sample caption: {caption}")
+    caption, _ = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
+    logger.info(f"Sample caption: {caption[0]}")
 
 
 def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, scheduler: SchedulerWrapper, train_loss: float, val_loss: float,

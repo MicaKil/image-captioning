@@ -379,17 +379,18 @@ class ImageCaptioningTransformer(nn.Module):
 
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
-    def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
-                 temperature: Optional[float] = None, beam_size: int = 1) -> tuple[list[str], torch.Tensor]:
+    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, device: torch.device, temperature: Optional[float], beam_size: int,
+                 no_grad: bool) -> tuple[list[str], torch.Tensor]:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
-        :param image:
+        :param images:
         :param vocab:
         :param max_length:
         :param device:
         :param temperature:
         :param beam_size:
+        :param no_grad:
         :return:
         """
         if max_length > self.max_length:
@@ -397,18 +398,30 @@ class ImageCaptioningTransformer(nn.Module):
             max_length = self.max_length
 
         self.eval()
-        with torch.no_grad():
-            image = image.to(device)
-            # Encode image
-            features = self.encoder(image)
-            features = rearrange(features, 'b c h w -> b (h w) c')
+        if no_grad:
+            print("here")
+            with torch.no_grad():
+                images = images.to(device)
+                # Encode image
+                features = self.encoder(images)
+                features = rearrange(features, 'b c h w -> b (h w) c')
 
-            if beam_size > 1:
-                return self.beam_search(features, vocab, max_length, beam_size)
-            else:
-                return self.temperature_sampling(features, vocab, max_length, temperature)
+                if beam_size > 1:
+                    return self.beam_search(features, vocab, max_length, beam_size)
+                else:
+                    return self.temperature_sampling(features, vocab, max_length, temperature)
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[list[str], Tensor]:
+        images = images.to(device)
+        # Encode image
+        features = self.encoder(images)
+        features = rearrange(features, 'b c h w -> b (h w) c')
+        if beam_size > 1:
+            return self.beam_search(features, vocab, max_length, beam_size)
+        else:
+            return self.temperature_sampling(features, vocab, max_length, temperature)
+
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int,
+                             temperature: Optional[float]) -> tuple[list[str], Tensor]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
@@ -422,7 +435,7 @@ class ImageCaptioningTransformer(nn.Module):
         batch_size = features.size(0)
         tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
-        log_probs = torch.zeros(batch_size, device=features.device)  # Track log probabilities
+        log_probs = []  # Track log probabilities for each step
 
         for _ in range(max_length):
             txt_emb = self.seq_embedding(tokens)
@@ -430,11 +443,12 @@ class ImageCaptioningTransformer(nn.Module):
                 txt_emb = layer(features, txt_emb)
             logits = self.output_layer(txt_emb[:, -1, :])
 
-            if temperature is None or temperature == 0:
-                probs = torch.softmax(logits, dim=-1)  # Greedy sampling if temperature=0
-            else:
+            if temperature is not None and temperature != 0:
                 # Apply temperature scaling
                 probs = torch.softmax(logits / temperature, dim=-1)
+            else:
+                # Greedy sampling if temperature=0
+                probs = torch.softmax(logits, dim=-1)
 
             # Sample tokens and compute log probabilities
             sampler = torch.distributions.Categorical(probs)
@@ -442,7 +456,9 @@ class ImageCaptioningTransformer(nn.Module):
             log_probs_step = sampler.log_prob(next_tokens)  # (batch_size,)
 
             # Mask finished sequences (no further probability accumulation)
-            log_probs += torch.where(finished, 0.0, log_probs_step)
+            log_probs_step = torch.where(finished, 0.0, log_probs_step)
+            log_probs.append(log_probs_step)
+            # Update tokens
             next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens.unsqueeze(-1))
             tokens = torch.cat([tokens, next_tokens], dim=1)
 
@@ -452,8 +468,9 @@ class ImageCaptioningTransformer(nn.Module):
             if finished.all():
                 break
 
+        log_probs = torch.stack(log_probs, dim=0).sum(dim=0)  # Sum log probabilities across steps
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
-        return captions, log_probs  # Return both captions and log_probs
+        return captions, log_probs
 
     def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> tuple[list[str], Tensor]:
         """
