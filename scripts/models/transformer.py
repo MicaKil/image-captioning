@@ -401,7 +401,6 @@ class ImageCaptioningTransformer(nn.Module):
         images = images.to(device)
 
         if no_grad:
-            print("here")
             with torch.no_grad():
                 # Encode image
                 features = self.encoder(images)
