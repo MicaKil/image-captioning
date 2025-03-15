@@ -76,5 +76,6 @@ CONFIG = {
     "eval_bleu4": {
         "step": 5
     } if eval_bleu4 else None,
-    "rl_baseline": False
+    "rl_baseline": False,
+    "allow_rl_switch": False
 }

@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import wandb
 from nltk.translate.bleu_score import SmoothingFunction
-from torch import GradScaler
 from tqdm import tqdm
 
 import scripts.metrics as metrics
@@ -55,6 +54,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     last_state = dict()
     epochs_no_improve = 0
     use_rl = False
+    allow_rl_switch = config["allow_rl_switch"]
 
     start_epoch = 0
     if resume_checkpoint:
@@ -106,7 +106,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             epochs_no_improve += 1
         # epochs_no_improve = 1000
         if config["patience"] is not None and epochs_no_improve >= config["patience"]:
-            if not use_rl:
+            if not use_rl and allow_rl_switch:
                 # reached the end of the patience for XE, switch to RL
                 use_rl = True
                 epochs_no_improve = 0
@@ -229,8 +229,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         images = images.to(device)
         optimizer.zero_grad()
 
-        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device,
-                                           config["temperature"], 1, False)
+        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
         references = metrics.get_references(train_loader.annotations, images_id)
         reward, rewards = metrics.get_cider_score(generated, references)
 
