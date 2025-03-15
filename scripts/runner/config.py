@@ -67,7 +67,7 @@ CONFIG = {
     },
     "max_caption_len": 60,
     "temperature": 0,
-    "beam_size": 3,
+    "beam_size": 1,
     "scheduler": {
         "type": "ReduceLROnPlateau",
         "factor": 0.5,

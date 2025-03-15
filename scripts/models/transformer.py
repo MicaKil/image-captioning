@@ -6,7 +6,7 @@ import torch.nn as nn
 import torchvision.models as models
 from einops import rearrange
 from torch import Tensor
-from torch.nn.functional import log_softmax
+from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
 
 from constants import SOS, EOS, UNK, PAD
@@ -402,7 +402,6 @@ class ImageCaptioningTransformer(nn.Module):
         if no_grad:
             self.eval()
             with torch.no_grad():
-                # Encode image
                 features = self.encoder(images)
                 features = rearrange(features, 'b c h w -> b (h w) c')
 
@@ -411,7 +410,6 @@ class ImageCaptioningTransformer(nn.Module):
                 else:
                     return self.temperature_sampling(features, vocab, max_length, temperature)
 
-        # Encode image
         features = self.encoder(images)
         features = rearrange(features, 'b c h w -> b (h w) c')
         if beam_size > 1:
@@ -419,8 +417,7 @@ class ImageCaptioningTransformer(nn.Module):
         else:
             return self.temperature_sampling(features, vocab, max_length, temperature)
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int,
-                             temperature: Optional[float]) -> tuple[list[str], Tensor]:
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[list[str], Tensor]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
@@ -449,20 +446,16 @@ class ImageCaptioningTransformer(nn.Module):
 
             if temperature is not None and temperature != 0:
                 # Apply temperature scaling
-                probs = torch.softmax(logits / temperature, dim=-1)
+                probs = softmax(logits / temperature, dim=-1)
+                next_tokens = torch.multinomial(probs, 1)
             else:
                 # Greedy sampling if temperature=0
-                probs = torch.softmax(logits, dim=-1)
-
-            # Sample tokens and compute log probabilities
-            sampler = torch.distributions.Categorical(probs)
-            next_tokens = sampler.sample()
-            log_probs_step = sampler.log_prob(next_tokens)  # (batch_size,)
+                probs = softmax(logits, dim=-1)
+                next_tokens = logits.argmax(-1, keepdim=True)
 
             # Mask finished sequences (no further probability accumulation)
-            log_probs += torch.where(finished, 0.0, log_probs_step)
-            # Update tokens
-            next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens.unsqueeze(-1))
+            log_probs += torch.where(finished, 0.0, probs)
+            next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens)
             tokens = torch.cat([tokens, next_tokens], dim=1)
 
             # Update finished flags
@@ -490,7 +483,7 @@ class ImageCaptioningTransformer(nn.Module):
         eos_idx = vocab.str_to_idx(EOS)
 
         captions = []
-        all_probs = []  # To store log probabilities for each sequence
+        all_probs = torch.zeros(batch_size, device=features.device)  # To store log probabilities for each sequence
 
         # Process each image in batch separately
         for i in range(batch_size):
@@ -509,6 +502,11 @@ class ImageCaptioningTransformer(nn.Module):
                     for layer in self.decoder_layers:
                         txt_emb = layer(image, txt_emb)
                     logits = self.output_layer(txt_emb[:, -1, :])
+
+                    if tokens.size(1) > 1:
+                        last_token = tokens[:, -1]
+                        # Penalize the logits for the last generated token (per batch element)
+                        logits[torch.arange(batch_size), last_token] -= 1.0  # Reduce probability
 
                     step_probs = log_softmax(logits, dim=-1)
                     top_probs, top_indices = step_probs.topk(beam_size)
@@ -530,15 +528,15 @@ class ImageCaptioningTransformer(nn.Module):
             # Select best beam
             best_beam = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))
             captions.append(vocab.encode_as_words(best_beam[1]))
-            all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
+            # all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
+            all_probs = torch.cat((all_probs, sum(best_beam[2])), dim=0)
 
         return captions, torch.tensor(all_probs, device=features.device)
 
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
 
     def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict,
-                    resume_checkpoint: str) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict, resume_checkpoint: str) -> tuple:
         """
         Training loop for the model.
 
@@ -554,8 +552,7 @@ class ImageCaptioningTransformer(nn.Module):
         :param run_config: Configuration for the run
         :return: Path to the best model
         """
-        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config,
-                     resume_checkpoint)
+        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config, resume_checkpoint)
 
     def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
         """

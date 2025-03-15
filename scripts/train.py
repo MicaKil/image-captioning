@@ -53,7 +53,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     last_path = None
     last_state = dict()
     epochs_no_improve = 0
-    use_rl = False
+    use_rl = True
     allow_rl_switch = config["allow_rl_switch"]
 
     start_epoch = 0
@@ -246,11 +246,10 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         #     rewards = rewards - rewards.mean()
         #
         # Calculate loss
-        loss = -torch.mean(log_probs, dim=-1) * (rewards - reward_baseline)
-        loss = loss.mean()
+        loss = -torch.mean(log_probs * (rewards - reward_baseline), dim=-1)
 
         # Backpropagation
-        loss.backward()  # Instead of loss.backward()
+        loss.backward()
         if config['gradient_clip']:
             nn.utils.clip_grad_norm_(model.parameters(), config['gradient_clip'])
         optimizer.step()
