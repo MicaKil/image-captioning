@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import wandb
 from nltk.translate.bleu_score import SmoothingFunction
+from torch.cuda.amp import GradScaler
 from tqdm import tqdm
 
 import scripts.metrics as metrics
@@ -90,7 +91,8 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             # Only remove the last checkpoint if it is not the best one
             os.remove(last_path)
         last_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
-        cur_state = save_checkpoint(model, last_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config, use_rl)
+        cur_state = save_checkpoint(model, last_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config,
+                                    use_rl)
 
         if avg_val_loss < best_val_loss:  # new best model
             best_val_loss = avg_val_loss
@@ -220,6 +222,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
     vocab = train_loader.vocab
 
     model.train()
+    scaler = GradScaler()
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [RL Training]")
     for images, _, images_id in batch_progress:
         images = images.to(device)
@@ -242,15 +245,20 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         loss = -torch.mean(log_probs * rewards)
 
         # Backpropagation
-        loss.backward()
-        if config['gradient_clip'] is not None:
+        scaler.scale(loss).backward()  # Instead of loss.backward()
+        if config['gradient_clip']:
+            scaler.unscale_(optimizer)
             nn.utils.clip_grad_norm_(model.parameters(), config['gradient_clip'])
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
 
         # Update metrics
         running_loss += loss.item()
         running_reward += rewards.mean().item()
         batch_progress.set_postfix({'loss': running_loss / (batch_progress.n + 1), 'reward': running_reward / (batch_progress.n + 1)})
+
+        del generated, log_probs, rewards  # Free GPU memory
+        torch.cuda.empty_cache()  # Clear cache
 
     return running_loss / len(train_loader)
 
