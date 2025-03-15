@@ -41,7 +41,7 @@ CONFIG = {
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
     "max_epochs": 2,
-    "patience": 0,
+    "patience": None,
     "gradient_clip": 2.0,
     "dataset": {
         "name": "coco",

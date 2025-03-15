@@ -230,7 +230,10 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
 
         generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1, False)
         references = metrics.get_references(train_loader.annotations, images_id)
-        _, rewards = metrics.get_cider_score(generated, references)
+        reward, rewards = metrics.get_cider_score(generated, references)
+        print(f'Generated: {generated[0]}')
+        print(f'References: {references[0][0]}')
+        print(f'Reward: {reward} | Rewards: {rewards[0]}')
 
         # when generating captions, the model is set to eval mode. so set it back to train mode
         model.train()
