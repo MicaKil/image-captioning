@@ -397,10 +397,10 @@ class ImageCaptioningTransformer(nn.Module):
             # logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
             max_length = self.max_length
 
-        self.eval()
         images = images.to(device)
 
         if no_grad:
+            self.eval()
             with torch.no_grad():
                 # Encode image
                 features = self.encoder(images)
@@ -441,6 +441,11 @@ class ImageCaptioningTransformer(nn.Module):
             for layer in self.decoder_layers:
                 txt_emb = layer(features, txt_emb)
             logits = self.output_layer(txt_emb[:, -1, :])
+
+            if tokens.size(1) > 1:
+                last_token = tokens[:, -1]
+                # Penalize the logits for the last generated token (per batch element)
+                logits[torch.arange(batch_size), last_token] -= 1.0  # Reduce probability
 
             if temperature is not None and temperature != 0:
                 # Apply temperature scaling
