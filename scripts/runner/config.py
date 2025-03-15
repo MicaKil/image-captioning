@@ -12,7 +12,7 @@ TRANSFORM = v2.Compose([
 ])
 
 # dataloaders
-NUM_WORKERS = 8
+NUM_WORKERS = 4
 SHUFFLE = True
 PIN_MEMORY = True
 
@@ -28,7 +28,7 @@ CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention",
-    "batch_size": 128,
+    "batch_size": 16,
     "embed_size": None,
     "hidden_size": 512,
     "num_layers": 3,
