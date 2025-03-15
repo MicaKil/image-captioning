@@ -53,7 +53,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     last_path = None
     last_state = dict()
     epochs_no_improve = 0
-    use_rl = False
+    use_rl = True
 
     start_epoch = 0
     if resume_checkpoint:
@@ -229,6 +229,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         references = metrics.get_references(train_loader.annotations, images_id)
         _, rewards = metrics.get_cider_score(generated, references)
 
+        # when generating captions, the model is set to eval mode. so set it back to train mode
         model.train()
         # Convert rewards to tensor
         rewards = torch.tensor(rewards, device=device)

@@ -398,10 +398,11 @@ class ImageCaptioningTransformer(nn.Module):
             max_length = self.max_length
 
         self.eval()
+        images = images.to(device)
+
         if no_grad:
             print("here")
             with torch.no_grad():
-                images = images.to(device)
                 # Encode image
                 features = self.encoder(images)
                 features = rearrange(features, 'b c h w -> b (h w) c')
@@ -411,7 +412,6 @@ class ImageCaptioningTransformer(nn.Module):
                 else:
                     return self.temperature_sampling(features, vocab, max_length, temperature)
 
-        images = images.to(device)
         # Encode image
         features = self.encoder(images)
         features = rearrange(features, 'b c h w -> b (h w) c')

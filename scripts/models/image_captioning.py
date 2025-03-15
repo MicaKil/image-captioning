@@ -37,16 +37,23 @@ class ImageCaptioner(nn.Module):
         outputs = self.decoder(features, captions)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
         return outputs
 
-    def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
-                 temperature: Optional[float] = None, beam_size: int = 1) -> list[str]:
+    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float], beam_size: int, device: torch.device,
+                 no_grad: bool) -> list[str]:
         self.eval()
-        with torch.no_grad():
-            image = image.to(device)
-            features = self.encoder(image)  # Encode the image (batch_size, embed_size)
-            if beam_size > 1:
-                return self.beam_search(vocab, device, features, max_length, beam_size)
-            else:
-                return self.temperature_sampling(vocab, device, features, max_length, temperature)
+        images = images.to(device)
+        if no_grad:
+            with torch.no_grad():
+                features = self.encoder(images)  # Encode the image (batch_size, embed_size)
+                if beam_size > 1:
+                    return self.beam_search(vocab, device, features, max_length, beam_size)
+                else:
+                    return self.temperature_sampling(vocab, device, features, max_length, temperature)
+
+        features = self.encoder(images)  # Encode the image (batch_size, embed_size)
+        if beam_size > 1:
+            return self.beam_search(vocab, device, features, max_length, beam_size)
+        else:
+            return self.temperature_sampling(vocab, device, features, max_length, temperature)
 
     def temperature_sampling(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int,
                              temperature: Optional[float]) -> list[str]:
