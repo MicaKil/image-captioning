@@ -434,7 +434,7 @@ class ImageCaptioningTransformer(nn.Module):
         batch_size = features.size(0)
         tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
-        log_probs = []  # Track log probabilities for each step
+        log_probs = torch.zeros(batch_size, device=features.device)
 
         for _ in range(max_length):
             txt_emb = self.seq_embedding(tokens)
@@ -460,8 +460,7 @@ class ImageCaptioningTransformer(nn.Module):
             log_probs_step = sampler.log_prob(next_tokens)  # (batch_size,)
 
             # Mask finished sequences (no further probability accumulation)
-            log_probs_step = torch.where(finished, 0.0, log_probs_step)
-            log_probs.append(log_probs_step)
+            log_probs += torch.where(finished, 0.0, log_probs_step)
             # Update tokens
             next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens.unsqueeze(-1))
             tokens = torch.cat([tokens, next_tokens], dim=1)
@@ -472,7 +471,6 @@ class ImageCaptioningTransformer(nn.Module):
             if finished.all():
                 break
 
-        log_probs = torch.stack(log_probs, dim=0).sum(dim=0)  # Sum log probabilities across steps
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
         return captions, log_probs
 

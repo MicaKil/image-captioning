@@ -54,7 +54,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     last_path = None
     last_state = dict()
     epochs_no_improve = 0
-    use_rl = True
+    use_rl = False
 
     start_epoch = 0
     if resume_checkpoint:
@@ -104,7 +104,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             logger.info(f"New best validation loss: {best_val_loss:.4f}")
         else:
             epochs_no_improve += 1
-
+        # epochs_no_improve = 1000
         if config["patience"] is not None and epochs_no_improve >= config["patience"]:
             if not use_rl:
                 # reached the end of the patience for XE, switch to RL
@@ -218,50 +218,56 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
     """
     config = get_config(run_config, use_wandb)
     running_reward = 0.0
+    running_reward_baseline = 0.0
     running_loss = 0.0
     vocab = train_loader.vocab
 
     model.train()
-    scaler = GradScaler("cuda")
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [RL Training]")
+    i = 0
     for images, _, images_id in batch_progress:
         images = images.to(device)
         optimizer.zero_grad()
 
-        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1, False)
+        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device,
+                                           config["temperature"], 1, False)
         references = metrics.get_references(train_loader.annotations, images_id)
         reward, rewards = metrics.get_cider_score(generated, references)
-        print(f'Generated: {generated[0]}')
-        print(f'References: {references[0][0]}')
-        print(f'Reward: {reward} | Rewards: {rewards[0]}')
 
-        # when generating captions, the model is set to eval mode. so set it back to train mode
-        model.train()
-        # Convert rewards to tensor
+        if i % 1000 == 0:
+            print(f'Generated: {generated[0]}')
+            print(f'References: {references[0][0]}')
+            print(f'Reward: {reward} | Rewards: {rewards[0]}')
+
         rewards = torch.tensor(rewards, device=device)
+        reward_baseline = torch.mean(rewards, dim=-1, keepdim=True)
 
-        # Normalize rewards
-        if config['rl_baseline']:
-            rewards = rewards - rewards.mean()
-
+        # # Normalize rewards
+        # if config['rl_baseline']:
+        #     rewards = rewards - rewards.mean()
+        #
         # Calculate loss
-        loss = -torch.mean(log_probs * rewards)
+        loss = -torch.mean(log_probs, dim=-1) * (rewards - reward_baseline)
+        loss = loss.mean()
 
         # Backpropagation
-        scaler.scale(loss).backward()  # Instead of loss.backward()
+        loss.backward()  # Instead of loss.backward()
         if config['gradient_clip']:
-            scaler.unscale_(optimizer)
             nn.utils.clip_grad_norm_(model.parameters(), config['gradient_clip'])
-        scaler.step(optimizer)
-        scaler.update()
+        optimizer.step()
 
         # Update metrics
         running_loss += loss.item()
         running_reward += rewards.mean().item()
-        batch_progress.set_postfix({'loss': running_loss / (batch_progress.n + 1), 'reward': running_reward / (batch_progress.n + 1)})
+        running_reward_baseline += reward_baseline.mean().item()
+        batch_progress.set_postfix(
+            {'loss': running_loss / (batch_progress.n + 1), 'reward': running_reward / (batch_progress.n + 1),
+             'reward_baseline': running_reward_baseline / (batch_progress.n + 1)}
+        )
 
         del generated, log_probs, rewards  # Free GPU memory
         torch.cuda.empty_cache()  # Clear cache
+        i += 1
 
     return running_loss / len(train_loader)
 

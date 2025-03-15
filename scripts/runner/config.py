@@ -40,9 +40,9 @@ CONFIG = {
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 2,
-    "patience": None,
-    "gradient_clip": 2.0,
+    "max_epochs": 10,
+    "patience": 1,
+    "gradient_clip": 5.0,
     "dataset": {
         "name": "coco",
         "version": "2025-02-26",
@@ -61,8 +61,8 @@ CONFIG = {
         }
     },
     "vocab": {
-        "freq_threshold": None,
-        "tokenizer": "sp-bpe",
+        "freq_threshold": 3,
+        "tokenizer": "word",
         "vocab_size": 8500 if TAGS[1] == "coco" else 3500
     },
     "max_caption_len": 60,
@@ -76,5 +76,5 @@ CONFIG = {
     "eval_bleu4": {
         "step": 5
     } if eval_bleu4 else None,
-    "rl_baseline": True
+    "rl_baseline": False
 }
