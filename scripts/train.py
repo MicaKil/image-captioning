@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import wandb
 from nltk.translate.bleu_score import SmoothingFunction
-from torch.cuda.amp import GradScaler
+from torch import GradScaler
 from tqdm import tqdm
 
 import scripts.metrics as metrics
@@ -222,7 +222,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
     vocab = train_loader.vocab
 
     model.train()
-    scaler = GradScaler()
+    scaler = GradScaler("cuda")
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [RL Training]")
     for images, _, images_id in batch_progress:
         images = images.to(device)
