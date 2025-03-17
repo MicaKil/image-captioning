@@ -61,7 +61,6 @@ class ImageCaptioner(nn.Module):
         :return: Generated caption as a list of token indices
         """
         batch_size = features.size(0)
-        # caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
         captions = torch.full((batch_size, 1), vocab.str_to_idx(SOS), dtype=torch.long, device=device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
 

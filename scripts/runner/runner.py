@@ -65,7 +65,7 @@ class Runner:
         else:
             config = self.run_config
 
-        train_dataset, val_dataset, test_dataset, vocab = self.get_ds(config, date)
+        train_dataset, val_dataset, test_dataset, vocab = self.get_datasets(config, date)
         pad_idx = vocab.str_to_idx(PAD)
         model = self.get_model(config, vocab, pad_idx)
         save_dir = RESULTS_DIR + config["model"]
@@ -141,7 +141,7 @@ class Runner:
         wandb_run.define_metric("epoch", summary="max")
         return wandb_run
 
-    def get_ds(self, config: dict, date: str) -> tuple[CaptionDataset, CaptionDataset, CaptionDataset, Vocabulary]:
+    def get_datasets(self, config: dict, date: str) -> tuple[CaptionDataset, CaptionDataset, CaptionDataset, Vocabulary]:
         """
         Creates or loads the datasets.
         :param config: The run configuration.

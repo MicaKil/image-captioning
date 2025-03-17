@@ -26,7 +26,7 @@ class Sweeper(Runner):
         config = wandb.config
 
         # Load datasets
-        train_dataset, val_dataset, test_dataset, vocab = self.get_ds(config, None)
+        train_dataset, val_dataset, test_dataset, vocab = self.get_datasets(config, None)
         pad_idx = vocab.str_to_idx(PAD)
 
         train_dataloader = CaptionLoader(train_dataset, config["batch_size"], num_workers, shuffle, pin_memory)

@@ -216,7 +216,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         # Generate captions using beam search
         with torch.no_grad():
             # features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int
-            generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, None, config["beam_size"], True)
+            generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, None, config["beam_size"])
             # Get references and compute CIDEr scores
             references = metrics.get_references(train_loader.annotations, images_id)
             rewards = metrics.get_cider_score(generated, references)
@@ -283,7 +283,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
             total_tokens += num_tokens
 
             if calc_bleu4:
-                generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
+                generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
                 all_hypotheses.extend(generated)
                 references = metrics.get_references(val_loader.annotations, images_id)
                 all_references.extend(references)
@@ -347,7 +347,7 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     :return: Prints the sample caption
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
-    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)[0]
+    caption = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])[0]
     logger.info(f"Sample caption: {caption}")
 
 

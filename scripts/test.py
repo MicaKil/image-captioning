@@ -45,7 +45,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
     with torch.no_grad():
         for images, _, image_ids in tqdm(test_loader):
             # Generate captions
-            generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
+            generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
             all_hypotheses.extend(generated)
             # Get references
             references = get_references(df, image_ids)

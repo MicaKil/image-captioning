@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from einops import rearrange
-from torch import Tensor
 from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
 
@@ -379,8 +378,8 @@ class ImageCaptioningTransformer(nn.Module):
 
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
-    def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),
-                 temperature: Optional[float] = None, beam_size: int = 1, return_log_probs: bool = False) -> list[str]:
+    def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int, device: torch.device, temperature: float,
+                 beam_size: int) -> list[str]:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
@@ -390,7 +389,6 @@ class ImageCaptioningTransformer(nn.Module):
         :param device:
         :param temperature:
         :param beam_size:
-        :param return_log_probs:
         :return:
         """
         if max_length > self.max_length:
@@ -405,7 +403,7 @@ class ImageCaptioningTransformer(nn.Module):
             features = rearrange(features, 'b c h w -> b (h w) c')
 
             if beam_size > 1:
-                return self.beam_search(features, vocab, max_length, beam_size, return_log_probs)
+                return self.beam_search(features, vocab, max_length, beam_size)
             else:
                 return self.temperature_sampling(features, vocab, max_length, temperature)
 
@@ -420,7 +418,6 @@ class ImageCaptioningTransformer(nn.Module):
         :param temperature:
         :return:
         """
-        # tokens = torch.tensor([[vocab.to_idx(SOS)]], device=img_features.device)
         batch_size = features.size(0)
         tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
@@ -431,11 +428,11 @@ class ImageCaptioningTransformer(nn.Module):
                 txt_emb = layer(features, txt_emb)
             logits = self.output_layer(txt_emb[:, -1, :])
 
-            if temperature is None or temperature == 0:
-                next_tokens = logits.argmax(-1, keepdim=True)
-            else:
+            if temperature is not None and temperature != 0:
                 probs = softmax(logits / temperature, dim=-1)
                 next_tokens = torch.multinomial(probs, 1)
+            else:
+                next_tokens = logits.argmax(-1, keepdim=True)
 
             # Mask finished sequences
             next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens)
@@ -449,8 +446,7 @@ class ImageCaptioningTransformer(nn.Module):
 
         return [vocab.encode_as_words(seq.tolist()) for seq in tokens]
 
-    def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int,
-                    return_log_probs: bool = False) -> tuple[list[str], Tensor] | list[str]:
+    def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> list[str]:
         """
         Implements beam search to generate the most likely caption sequence.
         Repeats image features for each beam and, for each step, extends beams by considering the top probable next tokens, applying length
@@ -459,7 +455,6 @@ class ImageCaptioningTransformer(nn.Module):
         :param vocab:
         :param max_length:
         :param beam_size:
-        :param return_log_probs:
         :return:
         """
         batch_size = features.size(0)
@@ -509,8 +504,6 @@ class ImageCaptioningTransformer(nn.Module):
             captions.append(vocab.encode_as_words(best_beam[1]))
             all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
 
-        if return_log_probs:
-            return captions, torch.tensor(all_probs, device=features.device)
         return captions
 
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
