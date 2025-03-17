@@ -39,7 +39,7 @@ CONFIG = {
     "encoder_lr": 0.00001,
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
-    "optimizer": "AdamW",
+    "optimizer": "Adam",
     "max_epochs": 100,
     "patience": 10,
     "gradient_clip": 2.0,
