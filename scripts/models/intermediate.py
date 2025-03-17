@@ -94,7 +94,7 @@ class Decoder(nn.Module):
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.vocab_size = len(vocab)
-        self.banned_indices = [self.vocab.str_to_idx(token) for token in [PAD, SOS, UNK]]
+        self.banned_indices = [vocab.str_to_idx(token) for token in [PAD, SOS, UNK]]
 
         # Project image features to initialize hidden and cell states
         self.init_h = nn.Linear(embed_dim, num_layers * hidden_size)

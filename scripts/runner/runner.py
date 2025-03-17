@@ -356,7 +356,7 @@ def get_optimizer(config: dict, model: nn.Module) -> torch.optim:
     encoder_lr = config["encoder_lr"]
     decoder_lr = config["decoder_lr"]
     match config["model"]:
-        case "basic", "intermediate":
+        case "basic" | "intermediate":
             params = [
                 {"params": model.encoder.parameters(), "lr": encoder_lr},
                 {"params": model.decoder.parameters(), "lr": decoder_lr}
@@ -376,3 +376,5 @@ def get_optimizer(config: dict, model: nn.Module) -> torch.optim:
             return Adam(params)
         case "AdamW":
             return Adam(params)
+        case _:
+            raise ValueError(f"Optimizer {config['optimizer']} not recognized")
