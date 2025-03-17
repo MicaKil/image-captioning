@@ -3,6 +3,7 @@ from datetime import datetime
 import torch
 import wandb
 from matplotlib import pyplot as plt
+from wandb.sdk import Config
 
 
 def show_img(img: torch.tensor, mean: list[float] = None, std: list[float] = None, batch_dim=False) -> None:
@@ -43,7 +44,7 @@ def date_str() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
 
-def get_config(run_config: dict, use_wandb: bool):
+def get_config(run_config: dict, use_wandb: bool) -> Config | dict:
     """
     Get the configuration for the run
     :param run_config: Default configuration

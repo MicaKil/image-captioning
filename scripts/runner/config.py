@@ -27,7 +27,7 @@ eval_bleu4 = False
 CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
-    "decoder": "LSTM" if TAGS[0] == "lstm" else "Attention",
+    "decoder": "LSTM" if TAGS[0] == "intermediate" else "Attention",
     "batch_size": 64,
     "embed_size": 512,
     "hidden_size": 512,
@@ -75,5 +75,7 @@ CONFIG = {
     } if use_scheduler else None,
     "eval_bleu4": {
         "step": 5
-    } if eval_bleu4 else None
+    } if eval_bleu4 else None,
+    "rl_baseline": False,
+    "allow_rl_switch": True
 }
