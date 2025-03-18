@@ -3,10 +3,11 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
+from scripts.models.encoder import EncoderBase
 from scripts.models.image_captioning import ImageCaptioner
 
 
-class Encoder(nn.Module):
+class Encoder(EncoderBase):
     """
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
@@ -31,30 +32,6 @@ class Encoder(nn.Module):
         self.linear = nn.Linear(in_features, embed_dim)
         self.linear.bias.data.zero_()  # Initialize bias to zeros
         self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
-
-    def set_requires_grad(self, fine_tune: str) -> None:
-        """
-        Set the requires_grad attribute of the parameters based on the fine_tune argument.
-        :param fine_tune: String indicating the fine-tuning strategy. Can be "full", "partial", or "none".
-        :return:
-        """
-        match fine_tune:
-            case "full":
-                return
-            case "partial":
-                # Freeze all layers except the last two layers of the ResNet-50 model
-                for param in self.resnet.parameters():
-                    param.requires_grad = False
-                if fine_tune:
-                    # Unfreeze the last two layers of the ResNet-50 model
-                    for layer in list(self.resnet.children())[-2:]:
-                        for param in layer.parameters():
-                            param.requires_grad = True
-                return
-            case _:
-                for param in self.resnet.parameters():
-                    param.requires_grad = False
-                return
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         """
