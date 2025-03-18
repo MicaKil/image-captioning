@@ -10,7 +10,6 @@ from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
 
 from constants import SOS, EOS, UNK, PAD
-from scripts.caption import gen_caption
 from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.encoder import EncoderBase
 
@@ -32,8 +31,8 @@ class Encoder(EncoderBase):
         self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
         in_features = self.resnet.fc.in_features
         self.resnet = nn.Sequential(
-            *list(self.resnet.children())[:-1]  # Remove the last FC layer (Classification layer)
-        )  # Output shape: (batch, feature_dim, 1, 1)
+            *list(self.resnet.children())[:-2]  # Remove the last 2 layers (AvgPool and FC)
+        ) # Output shape: (batch, in_features, 7, 7)
 
         self.set_requires_grad(fine_tune)
 
@@ -355,7 +354,7 @@ class ImageCaptioningTransformer(nn.Module):
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
     def generate(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, device: torch.device, temperature: Optional[float], beam_size: int,
-                 no_grad: bool) -> tuple[list[str], torch.Tensor]:
+                 no_grad: bool) -> tuple[list[str], Tensor]:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
@@ -383,21 +382,22 @@ class ImageCaptioningTransformer(nn.Module):
                 if beam_size > 1:
                     return self.beam_search(features, vocab, max_length, beam_size)
                 else:
-                    return self.temperature_sampling(features, vocab, max_length, temperature)
+                    return self.temperature_sampling(features, vocab, max_length, temperature)[:2]
 
         features = self.encoder(images)
         features = rearrange(features, 'b c h w -> b (h w) c')
         if beam_size > 1:
             return self.beam_search(features, vocab, max_length, beam_size)
         else:
-            return self.temperature_sampling(features, vocab, max_length, temperature)
+            return self.temperature_sampling(features, vocab, max_length, temperature)[:2]
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[
-        list[str], Tensor]:
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float],
+                             collect_attn=False) -> tuple[list[str], Tensor, list]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
         max_length is reached.
+        :param collect_attn:
         :param features:
         :param vocab:
         :param max_length:
@@ -408,13 +408,21 @@ class ImageCaptioningTransformer(nn.Module):
         tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
         log_probs = torch.zeros(batch_size, device=features.device)
+        all_attn = []
 
         for _ in range(max_length):
             txt_emb = self.seq_embedding(tokens)
+            attn_step = []
             for layer in self.decoder_layers:
                 txt_emb = layer(features, txt_emb)
-            logits = self.output_layer(txt_emb[:, -1, :])
+                if collect_attn:
+                    attn = layer.cross_attention.attention_scores
+                    attn = attn.mean(dim=1).squeeze(1).squeeze(1)  # Average attention over heads and remove singleton dimensions
+                    attn_step.append(attn.cpu().numpy())
+            if collect_attn:
+                all_attn.append(attn_step)
 
+            logits = self.output_layer(txt_emb[:, -1, :])
             if tokens.size(1) > 1:
                 last_token = tokens[:, -1]
                 # Penalize the logits for the last generated token (per batch element)
@@ -441,7 +449,7 @@ class ImageCaptioningTransformer(nn.Module):
                 break
 
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
-        return captions, log_probs
+        return captions, log_probs, all_attn
 
     def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> tuple[list[str], Tensor]:
         """
