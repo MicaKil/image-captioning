@@ -10,10 +10,7 @@ from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
 
 from constants import SOS, EOS, UNK, PAD
-from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.test import test
-from scripts.train import train
 
 
 class Encoder(nn.Module):
@@ -176,7 +173,7 @@ class CrossAttention(nn.Module):
         :return:
         """
         attn_output, attn_weights = self.mha(txt_emb, img_features, img_features)
-        self.attention_scores = attn_weights  # Save attention scores for visualization
+        self.attention_scores = attn_weights.detach()  # Save attention scores for visualization
         txt_emb = txt_emb + attn_output
         return self.layer_norm(txt_emb)
 
@@ -417,7 +414,8 @@ class ImageCaptioningTransformer(nn.Module):
         else:
             return self.temperature_sampling(features, vocab, max_length, temperature)
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[list[str], Tensor]:
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[
+        list[str], Tensor]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
@@ -532,37 +530,3 @@ class ImageCaptioningTransformer(nn.Module):
             all_probs = torch.cat((all_probs, sum(best_beam[2])), dim=0)
 
         return captions, torch.tensor(all_probs, device=features.device)
-
-    # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
-
-    def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict, resume_checkpoint: str) -> tuple:
-        """
-        Training loop for the model.
-
-        :param resume_checkpoint:
-        :param train_loader: DataLoader for the training set
-        :param val_loader: DataLoader for the validation set
-        :param device: Device to run the training on
-        :param criterion: Loss function
-        :param optimizer: Optimizer for training
-        :param scheduler: Learning rate scheduler
-        :param checkpoint_dir: Directory to save the best model
-        :param use_wandb: Whether to use Weights & Biases for logging
-        :param run_config: Configuration for the run
-        :return: Path to the best model
-        """
-        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config, resume_checkpoint)
-
-    def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
-        """
-        Evaluate model on test set and log results
-        :param test_loader: Test data loader to use
-        :param device: Device to use (cpu or cuda)
-        :param save_dir: If not None, save results to this directory
-        :param tag: Tag to use for saving results
-        :param use_wandb: Whether to use Weights & Biases for logging
-        :param run_config: Configuration for the run if not using wandb
-        :return:
-        """
-        return test(self, test_loader, device, save_dir, tag, use_wandb, run_config)

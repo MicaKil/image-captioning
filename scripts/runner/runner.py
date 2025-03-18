@@ -18,6 +18,8 @@ from scripts.dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer
 from scripts.runner.config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY
 from scripts.scheduler import SchedulerWrapper
+from scripts.test import test
+from scripts.train import train
 from scripts.utils import date_str
 
 
@@ -86,13 +88,13 @@ class Runner:
             optim = get_optimizer(config, model)
             scheduler = get_scheduler(config, optim, config["encoder_lr"])
 
-            best_path, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optim, scheduler,
-                                                         CHECKPOINT_DIR + config["model"], self.use_wandb, config, self.checkpoint)
+            best_path, best_state, _ = train(model, train_dataloader, val_dataloader, DEVICE, criterion, optim, scheduler,
+                                             CHECKPOINT_DIR + config["model"], self.use_wandb, config, self.checkpoint)
 
             if self.test_model:
                 # test last model
                 test_dataloader = CaptionLoader(test_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-                model.test_model(test_dataloader, DEVICE, save_dir, "LAST", self.use_wandb, config)
+                test(model, test_dataloader, DEVICE, save_dir, "LAST", self.use_wandb, config)
                 if self.use_wandb:
                     wandb.finish()
 
@@ -106,7 +108,7 @@ class Runner:
                     best = self.get_model(config, vocab, pad_idx)
                     best_checkpoint = torch.load(best_path)
                     best.load_state_dict(best_checkpoint["model_state"])
-                    best.test_model(test_dataloader, DEVICE, save_dir, "BEST", self.use_wandb, config)
+                    test(best, test_dataloader, DEVICE, save_dir, "BEST", self.use_wandb, config)
                     if self.use_wandb:
                         wandb.log({"epoch": best_state["epoch"],
                                    "train_loss": best_state["train_loss"],
@@ -122,7 +124,7 @@ class Runner:
             checkpoint = torch.load(os.path.join(ROOT, self.checkpoint), weights_only=False)
             model.load_state_dict(checkpoint['model_state'])
             test_dataloader = CaptionLoader(test_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-            model.test_model(test_dataloader, DEVICE, save_dir, "checkpoint", self.use_wandb, config)
+            test(model, test_dataloader, DEVICE, save_dir, "checkpoint", self.use_wandb, config)
 
         if self.use_wandb:
             wandb.finish()
