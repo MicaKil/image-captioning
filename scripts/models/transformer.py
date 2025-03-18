@@ -6,8 +6,8 @@ import torch.nn as nn
 import torchvision.models as models
 from einops import rearrange
 from torch import Tensor
-from torch.nn.functional import log_softmax, softmax
 from torchvision.models import ResNet50_Weights
+import torch.nn.functional as F
 
 from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.dataloader import CaptionLoader
@@ -439,78 +439,88 @@ class ImageCaptioningTransformer(nn.Module):
                 txt_emb = layer(features, txt_emb)
             logits = self.output_layer(txt_emb[:, -1, :])
 
+            # Penalize the logits for the last generated token (per batch element)
             if tokens.size(1) > 1:
-                last_token = tokens[:, -1]
-                # Penalize the logits for the last generated token (per batch element)
-                logits[torch.arange(batch_size), last_token] -= 1.0  # Reduce probability
+                logits[torch.arange(batch_size), tokens[:, -1]] -= 1.0  # Reduce probability
 
+            # Compute log probabilities (scaling logits if temperature is provided)
             if temperature is not None and temperature != 0:
-                # Apply temperature scaling
-                probs = softmax(logits / temperature, dim=-1)
-                next_tokens = torch.multinomial(probs, 1)
+                logits_scaled = logits / temperature
             else:
-                # Greedy sampling if temperature=0
-                probs = softmax(logits, dim=-1)
-                next_tokens = logits.argmax(-1, keepdim=True)
+                logits_scaled = logits
+            log_probs_step = F.log_softmax(logits_scaled, dim=-1)
 
-            # Mask finished sequences (no further probability accumulation)
-            log_probs += torch.where(finished, 0.0, probs)
-            next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens)
+            # Sample from the probability distribution
+            # Since multinomial works on probabilities, we exponentiate the log probabilities.
+            probs = log_probs_step.exp()
+            next_tokens = torch.multinomial(probs, 1)
+
+            # Gather the log probability of the sampled token.
+            selected_log_prob = log_probs_step.gather(1, next_tokens).squeeze(1)
+
+            # Only update log_probs for sequences not finished
+            log_probs = log_probs + torch.where(finished, torch.zeros_like(selected_log_prob), selected_log_prob)
+
+            # Replace tokens for finished sequences with PAD
+            next_tokens = torch.where(finished.unsqueeze(-1), torch.tensor(vocab.str_to_idx(PAD), device=features.device), next_tokens)
             tokens = torch.cat([tokens, next_tokens], dim=1)
 
             # Update finished flags
-            finished = finished | (next_tokens.squeeze() == vocab.str_to_idx(EOS))
-
+            finished = finished | (next_tokens.squeeze(1) == vocab.str_to_idx(EOS))
             if finished.all():
                 break
 
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
         return captions, log_probs
 
-    def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> tuple[list[str], Tensor]:
+    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], Tensor]:
         """
         Implements beam search to generate the most likely caption sequence.
         Repeats image features for each beam and, for each step, extends beams by considering the top probable next tokens, applying length
         normalization before choosing the best sequence
-        :param features:
-        :param vocab:
-        :param max_length:
+        :param images: Batch of images features
+        :param vocab: 
+        :param max_len:
         :param beam_size:
         :return:
         """
-        batch_size = features.size(0)
+        batch_size = images.size(0)
         sos_idx = vocab.str_to_idx(SOS)
         eos_idx = vocab.str_to_idx(EOS)
 
         captions = []
-        all_probs = torch.zeros(batch_size, device=features.device)  # To store log probabilities for each sequence
+        all_probs = []
 
         # Process each image in batch separately
         for i in range(batch_size):
-            image = features[i].unsqueeze(0)
+            image = images[i].unsqueeze(0).repeat(beam_size, 1, 1)
             beams = [(0.0, [sos_idx], [])]  # (score, sequence, log_probs)
 
-            for _ in range(max_length):
+            for _ in range(max_len):
                 candidates = []
                 for score, seq, log_probs in beams:
                     if seq[-1] == eos_idx:
                         candidates.append((score, seq, log_probs))
                         continue
 
+                    # Prepare input
                     tokens = torch.tensor([seq], device=image.device)
+
+                    # Forward pass
                     txt_emb = self.seq_embedding(tokens)
                     for layer in self.decoder_layers:
-                        txt_emb = layer(image, txt_emb)
+                        txt_emb = layer(image[:len(tokens)], txt_emb)
                     logits = self.output_layer(txt_emb[:, -1, :])
 
+                    # Penalize the logits for the last generated token (per batch element)
                     if tokens.size(1) > 1:
-                        last_token = tokens[:, -1]
-                        # Penalize the logits for the last generated token (per batch element)
-                        logits[torch.arange(batch_size), last_token] -= 1.0  # Reduce probability
+                        logits[torch.arange(tokens.size(0)), tokens[:, -1]] -= 1.0  # Reduce probability
 
-                    step_probs = log_softmax(logits, dim=-1)
+                    # Get probabilities
+                    step_probs = F.log_softmax(logits, dim=-1)
                     top_probs, top_indices = step_probs.topk(beam_size)
 
+                    # Add candidates
                     for j in range(beam_size):
                         candidates.append((
                             score + top_probs[0, j].item(),
@@ -528,10 +538,9 @@ class ImageCaptioningTransformer(nn.Module):
             # Select best beam
             best_beam = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))
             captions.append(vocab.encode_as_words(best_beam[1]))
-            # all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
-            all_probs = torch.cat((all_probs, sum(best_beam[2])), dim=0)
+            all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
 
-        return captions, torch.tensor(all_probs, device=features.device)
+        return captions, torch.tensor(all_probs, device=images.device)
 
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
 

@@ -21,14 +21,14 @@ PROJECT = "image-captioning-v1"
 TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-use_scheduler = True
+use_scheduler = False
 eval_bleu4 = False
 
 CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention",
-    "batch_size": 16,
+    "batch_size": 64,
     "embed_size": None,
     "hidden_size": 512,
     "num_layers": 3,
@@ -40,7 +40,7 @@ CONFIG = {
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 10,
+    "max_epochs": 5,
     "patience": 1,
     "gradient_clip": 5.0,
     "dataset": {
@@ -67,7 +67,7 @@ CONFIG = {
     },
     "max_caption_len": 60,
     "temperature": 0,
-    "beam_size": 1,
+    "beam_size": 5,
     "scheduler": {
         "type": "ReduceLROnPlateau",
         "factor": 0.5,
