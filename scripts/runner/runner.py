@@ -240,8 +240,9 @@ class Runner:
                 decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
                 return intermediate.IntermediateImageCaptioner(encoder, decoder)
             case "transformer":
-                return transformer.ImageCaptioningTransformer(vocab, hidden_size, num_layers, config["num_heads"], self.max_sequence_length(vocab),
-                                                              encoder_dropout, decoder_dropout, fine_tune)
+                encoder = transformer.Encoder(hidden_size, encoder_dropout, fine_tune)
+                return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"], self.max_seq_len(vocab),
+                                                              decoder_dropout)
             case _:
                 raise ValueError(f"Model {config['model']} not recognized")
 
@@ -256,12 +257,9 @@ class Runner:
         :return:
         """
         dataset_splits = config['dataset']['split']
-        train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{dataset_splits['train']}.csv"), header=["image_id", "caption"],
-                        index=False)
-        val_df.to_csv(os.path.join(ROOT, self.ds_dir, f"val_{date}_{dataset_splits['val']}.csv"), header=["image_id", "caption"],
-                      index=False)
-        test_df.to_csv(os.path.join(ROOT, self.ds_dir, f"test_{date}_{dataset_splits['test']}.csv"), header=["image_id", "caption"],
-                       index=False)
+        train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{dataset_splits['train']}.csv"), header=["image_id", "caption"], index=False)
+        val_df.to_csv(os.path.join(ROOT, self.ds_dir, f"val_{date}_{dataset_splits['val']}.csv"), header=["image_id", "caption"], index=False)
+        test_df.to_csv(os.path.join(ROOT, self.ds_dir, f"test_{date}_{dataset_splits['test']}.csv"), header=["image_id", "caption"], index=False)
 
     def save_datasets(self, full_dataset: Optional[CaptionDataset], train_dataset: CaptionDataset, val_dataset: CaptionDataset,
                       test_dataset: CaptionDataset, date: str, config: dict):
@@ -321,7 +319,7 @@ class Runner:
         artifact.add_file(dataset_path)
         wandb.log_artifact(artifact)
 
-    def max_sequence_length(self, vocab: Vocabulary):
+    def max_seq_len(self, vocab: Vocabulary):
         """
         Calculate the maximum sequence length in the dataset
         :param vocab:
