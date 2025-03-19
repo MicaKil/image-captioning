@@ -473,17 +473,18 @@ class ImageCaptioningTransformer(nn.Module):
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
         return captions, log_probs
 
-    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], Tensor]:
+    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], torch.Tensor]:
         """
         Implements beam search to generate the most likely caption sequence.
         Repeats image features for each beam and, for each step, extends beams by considering the top probable next tokens, applying length
         normalization before choosing the best sequence
         :param images: Batch of images features
-        :param vocab: 
+        :param vocab:
         :param max_len:
         :param beam_size:
         :return:
         """
+
         batch_size = images.size(0)
         sos_idx = vocab.str_to_idx(SOS)
         eos_idx = vocab.str_to_idx(EOS)
@@ -491,54 +492,56 @@ class ImageCaptioningTransformer(nn.Module):
         captions = []
         all_probs = []
 
-        # Process each image in batch separately
-        for i in range(batch_size):
-            image = images[i].unsqueeze(0).repeat(beam_size, 1, 1)
+        # Process each image in the batch separately
+        for b in range(batch_size):
+            image = images[b].unsqueeze(0).repeat(beam_size, 1, 1)
             beams = [(0.0, [sos_idx], [])]  # (score, sequence, log_probs)
 
-            for _ in range(max_len):
-                candidates = []
-                for score, seq, log_probs in beams:
-                    if seq[-1] == eos_idx:
-                        candidates.append((score, seq, log_probs))
-                        continue
-
-                    # Prepare input
-                    tokens = torch.tensor([seq], device=image.device)
-
-                    # Forward pass
-                    txt_emb = self.seq_embedding(tokens)
-                    for layer in self.decoder_layers:
-                        txt_emb = layer(image[:len(tokens)], txt_emb)
-                    logits = self.output_layer(txt_emb[:, -1, :])
-
-                    # Penalize the logits for the last generated token (per batch element)
-                    if tokens.size(1) > 1:
-                        logits[torch.arange(tokens.size(0)), tokens[:, -1]] -= 1.0  # Reduce probability
-
-                    # Get probabilities
-                    step_probs = F.log_softmax(logits, dim=-1)
-                    top_probs, top_indices = step_probs.topk(beam_size)
-
-                    # Add candidates
-                    for j in range(beam_size):
-                        candidates.append((
-                            score + top_probs[0, j].item(),
-                            seq + [top_indices[0, j].item()],
-                            log_probs + [top_probs[0, j].item()]
-                        ))
-
-                # Keep top-k candidates with length normalization
-                candidates.sort(reverse=True, key=lambda x: x[0] / (len(x[1]) ** 0.5))
-                beams = candidates[:beam_size]
-
-                if all(seq[-1] == eos_idx for _, seq, _ in beams):
+            for t in range(max_len):
+                # Prepare current beam sequences, skipping extension for beams that already ended
+                active_beams = [beam for beam in beams if beam[1][-1] != eos_idx]
+                # If no beams are active, break out of the loop
+                if len(active_beams) == 0:
                     break
 
-            # Select best beam
+                # For candidates that are active, extend them
+                seqs = [beam[1] for beam in active_beams]
+                max_seq_length = max(len(seq) for seq in seqs)
+                padded_seqs = [seq + [vocab.str_to_idx(PAD)] * (max_seq_length - len(seq)) for seq in seqs]
+                seq_tensor = torch.tensor(padded_seqs, device=image.device)
+
+                txt_emb = self.seq_embedding(seq_tensor)
+                for layer in self.decoder_layers:
+                    txt_emb = layer(image[:seq_tensor.size(0)], txt_emb)
+                logits = self.output_layer(txt_emb[:, -1, :])
+                step_log_probs = F.log_softmax(logits, dim=-1)  # (active_beams, vocab_size)
+
+                topk = beam_size
+                top_probs, top_indices = step_log_probs.topk(topk, dim=-1)
+
+                candidates = []
+                for i in range(seq_tensor.size(0)):
+                    for j in range(topk):
+                        new_score = active_beams[i][0] + top_probs[i, j].item()
+                        new_seq = active_beams[i][1] + [top_indices[i, j].item()]
+                        new_log_probs = active_beams[i][2] + [top_probs[i, j].item()]
+                        candidates.append((new_score, new_seq, new_log_probs))
+
+                # Add beams that have already finished (without extension)
+                finished_beams = [beam for beam in beams if beam[1][-1] == eos_idx]
+                # Combine and sort candidates
+                all_candidates = candidates + finished_beams
+                all_candidates.sort(reverse=True, key=lambda x: x[0] / (len(x[1]) ** 0.5))
+                beams = all_candidates[:beam_size]
+
+                # If all beams have ended, break early
+                if all(beam[1][-1] == eos_idx for beam in beams):
+                    break
+
+            # After max_len iterations, choose the best beam
             best_beam = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))
             captions.append(vocab.encode_as_words(best_beam[1]))
-            all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
+            all_probs.append(sum(best_beam[2]))
 
         return captions, torch.tensor(all_probs, device=images.device)
 

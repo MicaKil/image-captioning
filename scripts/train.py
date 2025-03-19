@@ -228,7 +228,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         images = images.to(device)
         optim.zero_grad()
 
-        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
+        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1, False)
         references = metrics.get_references(train_loader.annotations, images_id)
         reward, rewards = metrics.get_cider_score(generated, references)
 

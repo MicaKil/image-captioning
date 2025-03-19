@@ -25,9 +25,6 @@ def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_l
     :return: List of generated captions
     """
 
-    # if temperature is not None and beam_size > 1:
-    #     raise Warning("Temperature sampling and beam search are mutually exclusive. Using beam search.")
-
     model = model.to(device)
     return model.generate(images=images, vocab=vocab, max_length=max_length, device=device, temperature=temperature, beam_size=beam_size,
                           no_grad=no_grad)
