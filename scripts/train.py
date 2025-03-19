@@ -31,7 +31,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     :param criterion: Loss function
     :param optim: Optimizer for training
     :param scheduler: Learning rate scheduler
-    :param checkpoint_dir: Directory to save the best model
+    :param checkpoint_dir: Directory to save the models
     :param use_wandb: Whether to use Weights & Biases for logging
     :param run_config: Configuration for the run
     :param resume_checkpoint: Path to a checkpoint to resume training from
@@ -53,7 +53,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     last_path = None
     last_state = dict()
     epochs_no_improve = 0
-    use_rl = True
+    use_rl = False  # Start training with cross entropy
     allow_rl_switch = config["allow_rl_switch"]
 
     start_epoch = 0
@@ -86,9 +86,8 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
                 logger.info(f"Current learning rates: Encoder = {cur_lr[0]}, Decoder = {cur_lr[1]}")
 
-        # checkpointing
+        # Only remove the last checkpoint if it is not the best one
         if last_path is not None and last_path != best_pth:
-            # Only remove the last checkpoint if it is not the best one
             os.remove(last_path)
         last_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(val_loss, 4)).replace(".", "-")}.pt")
         cur_state = save_checkpoint(model, last_path, optim, scheduler, train_loss, val_loss, cur_lr, epoch, epochs_no_improve, config, use_rl)
@@ -103,23 +102,23 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             logger.info(f"New best validation loss: {best_val_loss:.4f}")
         else:
             epochs_no_improve += 1
-        # epochs_no_improve = 1000
-        # if config["patience"] is not None and epochs_no_improve >= config["patience"]:
-        if not use_rl and allow_rl_switch:
-            # reached the end of the patience for XE, switch to RL
-            use_rl = True
-            epochs_no_improve = 0
-            logger.info("Switching to Reinforcement Learning")
-        else:
-            # reached the end of the patience for RL, stop training
-            logger.info(f"Early stopping after {epoch + 1} epochs")
-            break
+
+        if config["patience"] is not None and epochs_no_improve >= config["patience"]:
+            if not use_rl and allow_rl_switch:
+                # reached the end of the patience for XE, switch to RL
+                use_rl = True
+                epochs_no_improve = 0
+                logger.info("Switching to Reinforcement Learning")
+            else:
+                # reached the end of the patience for RL, stop training
+                logger.info(f"Early stopping after {epoch + 1} epochs")
+                break
 
     logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
 
-    # check the best model is not the last model
+    # Check the best model is not the last model
     if best_state is not None and best_state["epoch"] == last_state["epoch"]:
-        # if they are the same, then the best model is the last model
+        # If they are the same, then the best model is the last model
         logger.info("Best model is the last model")
         return None, None, last_path
 
@@ -231,11 +230,6 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1, False)
         references = metrics.get_references(train_loader.annotations, images_id)
         reward, rewards = metrics.get_cider_score(generated, references)
-
-        if i % 1000 == 0:
-            print(f'Generated: {generated[0]}')
-            print(f'References: {references[0][0]}')
-            print(f'Reward: {reward} | Rewards: {rewards[0]}')
 
         rewards = torch.tensor(rewards, device=device)
         reward_baseline = torch.mean(rewards, dim=-1, keepdim=True)
