@@ -19,7 +19,7 @@ from scripts.utils import time_str, get_config
 
 
 def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module,
-          optimizer: torch.optim, scheduler: SchedulerWrapper, checkpoint_dir: str, use_wandb: bool, run_config: dict,
+          optim: torch.optim, scheduler: SchedulerWrapper, checkpoint_dir: str, use_wandb: bool, run_config: dict,
           resume_checkpoint: str) -> tuple:
     """
     Training loop for the model.
@@ -29,9 +29,9 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     :param val_loader: DataLoader for the validation set
     :param device: Device to run the training on
     :param criterion: Loss function
-    :param optimizer: Optimizer for training
+    :param optim: Optimizer for training
     :param scheduler: Learning rate scheduler
-    :param checkpoint_dir: Directory to save the best model
+    :param checkpoint_dir: Directory to save the models
     :param use_wandb: Whether to use Weights & Biases for logging
     :param run_config: Configuration for the run
     :param resume_checkpoint: Path to a checkpoint to resume training from
@@ -53,49 +53,47 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
     last_path = None
     last_state = dict()
     epochs_no_improve = 0
-    use_rl = True
+    use_rl = False  # Start training with cross entropy
     allow_rl_switch = config["allow_rl_switch"]
 
     start_epoch = 0
     if resume_checkpoint:
-        best_val_loss, epochs_no_improve, start_epoch, use_rl = resume(model, device, optimizer, scheduler, resume_checkpoint)
+        best_val_loss, epochs_no_improve, start_epoch, use_rl = resume(model, device, optim, scheduler, resume_checkpoint)
 
     model = model.to(device)
     for epoch in range(start_epoch, config["max_epochs"]):
         if not use_rl:
-            avg_train_loss = train_xe(model, train_loader, device, epoch, criterion, optimizer, use_wandb, run_config)
+            train_loss = train_xe(model, train_loader, device, epoch, criterion, optim, use_wandb, run_config)
         else:
-            avg_train_loss = train_rl(model, train_loader, device, epoch, optimizer, use_wandb, run_config)
-        avg_val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, use_wandb, run_config)
+            train_loss = train_rl(model, train_loader, device, epoch, optim, use_wandb, run_config)
+        val_loss, val_bleu4 = eval_load(model, val_loader, device, epoch, criterion, use_wandb, run_config)
 
         if val_bleu4 is not None:
-            logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}")
+            logger.info(f"Epoch {epoch + 1} | Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}, Val BLEU-4 = {val_bleu4:.4f}")
         else:
-            logger.info(f"Epoch {epoch + 1} | Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
+            logger.info(f"Epoch {epoch + 1} | Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}")
 
-        last_state = {"epoch": epoch + 1, "train_loss": avg_train_loss, "val_loss": avg_val_loss}
+        last_state = {"epoch": epoch + 1, "train_loss": train_loss, "val_loss": val_loss}
         if config["eval_bleu4"]:
             last_state["val_BLEU-4"] = val_bleu4
         if use_wandb:
             wandb.log(last_state)
 
         if scheduler is not None:
-            scheduler.step(avg_val_loss)
+            scheduler.step(val_loss)
             cur_lr = scheduler.scheduler.get_last_lr()
             if use_wandb:
                 wandb.log({"encoder_lr": cur_lr[0], "decoder_lr": cur_lr[1]})
                 logger.info(f"Current learning rates: Encoder = {cur_lr[0]}, Decoder = {cur_lr[1]}")
 
-        # checkpointing
+        # Only remove the last checkpoint if it is not the best one
         if last_path is not None and last_path != best_pth:
-            # Only remove the last checkpoint if it is not the best one
             os.remove(last_path)
-        last_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(avg_val_loss, 4)).replace(".", "-")}.pt")
-        cur_state = save_checkpoint(model, last_path, optimizer, scheduler, avg_train_loss, avg_val_loss, cur_lr, epoch, epochs_no_improve, config,
-                                    use_rl)
+        last_path = os.path.join(ROOT, f"{checkpoint_dir}/LAST_{time_str()}_{str(round(val_loss, 4)).replace(".", "-")}.pt")
+        cur_state = save_checkpoint(model, last_path, optim, scheduler, train_loss, val_loss, cur_lr, epoch, epochs_no_improve, config, use_rl)
 
-        if avg_val_loss < best_val_loss:  # new best model
-            best_val_loss = avg_val_loss
+        if val_loss < best_val_loss:  # new best model
+            best_val_loss = val_loss
             epochs_no_improve = 0
             if best_pth is not None:
                 os.remove(best_pth)
@@ -104,7 +102,7 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
             logger.info(f"New best validation loss: {best_val_loss:.4f}")
         else:
             epochs_no_improve += 1
-        # epochs_no_improve = 1000
+
         if config["patience"] is not None and epochs_no_improve >= config["patience"]:
             if not use_rl and allow_rl_switch:
                 # reached the end of the patience for XE, switch to RL
@@ -118,9 +116,9 @@ def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoad
 
     logger.info(f"Training finished. Best validation loss: {best_val_loss:.4f}")
 
-    # check the best model is not the last model
+    # Check the best model is not the last model
     if best_state is not None and best_state["epoch"] == last_state["epoch"]:
-        # if they are the same, then the best model is the last model
+        # If they are the same, then the best model is the last model
         logger.info("Best model is the last model")
         return None, None, last_path
 
@@ -203,7 +201,7 @@ def train_xe(model: nn.Module, train_loader: CaptionLoader, device: torch.device
     return train_loss / total_tokens if total_tokens > 0 else 0
 
 
-def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, optimizer: torch.optim, use_wandb: bool,
+def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device, epoch: int, optim: torch.optim, use_wandb: bool,
              run_config: dict) -> float:
     """
     Reinforcement learning training with CIDEr optimization
@@ -211,63 +209,51 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
     :param train_loader:
     :param device:
     :param epoch:
-    :param optimizer:
+    :param optim:
     :param use_wandb:
     :param run_config:
     :return:
     """
     config = get_config(run_config, use_wandb)
-    running_reward = 0.0
-    running_reward_baseline = 0.0
-    running_loss = 0.0
+    cur_reward = 0.0
+    cur_reward_baseline = 0.0
+    cur_loss = 0.0
     vocab = train_loader.vocab
 
     model.train()
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [RL Training]")
-    i = 0
     for images, _, images_id in batch_progress:
         images = images.to(device)
-        optimizer.zero_grad()
+        optim.zero_grad()
 
-        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"], False)
+        generated, log_probs = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], 1, False)
         references = metrics.get_references(train_loader.annotations, images_id)
         reward, rewards = metrics.get_cider_score(generated, references)
-
-        if i % 1000 == 0:
-            print(f'Generated: {generated[0]}')
-            print(f'References: {references[0][0]}')
-            print(f'Reward: {reward} | Rewards: {rewards[0]}')
 
         rewards = torch.tensor(rewards, device=device)
         reward_baseline = torch.mean(rewards, dim=-1, keepdim=True)
 
-        # # Normalize rewards
-        # if config['rl_baseline']:
-        #     rewards = rewards - rewards.mean()
-        #
-        # Calculate loss
         loss = -torch.mean(log_probs * (rewards - reward_baseline), dim=-1)
 
         # Backpropagation
         loss.backward()
         if config['gradient_clip']:
             nn.utils.clip_grad_norm_(model.parameters(), config['gradient_clip'])
-        optimizer.step()
+        optim.step()
 
         # Update metrics
-        running_loss += loss.item()
-        running_reward += rewards.mean().item()
-        running_reward_baseline += reward_baseline.mean().item()
+        cur_loss += loss.item()
+        cur_reward += rewards.mean().item()
+        cur_reward_baseline += reward_baseline.mean().item()
         batch_progress.set_postfix(
-            {'loss': running_loss / (batch_progress.n + 1), 'reward': running_reward / (batch_progress.n + 1),
-             'reward_baseline': running_reward_baseline / (batch_progress.n + 1)}
+            {'loss': cur_loss / (batch_progress.n + 1), 'reward': cur_reward / (batch_progress.n + 1),
+             'reward_baseline': cur_reward_baseline / (batch_progress.n + 1)}
         )
 
         del generated, log_probs, rewards  # Free GPU memory
         torch.cuda.empty_cache()  # Clear cache
-        i += 1
 
-    return running_loss / len(train_loader)
+    return cur_loss / len(train_loader)
 
 
 def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device, epoch: int, criterion: nn.Module, use_wandb: bool,
@@ -363,27 +349,27 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 
 def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: Vocabulary) -> None:
     """
-    Generate a sample caption
-    :param config: Run configuration
-    :param device: Device to run the model
-    :param model: Model to generate the caption
-    :param vocab: Vocabulary of the training set
-    :return: Prints the sample caption
+    Generate a sample caption.
+    :param config: Run configuration.
+    :param device: Device to run the model.
+    :param model: Model to generate the caption.
+    :param vocab: Vocabulary of the training set.
+    :return: Prints the sample caption.
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
     caption, _ = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
     logger.info(f"Sample caption: {caption[0]}")
 
 
-def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, scheduler: SchedulerWrapper, train_loss: float, val_loss: float,
-                    cur_lr: tuple, epoch: int, epochs_no_improve: int, config: dict, use_rl: bool) -> dict:
+def save_checkpoint(model: nn.Module, path: str, optim: torch.optim, scheduler: SchedulerWrapper, train_loss: float, val_loss: float, cur_lr: tuple,
+                    epoch: int, epochs_no_improve: int, config: dict, use_rl) -> dict:
     """
     Checkpoint the model
+    :param use_rl:
     :param model: Current model
     :param path: Path to save the checkpoint
-    :param optimizer: Current optimizer
+    :param optim: Current optimizer
     :param scheduler: Scheduler for the optimizer
-    :param use_rl:
     :param train_loss: Current training loss
     :param val_loss: Current best validation loss
     :param cur_lr: Current learning rate in the encoder and decoder
@@ -395,7 +381,7 @@ def save_checkpoint(model: nn.Module, path: str, optimizer: torch.optim, schedul
     state = {
         'epoch': epoch + 1,
         'model_state': model.state_dict(),
-        'optimizer_state': optimizer.state_dict(),
+        'optimizer_state': optim.state_dict(),
         'scheduler_state': scheduler.scheduler.state_dict() if scheduler else None,
         'best_val_loss': val_loss,
         'train_loss': train_loss,
