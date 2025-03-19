@@ -351,12 +351,12 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 
 def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: Vocabulary) -> None:
     """
-    Generate a sample caption
-    :param config: Run configuration
-    :param device: Device to run the model
-    :param model: Model to generate the caption
-    :param vocab: Vocabulary of the training set
-    :return: Prints the sample caption
+    Generate a sample caption.
+    :param config: Run configuration.
+    :param device: Device to run the model.
+    :param model: Model to generate the caption.
+    :param vocab: Vocabulary of the training set.
+    :return: Prints the sample caption.
     """
     img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
     caption, _ = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
