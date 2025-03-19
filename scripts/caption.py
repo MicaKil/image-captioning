@@ -43,8 +43,9 @@ def plot_attention(image_tensor: torch.Tensor, caption: list[str], attentions: l
     :param std: Standard deviation values for normalization
     :param save_path: Path to save the plot (optional)
     """
+    print(len(caption))
+    print(len(attentions))
     assert len(attentions) == len(caption), "attentions length must match caption length"
-
     # Inverse normalize the image
     inverse_normalize = v2.Normalize(
         mean=[-m / s for m, s in zip(mean, std)],

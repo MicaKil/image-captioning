@@ -367,7 +367,6 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         if max_length > self.max_length:
-            # logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
             max_length = self.max_length
 
         images = images.to(device)
@@ -417,7 +416,7 @@ class ImageCaptioningTransformer(nn.Module):
                 if collect_attn:
                     attn = layer.cross_attention.attention_scores
                     attn = attn.mean(dim=1).squeeze(1).squeeze(1)  # Average attention over heads and remove singleton dimensions
-                    attn_step.append(attn.cpu().numpy())
+                    attn_step.append(attn.detach().cpu().numpy())
             if collect_attn:
                 all_attn.append(attn_step)
 
@@ -428,7 +427,7 @@ class ImageCaptioningTransformer(nn.Module):
                 logits[torch.arange(batch_size), tokens[:, -1]] -= 1.0  # Reduce probability
 
             # Compute log probabilities (scaling logits if temperature is provided)
-            if temperature is not None and temperature != 0:
+            if temperature is not None and temperature > 0:
                 logits_scaled = logits / temperature
             else:
                 logits_scaled = logits
