@@ -5,8 +5,9 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from einops import rearrange
-from torch.nn.functional import log_softmax, softmax
+from torch import Tensor
 from torchvision.models import ResNet50_Weights
+import torch.nn.functional as F
 
 from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.dataloader import CaptionLoader
@@ -378,36 +379,45 @@ class ImageCaptioningTransformer(nn.Module):
 
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
-    def generate(self, image: torch.Tensor, vocab: Vocabulary, max_length: int, device: torch.device, temperature: float,
-                 beam_size: int) -> list[str]:
+    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, device: torch.device, temperature: Optional[float], beam_size: int,
+                 no_grad: bool) -> tuple[list[str], torch.Tensor]:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
-        :param image:
+        :param images:
         :param vocab:
         :param max_length:
         :param device:
         :param temperature:
         :param beam_size:
+        :param no_grad:
         :return:
         """
         if max_length > self.max_length:
             # logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
             max_length = self.max_length
 
-        self.eval()
-        with torch.no_grad():
-            image = image.to(device)
-            # Encode image
-            features = self.encoder(image)
-            features = rearrange(features, 'b c h w -> b (h w) c')
+        images = images.to(device)
 
-            if beam_size > 1:
-                return self.beam_search(features, vocab, max_length, beam_size)
-            else:
-                return self.temperature_sampling(features, vocab, max_length, temperature)
+        if no_grad:
+            self.eval()
+            with torch.no_grad():
+                features = self.encoder(images)
+                features = rearrange(features, 'b c h w -> b (h w) c')
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> list[str]:
+                if beam_size > 1:
+                    return self.beam_search(features, vocab, max_length, beam_size)
+                else:
+                    return self.temperature_sampling(features, vocab, max_length, temperature)
+
+        features = self.encoder(images)
+        features = rearrange(features, 'b c h w -> b (h w) c')
+        if beam_size > 1:
+            return self.beam_search(features, vocab, max_length, beam_size)
+        else:
+            return self.temperature_sampling(features, vocab, max_length, temperature)
+
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[list[str], Tensor]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
@@ -421,6 +431,7 @@ class ImageCaptioningTransformer(nn.Module):
         batch_size = features.size(0)
         tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
+        log_probs = torch.zeros(batch_size, device=features.device)
 
         for _ in range(max_length):
             txt_emb = self.seq_embedding(tokens)
@@ -428,89 +439,116 @@ class ImageCaptioningTransformer(nn.Module):
                 txt_emb = layer(features, txt_emb)
             logits = self.output_layer(txt_emb[:, -1, :])
 
-            if temperature is not None and temperature != 0:
-                probs = softmax(logits / temperature, dim=-1)
-                next_tokens = torch.multinomial(probs, 1)
-            else:
-                next_tokens = logits.argmax(-1, keepdim=True)
+            # Penalize the logits for the last generated token (per batch element)
+            if tokens.size(1) > 1:
+                logits[torch.arange(batch_size), tokens[:, -1]] -= 1.0  # Reduce probability
 
-            # Mask finished sequences
-            next_tokens = torch.where(finished.unsqueeze(-1), vocab.str_to_idx(PAD), next_tokens)
+            # Compute log probabilities (scaling logits if temperature is provided)
+            if temperature is not None and temperature != 0:
+                logits_scaled = logits / temperature
+            else:
+                logits_scaled = logits
+            log_probs_step = F.log_softmax(logits_scaled, dim=-1)
+
+            # Sample from the probability distribution
+            # Since multinomial works on probabilities, we exponentiate the log probabilities.
+            probs = log_probs_step.exp()
+            next_tokens = torch.multinomial(probs, 1)
+
+            # Gather the log probability of the sampled token.
+            selected_log_prob = log_probs_step.gather(1, next_tokens).squeeze(1)
+
+            # Only update log_probs for sequences not finished
+            log_probs = log_probs + torch.where(finished, torch.zeros_like(selected_log_prob), selected_log_prob)
+
+            # Replace tokens for finished sequences with PAD
+            next_tokens = torch.where(finished.unsqueeze(-1), torch.tensor(vocab.str_to_idx(PAD), device=features.device), next_tokens)
             tokens = torch.cat([tokens, next_tokens], dim=1)
 
             # Update finished flags
-            finished = finished | (next_tokens.squeeze() == vocab.str_to_idx(EOS))
-
+            finished = finished | (next_tokens.squeeze(1) == vocab.str_to_idx(EOS))
             if finished.all():
                 break
 
-        return [vocab.encode_as_words(seq.tolist()) for seq in tokens]
+        captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
+        return captions, log_probs
 
-    def beam_search(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, beam_size: int) -> list[str]:
+    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], torch.Tensor]:
         """
         Implements beam search to generate the most likely caption sequence.
         Repeats image features for each beam and, for each step, extends beams by considering the top probable next tokens, applying length
         normalization before choosing the best sequence
-        :param features:
+        :param images: Batch of images features
         :param vocab:
-        :param max_length:
+        :param max_len:
         :param beam_size:
         :return:
         """
-        batch_size = features.size(0)
+
+        batch_size = images.size(0)
         sos_idx = vocab.str_to_idx(SOS)
         eos_idx = vocab.str_to_idx(EOS)
 
         captions = []
-        all_probs = []  # To store log probabilities for each sequence
+        all_probs = []
 
-        # Process each image in batch separately
-        for i in range(batch_size):
-            image = features[i].unsqueeze(0)
+        # Process each image in the batch separately
+        for b in range(batch_size):
+            image = images[b].unsqueeze(0).repeat(beam_size, 1, 1)
             beams = [(0.0, [sos_idx], [])]  # (score, sequence, log_probs)
 
-            for _ in range(max_length):
-                candidates = []
-                for score, seq, log_probs in beams:
-                    if seq[-1] == eos_idx:
-                        candidates.append((score, seq, log_probs))
-                        continue
-
-                    tokens = torch.tensor([seq], device=image.device)
-                    txt_emb = self.seq_embedding(tokens)
-                    for layer in self.decoder_layers:
-                        txt_emb = layer(image, txt_emb)
-                    logits = self.output_layer(txt_emb[:, -1, :])
-
-                    step_probs = log_softmax(logits, dim=-1)
-                    top_probs, top_indices = step_probs.topk(beam_size)
-
-                    for j in range(beam_size):
-                        candidates.append((
-                            score + top_probs[0, j].item(),
-                            seq + [top_indices[0, j].item()],
-                            log_probs + [top_probs[0, j].item()]
-                        ))
-
-                # Keep top-k candidates with length normalization
-                candidates.sort(reverse=True, key=lambda x: x[0] / (len(x[1]) ** 0.5))
-                beams = candidates[:beam_size]
-
-                if all(seq[-1] == eos_idx for _, seq, _ in beams):
+            for t in range(max_len):
+                # Prepare current beam sequences, skipping extension for beams that already ended
+                active_beams = [beam for beam in beams if beam[1][-1] != eos_idx]
+                # If no beams are active, break out of the loop
+                if len(active_beams) == 0:
                     break
 
-            # Select best beam
+                # For candidates that are active, extend them
+                seqs = [beam[1] for beam in active_beams]
+                max_seq_length = max(len(seq) for seq in seqs)
+                padded_seqs = [seq + [vocab.str_to_idx(PAD)] * (max_seq_length - len(seq)) for seq in seqs]
+                seq_tensor = torch.tensor(padded_seqs, device=image.device)
+
+                txt_emb = self.seq_embedding(seq_tensor)
+                for layer in self.decoder_layers:
+                    txt_emb = layer(image[:seq_tensor.size(0)], txt_emb)
+                logits = self.output_layer(txt_emb[:, -1, :])
+                step_log_probs = F.log_softmax(logits, dim=-1)  # (active_beams, vocab_size)
+
+                topk = beam_size
+                top_probs, top_indices = step_log_probs.topk(topk, dim=-1)
+
+                candidates = []
+                for i in range(seq_tensor.size(0)):
+                    for j in range(topk):
+                        new_score = active_beams[i][0] + top_probs[i, j].item()
+                        new_seq = active_beams[i][1] + [top_indices[i, j].item()]
+                        new_log_probs = active_beams[i][2] + [top_probs[i, j].item()]
+                        candidates.append((new_score, new_seq, new_log_probs))
+
+                # Add beams that have already finished (without extension)
+                finished_beams = [beam for beam in beams if beam[1][-1] == eos_idx]
+                # Combine and sort candidates
+                all_candidates = candidates + finished_beams
+                all_candidates.sort(reverse=True, key=lambda x: x[0] / (len(x[1]) ** 0.5))
+                beams = all_candidates[:beam_size]
+
+                # If all beams have ended, break early
+                if all(beam[1][-1] == eos_idx for beam in beams):
+                    break
+
+            # After max_len iterations, choose the best beam
             best_beam = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))
             captions.append(vocab.encode_as_words(best_beam[1]))
-            all_probs.append(sum(best_beam[2]))  # Sum of log probabilities
+            all_probs.append(sum(best_beam[2]))
 
-        return captions
+        return captions, torch.tensor(all_probs, device=images.device)
 
     # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
 
     def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict,
-                    resume_checkpoint: str) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict, resume_checkpoint: str) -> tuple:
         """
         Training loop for the model.
 
@@ -526,8 +564,7 @@ class ImageCaptioningTransformer(nn.Module):
         :param run_config: Configuration for the run
         :return: Path to the best model
         """
-        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config,
-                     resume_checkpoint)
+        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config, resume_checkpoint)
 
     def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
         """

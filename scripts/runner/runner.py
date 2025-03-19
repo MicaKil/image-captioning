@@ -7,6 +7,7 @@ import torch.nn as nn
 import wandb
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from wandb.sdk import Config
 from wandb.sdk.wandb_run import Run
 
 from config.config import logger
@@ -70,6 +71,7 @@ class Runner:
         model = self.get_model(config, vocab, pad_idx)
         save_dir = RESULTS_DIR + config["model"]
 
+        batch_size = config["batch_size"]
         if self.train_model:
             parameter_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
             if self.use_wandb:
@@ -77,19 +79,19 @@ class Runner:
             logger.info(f"Number of trainable parameters: {parameter_count}")
 
             # dataloaders
-            train_dataloader = CaptionLoader(train_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
-            val_dataloader = CaptionLoader(val_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+            train_dataloader = CaptionLoader(train_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+            val_dataloader = CaptionLoader(val_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
             criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="none")
-            optimizer = get_optimizer(config, model)
-            scheduler = get_scheduler(config, optimizer, config["encoder_lr"])
+            optim = get_optimizer(config, model)
+            scheduler = get_scheduler(config, optim, config["encoder_lr"])
 
-            best_path, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optimizer, scheduler,
+            best_path, best_state, _ = model.train_model(train_dataloader, val_dataloader, DEVICE, criterion, optim, scheduler,
                                                          CHECKPOINT_DIR + config["model"], self.use_wandb, config, self.checkpoint)
 
             if self.test_model:
                 # test last model
-                test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+                test_dataloader = CaptionLoader(test_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
                 model.test_model(test_dataloader, DEVICE, save_dir, "LAST", self.use_wandb, config)
                 if self.use_wandb:
                     wandb.finish()
@@ -119,7 +121,7 @@ class Runner:
             logger.info(f"Testing model from checkpoint.")
             checkpoint = torch.load(os.path.join(ROOT, self.checkpoint), weights_only=False)
             model.load_state_dict(checkpoint['model_state'])
-            test_dataloader = CaptionLoader(test_dataset, config["batch_size"], NUM_WORKERS, SHUFFLE, PIN_MEMORY)
+            test_dataloader = CaptionLoader(test_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
             model.test_model(test_dataloader, DEVICE, save_dir, "checkpoint", self.use_wandb, config)
 
         if self.use_wandb:
@@ -141,7 +143,7 @@ class Runner:
         wandb_run.define_metric("epoch", summary="max")
         return wandb_run
 
-    def get_datasets(self, config: dict, date: str) -> tuple[CaptionDataset, CaptionDataset, CaptionDataset, Vocabulary]:
+    def get_datasets(self, config: dict | Config, date: Optional[str]) -> tuple[CaptionDataset, CaptionDataset, CaptionDataset, Vocabulary]:
         """
         Creates or loads the datasets.
         :param config: The run configuration.
@@ -212,7 +214,7 @@ class Runner:
                 raise ValueError("Dataframe file format not recognized")
         return train_df, val_df, test_df
 
-    def get_model(self, config: dict, vocab: Vocabulary, pad_idx: int) -> nn.Module:
+    def get_model(self, config: dict | Config, vocab: Vocabulary, pad_idx: int) -> nn.Module:
         """
         Get the model based on the configuration
         :param config: The run configuration
@@ -241,7 +243,7 @@ class Runner:
             case _:
                 raise ValueError(f"Model {config['model']} not recognized")
 
-    def save_df(self, config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame):
+    def save_annotations(self, config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame):
         """
         Save dataframes to disk
         :param config: Run configuration
@@ -330,7 +332,7 @@ class Runner:
         return max_len + 2  # add 2 for start and end tokens
 
 
-def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
+def get_scheduler(config: dict | Config, optimizer: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
     """
     Get the scheduler based on the configuration
     :param config: The run configuration
@@ -340,13 +342,12 @@ def get_scheduler(config: dict, optimizer: torch.optim, encoder_lr: float) -> Op
     """
     scheduler = config["scheduler"]
     if scheduler is not None:
-        scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=scheduler["factor"], patience=scheduler["patience"],
-                                      min_lr=1e-6)
-        return SchedulerWrapper(scheduler, encoder_lr)
+        return SchedulerWrapper(ReduceLROnPlateau(optimizer, mode="min", factor=scheduler["factor"], patience=scheduler["patience"], min_lr=1e-6),
+                                encoder_lr)
     return None
 
 
-def get_optimizer(config: dict, model: nn.Module) -> torch.optim:
+def get_optimizer(config: dict | Config, model: nn.Module) -> torch.optim:
     """
     Get the optimizer based on the configuration.
     :param config: The run configuration

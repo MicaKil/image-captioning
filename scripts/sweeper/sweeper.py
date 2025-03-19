@@ -42,6 +42,5 @@ class Sweeper(Runner):
         wandb.run.summary["trainable_parameters"] = parameter_count
         logger.info(f"Number of trainable parameters: {parameter_count}")
 
-        model.train_model(train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR + config["model"], True, config,
-                          None)
+        model.train_model(train_dataloader, val_dataloader, device, criterion, optimizer, scheduler, CHECKPOINT_DIR + config["model"], True, config, None)
         model.test_model(test_dataloader, device, RESULTS_DIR + config["model"], "LAST", True, config)

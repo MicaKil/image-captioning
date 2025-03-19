@@ -12,7 +12,7 @@ from constants import ROOT
 from scripts.caption import gen_caption
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.metrics import get_references, get_cider_score, get_bleu_scores
-from scripts.utils import time_str
+from scripts.utils import time_str, get_config
 
 
 def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
@@ -27,11 +27,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
     :param run_config: Configuration for the run if not using wandb
     :return:
     """
-    if use_wandb:
-        config = wandb.config
-    else:
-        config = run_config
-
+    config = get_config(run_config, use_wandb)
     logger.info("Start testing model")
 
     results = []
@@ -45,7 +41,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
     with torch.no_grad():
         for images, _, image_ids in tqdm(test_loader):
             # Generate captions
-            generated = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
+            generated, _ = gen_caption(model, images, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
             all_hypotheses.extend(generated)
             # Get references
             references = get_references(df, image_ids)
@@ -59,7 +55,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
     bleu_1, bleu_2, bleu_4 = get_bleu_scores(all_hypotheses, all_references, smoothing)
 
     # CIDEr score
-    cider_score = get_cider_score(all_hypotheses, all_references)
+    cider_score, _ = get_cider_score(all_hypotheses, all_references)
 
     # Log time
     logger.info(f"Finished testing model.")

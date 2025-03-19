@@ -17,18 +17,18 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
     return references
 
 
-def get_cider_score(all_hypotheses: list, all_references: list) -> float:
+def get_cider_score(all_hypotheses: list, all_references: list)  -> tuple[float, list]:
     """
     Calculate CIDEr score for a list of hypotheses and references
     :param all_hypotheses: Hypotheses (generated captions) to evaluate
     :param all_references: References (ground truth captions) to evaluate
-    :return: CIDEr score
+    :return: CIDEr mean score, CIDEr scores for each hypothesis
     """
     hyp_dict = {i: [hyp] for i, hyp in enumerate(all_hypotheses)}
     ref_dict = {i: refs for i, refs in enumerate(all_references)}
     cider_scorer = Cider()
-    cider_score, _ = cider_scorer.compute_score(ref_dict, hyp_dict)
-    return cider_score
+    cider_score, cider_scores = cider_scorer.compute_score(ref_dict, hyp_dict)
+    return cider_score, cider_scores.tolist()
 
 
 def get_bleu_scores(all_hypotheses: list, all_references: list, smoothing) -> tuple:
