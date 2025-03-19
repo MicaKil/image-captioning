@@ -68,7 +68,6 @@ class ImageCaptioner(nn.Module):
         :return: Generated caption as a list of token indices
         """
         batch_size = features.size(0)
-        # caption = [vocab.to_idx(SOS)]  # Initialize caption with start token
         captions = torch.full((batch_size, 1), vocab.str_to_idx(SOS), dtype=torch.long, device=device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
@@ -113,7 +112,7 @@ class ImageCaptioner(nn.Module):
 
         for i in range(batch_size):
             # The image features are replicated beam_size times (one copy per beam/hypothesis)
-            img_features = features[i].expand(beam_size, -1)  # (beam_size, embed_size)
+            img_features = features[i].unsqueeze(0)  # (beam_size, embed_size)
             beams = [(0.0, [sos_idx])]
 
             for _ in range(max_length):
@@ -123,7 +122,7 @@ class ImageCaptioner(nn.Module):
                         candidates.append((score, seq))
                         continue
 
-                    tokens = torch.tensor(seq, device=device).unsqueeze(0)
+                    tokens = torch.tensor([seq], device=device)
                     outputs = self.decoder(img_features, tokens)  # (1, seq_len, vocab_size)
                     logits = outputs[:, -1, :]  # (1, vocab_size)
 

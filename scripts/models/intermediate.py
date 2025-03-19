@@ -3,10 +3,10 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
+from constants import PAD, SOS, UNK
+from scripts.dataset.vocabulary import Vocabulary
 from scripts.models.image_captioning import ImageCaptioner
 
-
-# TODO: Sequential Embedding
 
 class Encoder(nn.Module):
     """
@@ -79,14 +79,13 @@ class Decoder(nn.Module):
     Decoder class that uses an LSTM to generate captions for images.
     """
 
-    def __init__(self, embed_dim: int, hidden_size: int, vocab_size: int, dropout: float, num_layers: int,
-                 padding_idx: int) -> None:
+    def __init__(self, embed_dim: int, hidden_size: int, vocab: Vocabulary, dropout: float, num_layers: int, padding_idx: int) -> None:
         """
         Constructor for the DecoderLSTM class
 
         :param embed_dim: Size of the word embeddings
         :param hidden_size: Size of the hidden state of the LSTM
-        :param vocab_size: Size of the vocabulary
+        :param vocab:
         :param dropout: Dropout probability
         :param num_layers: Number of layers in the LSTM
         :param padding_idx: Index of the padding token in the vocabulary
@@ -94,17 +93,19 @@ class Decoder(nn.Module):
         super().__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
+        self.vocab_size = len(vocab)
+        self.banned_indices = [vocab.str_to_idx(token) for token in [PAD, SOS, UNK]]
 
         # Project image features to initialize hidden and cell states
         self.init_h = nn.Linear(embed_dim, num_layers * hidden_size)
         self.init_c = nn.Linear(embed_dim, num_layers * hidden_size)
 
-        self.embed = nn.Embedding(vocab_size, embed_dim, padding_idx=padding_idx)
+        self.embed = nn.Embedding(self.vocab_size, embed_dim, padding_idx=padding_idx)
         self.dropout = nn.Dropout(dropout)
         self.lstm = nn.LSTM(embed_dim, hidden_size, num_layers, batch_first=True, dropout=dropout if num_layers > 1 else 0)
         self.layer_norm = nn.LayerNorm(hidden_size)
 
-        self.linear = nn.Linear(hidden_size, vocab_size)
+        self.linear = nn.Linear(hidden_size, self.vocab_size)
         self.linear.bias.data.zero_()  # Initialize bias to zeros
         self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
 

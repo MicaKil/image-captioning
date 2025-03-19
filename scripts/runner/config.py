@@ -27,7 +27,7 @@ eval_bleu4 = False
 CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
-    "decoder": "Attention",
+    "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
     "batch_size": 64,
     "embed_size": None,
     "hidden_size": 512,
@@ -76,6 +76,5 @@ CONFIG = {
     "eval_bleu4": {
         "step": 5
     } if eval_bleu4 else None,
-    "rl_baseline": False,
     "allow_rl_switch": True
 }

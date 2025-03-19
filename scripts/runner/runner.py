@@ -235,10 +235,10 @@ class Runner:
                 return basic.BasicImageCaptioner(encoder, decoder)
             case "intermediate":
                 encoder = intermediate.Encoder(embed_dim, encoder_dropout, fine_tune)
-                decoder = intermediate.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
+                decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
                 return intermediate.IntermediateImageCaptioner(encoder, decoder)
             case "transformer":
-                return transformer.ImageCaptioningTransformer(vocab, hidden_size, num_layers, config["num_heads"], self.max_sequence_length(vocab),
+                return transformer.ImageCaptioningTransformer(vocab, hidden_size, num_layers, config["num_heads"], self.max_seq_length(vocab),
                                                               encoder_dropout, decoder_dropout, fine_tune)
             case _:
                 raise ValueError(f"Model {config['model']} not recognized")
@@ -319,7 +319,7 @@ class Runner:
         artifact.add_file(dataset_path)
         wandb.log_artifact(artifact)
 
-    def max_sequence_length(self, vocab: Vocabulary):
+    def max_seq_length(self, vocab: Vocabulary):
         """
         Calculate the maximum sequence length in the dataset
         :param vocab:
@@ -357,7 +357,7 @@ def get_optimizer(config: dict | Config, model: nn.Module) -> torch.optim:
     encoder_lr = config["encoder_lr"]
     decoder_lr = config["decoder_lr"]
     match config["model"]:
-        case "basic", "intermediate":
+        case "basic" | "intermediate":
             params = [
                 {"params": model.encoder.parameters(), "lr": encoder_lr},
                 {"params": model.decoder.parameters(), "lr": decoder_lr}
@@ -377,3 +377,5 @@ def get_optimizer(config: dict | Config, model: nn.Module) -> torch.optim:
             return Adam(params)
         case "AdamW":
             return Adam(params)
+        case _:
+            raise ValueError(f"Optimizer {config['optimizer']} not recognized")
