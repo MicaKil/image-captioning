@@ -198,6 +198,9 @@ def train_xe(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         total_tokens += num_tokens
         batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
+    del images, captions
+    torch.cuda.empty_cache()
+
     return train_loss / total_tokens if total_tokens > 0 else 0
 
 

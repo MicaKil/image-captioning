@@ -28,21 +28,21 @@ CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
-    "batch_size": 64,
+    "batch_size": 32,
     "embed_size": None,
     "hidden_size": 512,
     "num_layers": 3,
     "num_heads": 4 if TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.1,
+    "encoder_dropout": 0.2,
     "dropout": 0.5,  # decoder dropout
-    "fine_tune_encoder": "partial",
+    "fine_tune_encoder": "full",
     "encoder_lr": 0.00001,
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW",
-    "max_epochs": 5,
-    "patience": 1,
-    "gradient_clip": 5.0,
+    "max_epochs": 100,
+    "patience": 10,
+    "gradient_clip": 1.0,
     "dataset": {
         "name": "coco",
         "version": "2025-02-26",
@@ -62,7 +62,7 @@ CONFIG = {
     },
     "vocab": {
         "freq_threshold": 3,
-        "tokenizer": "word",
+        "tokenizer": "sp-bpe",
         "vocab_size": 8500 if TAGS[1] == "coco" else 3500
     },
     "max_caption_len": 60,
@@ -76,5 +76,5 @@ CONFIG = {
     "eval_bleu4": {
         "step": 5
     } if eval_bleu4 else None,
-    "allow_rl_switch": True
+    "allow_rl_switch": False
 }
