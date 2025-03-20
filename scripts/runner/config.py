@@ -6,7 +6,7 @@ STD = [0.229, 0.224, 0.225]
 
 TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((256, 256)),
+    v2.Resize((224, 224)),
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=MEAN, std=STD),
 ])

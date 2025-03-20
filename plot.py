@@ -26,7 +26,4 @@ features = rearrange(features, 'b c h w -> b (h w) c')
 captions, _, attentions = model.temperature_sampling(features, vocab, max_length=60, temperature=0, collect_attn=True)
 
 pieces = vocab.tokenize(captions[0])
-
-print(attentions)
-print(pieces)
-plot_attention(img[0], pieces, attentions[0], MEAN, STD, None)
+plot_attention(img[0], pieces, attentions[:-1], MEAN, STD, None)

@@ -453,6 +453,8 @@ class ImageCaptioningTransformer(nn.Module):
             if finished.all():
                 break
 
+        # print(len(tokens[0])) # 12
+        # print(len(all_attn)) # 11
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
         return captions, log_probs, all_attn
 
