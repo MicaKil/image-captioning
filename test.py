@@ -7,12 +7,12 @@ import wandb
 from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
+from caption import gen_caption
 from config.config import logger
 from constants import ROOT
 from dataset.dataloader import CaptionLoader
-from scripts.caption import gen_caption
-from scripts.metrics import get_references, get_cider_score, get_bleu_scores
-from scripts.utils import time_str, get_config
+from metrics import get_references, get_cider_score, get_bleu_scores
+from utils import time_str, get_config
 
 
 def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:

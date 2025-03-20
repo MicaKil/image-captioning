@@ -7,15 +7,15 @@ import wandb
 from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
-import scripts.metrics as metrics
+import metrics as metrics
+from caption import gen_caption, preprocess_image
 from config.config import logger
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
 from dataset.vocabulary import Vocabulary
 from runner import TRANSFORM
-from scripts.caption import gen_caption, preprocess_image
-from scripts.scheduler import SchedulerWrapper
-from scripts.utils import time_str, get_config
+from scheduler import SchedulerWrapper
+from utils import time_str, get_config
 
 
 def train(model: nn.Module, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module,

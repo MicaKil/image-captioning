@@ -17,10 +17,10 @@ from dataset.dataset import CaptionDataset
 from dataset.vocabulary import Vocabulary
 from models import intermediate, transformer, swin, basic
 from runner.config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY
-from scripts.scheduler import SchedulerWrapper
-from scripts.test import test
-from scripts.train import train
-from scripts.utils import date_str
+from scheduler import SchedulerWrapper
+from test import test
+from train import train
+from utils import date_str
 
 
 class Runner:
