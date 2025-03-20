@@ -15,7 +15,7 @@ from constants import ROOT, CHECKPOINT_DIR, PAD, RESULTS_DIR
 from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.dataset import CaptionDataset
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.models import basic, intermediate, transformer
+from scripts.models import basic, intermediate, transformer, swin
 from scripts.runner.config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY
 from scripts.scheduler import SchedulerWrapper
 from scripts.test import test
@@ -230,20 +230,37 @@ class Runner:
         decoder_dropout = config["dropout"]
         encoder_dropout = config["encoder_dropout"]
         num_layers = config["num_layers"]
-        match config["model"]:
-            case "basic":
-                encoder = basic.Encoder(embed_dim, fine_tune)
-                decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
-                return basic.BasicImageCaptioner(encoder, decoder)
-            case "intermediate":
-                encoder = intermediate.Encoder(embed_dim, encoder_dropout, fine_tune)
-                decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
-                return intermediate.IntermediateImageCaptioner(encoder, decoder)
-            case "transformer":
-                return transformer.ImageCaptioningTransformer(vocab, hidden_size, num_layers, config["num_heads"], self.max_sequence_length(vocab),
-                                                              encoder_dropout, decoder_dropout, fine_tune)
+        match config["encoder"]:
+            case "resnet50":
+                match config["model"]:
+                    case "basic":
+                        encoder = basic.Encoder(embed_dim, fine_tune)
+                        decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
+                        return basic.BasicImageCaptioner(encoder, decoder)
+                    case "intermediate":
+                        encoder = intermediate.Encoder(embed_dim, encoder_dropout, fine_tune)
+                        decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
+                        return intermediate.IntermediateImageCaptioner(encoder, decoder)
+                    case "transformer":
+                        encoder = transformer.Encoder(hidden_size, encoder_dropout, fine_tune)
+                        return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"], self.max_seq_len(vocab), decoder_dropout)
+                    case _:
+                        raise ValueError(f"Model {config['model']} not recognized")
+            case "swin":
+                encoder = swin.SwinEncoder(hidden_size, encoder_dropout, fine_tune)
+                match config["model"]:
+                    case "basic":
+                        decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
+                        return basic.BasicImageCaptioner(encoder, decoder)
+                    case "intermediate":
+                        decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
+                        return intermediate.IntermediateImageCaptioner(encoder, decoder)
+                    case "transformer":
+                        return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"], self.max_seq_len(vocab), decoder_dropout)
+                    case _:
+                        raise ValueError(f"Model {config['model']} not recognized")
             case _:
-                raise ValueError(f"Model {config['model']} not recognized")
+                raise ValueError(f"Encoder {config['encoder']} not recognized")
 
     def save_annotations(self, config: dict, date: str, test_df: pd.DataFrame, train_df: pd.DataFrame, val_df: pd.DataFrame):
         """
@@ -256,12 +273,9 @@ class Runner:
         :return:
         """
         dataset_splits = config['dataset']['split']
-        train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{dataset_splits['train']}.csv"), header=["image_id", "caption"],
-                        index=False)
-        val_df.to_csv(os.path.join(ROOT, self.ds_dir, f"val_{date}_{dataset_splits['val']}.csv"), header=["image_id", "caption"],
-                      index=False)
-        test_df.to_csv(os.path.join(ROOT, self.ds_dir, f"test_{date}_{dataset_splits['test']}.csv"), header=["image_id", "caption"],
-                       index=False)
+        train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{dataset_splits['train']}.csv"), header=["image_id", "caption"], index=False)
+        val_df.to_csv(os.path.join(ROOT, self.ds_dir, f"val_{date}_{dataset_splits['val']}.csv"), header=["image_id", "caption"], index=False)
+        test_df.to_csv(os.path.join(ROOT, self.ds_dir, f"test_{date}_{dataset_splits['test']}.csv"), header=["image_id", "caption"], index=False)
 
     def save_datasets(self, full_dataset: Optional[CaptionDataset], train_dataset: CaptionDataset, val_dataset: CaptionDataset,
                       test_dataset: CaptionDataset, date: str, config: dict):
@@ -321,7 +335,7 @@ class Runner:
         artifact.add_file(dataset_path)
         wandb.log_artifact(artifact)
 
-    def max_sequence_length(self, vocab: Vocabulary):
+    def max_seq_len(self, vocab: Vocabulary):
         """
         Calculate the maximum sequence length in the dataset
         :param vocab:
@@ -334,17 +348,17 @@ class Runner:
         return max_len + 2  # add 2 for start and end tokens
 
 
-def get_scheduler(config: dict | Config, optimizer: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
+def get_scheduler(config: dict | Config, optim: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
     """
     Get the scheduler based on the configuration
     :param config: The run configuration
-    :param optimizer: The optimizer to be used in training
+    :param optim: The optimizer to be used in training
     :param encoder_lr: The initial learning rate for the encoder
     :return:
     """
     scheduler = config["scheduler"]
     if scheduler is not None:
-        return SchedulerWrapper(ReduceLROnPlateau(optimizer, mode="min", factor=scheduler["factor"], patience=scheduler["patience"], min_lr=1e-6),
+        return SchedulerWrapper(ReduceLROnPlateau(optim, mode="min", factor=scheduler["factor"], patience=scheduler["patience"], min_lr=1e-6),
                                 encoder_lr)
     return None
 
