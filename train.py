@@ -276,7 +276,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
     config = get_config(run_config, use_wandb)
 
     # for BLEU score
-    val_ble4 = None
+    val_bleu4 = None
     all_hypotheses = []
     all_references = []
     smoothing = SmoothingFunction().method1
@@ -304,12 +304,12 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
             batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
     if calc_bleu4:
-        val_ble4 = metrics.get_bleu4_score(all_hypotheses, all_references, smoothing)
+        val_bleu4 = metrics.get_bleu4_score(all_hypotheses, all_references, smoothing)
         if use_wandb:
-            wandb.log({"val_BLEU-4": val_ble4})
+            wandb.log({"val_BLEU-4": val_bleu4})
 
     sample_caption(config, device, model, vocab)
-    return val_loss / total_tokens if total_tokens > 0 else 0, val_ble4
+    return val_loss / total_tokens if total_tokens > 0 else 0, val_bleu4
 
 
 def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module, vocab: Vocabulary) -> tuple[torch.Tensor, int]:
