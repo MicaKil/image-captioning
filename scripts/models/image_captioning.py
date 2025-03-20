@@ -4,7 +4,7 @@ import torch
 from torch import nn as nn
 
 from constants import SOS, EOS, PAD
-from scripts.dataset.vocabulary import Vocabulary
+from dataset.vocabulary import Vocabulary
 
 
 class ImageCaptioner(nn.Module):

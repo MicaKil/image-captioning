@@ -8,7 +8,7 @@ from scipy.ndimage import zoom
 from torch import nn, Tensor
 from torchvision.transforms import v2
 
-from scripts.dataset.vocabulary import Vocabulary
+from dataset.vocabulary import Vocabulary
 
 
 def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_length: int = 30, device: torch.device = torch.device("cpu"),

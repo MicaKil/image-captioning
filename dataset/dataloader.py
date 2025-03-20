@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 
 from config.config import logger
 from constants import PAD
-from scripts.dataset.dataset import CaptionDataset
+from dataset.dataset import CaptionDataset
 
 
 class CaptionLoader(DataLoader):

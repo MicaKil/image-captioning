@@ -9,7 +9,7 @@ from einops import rearrange
 from torchvision.models import ResNet50_Weights
 
 from constants import SOS, EOS, UNK, PAD
-from scripts.dataset.vocabulary import Vocabulary
+from dataset.vocabulary import Vocabulary
 from scripts.models.encoder import EncoderBase
 
 

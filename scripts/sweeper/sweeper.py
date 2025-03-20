@@ -4,7 +4,7 @@ from torch.nn import CrossEntropyLoss
 
 from config.config import logger
 from constants import PAD, CHECKPOINT_DIR, RESULTS_DIR
-from scripts.dataset.dataloader import CaptionLoader
+from dataset.dataloader import CaptionLoader
 from scripts.runner.runner import Runner, get_optimizer, get_scheduler
 
 

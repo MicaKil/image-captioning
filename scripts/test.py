@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 from config.config import logger
 from constants import ROOT
+from dataset.dataloader import CaptionLoader
 from scripts.caption import gen_caption
-from scripts.dataset.dataloader import CaptionLoader
 from scripts.metrics import get_references, get_cider_score, get_bleu_scores
 from scripts.utils import time_str, get_config
 

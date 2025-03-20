@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
 
 from constants import EOS, SOS
-from scripts.dataset.vocabulary import Vocabulary
+from dataset.vocabulary import Vocabulary
 
 
 class CaptionDataset(Dataset):

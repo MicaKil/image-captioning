@@ -5,9 +5,9 @@ from einops import rearrange
 from torchvision.transforms import v2
 
 from constants import ROOT, PATH_ALVARITO
+from dataset.vocabulary import Vocabulary
 from scripts.caption import preprocess_image, plot_attention, gen_caption
-from scripts.dataset.vocabulary import Vocabulary
-from scripts.models.transformer import ImageCaptioningTransformer
+from scripts.models.transformer import ImageCaptioningTransformer, Encoder
 
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
@@ -22,10 +22,12 @@ TRANSFORM = v2.Compose([
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if __name__ == "__main__":
+    pass
     checkpoint_pth = os.path.join(ROOT, "checkpoints/transformer/BEST_2025-03-19_03-20_2-8243.pt")
     sp_model = os.path.join(ROOT, "data/flickr8k/flickr8k.model")
     vocab = Vocabulary("sp-bpe", None, None, sp_model)
-    model = ImageCaptioningTransformer(vocab, 512, 3, 4, 46, 0.2, 0.5, "full")
+    encoder = Encoder(512, 0.2, "full")
+    model = ImageCaptioningTransformer(encoder, vocab, 512, 3, 4, 46, 0.5)
     checkpoint = torch.load(os.path.join(ROOT, checkpoint_pth))
     model.load_state_dict(checkpoint['model_state'])
 

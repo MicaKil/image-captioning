@@ -12,9 +12,9 @@ from wandb.sdk.wandb_run import Run
 
 from config.config import logger
 from constants import ROOT, CHECKPOINT_DIR, PAD, RESULTS_DIR
-from scripts.dataset.dataloader import CaptionLoader
-from scripts.dataset.dataset import CaptionDataset
-from scripts.dataset.vocabulary import Vocabulary
+from dataset.dataloader import CaptionLoader
+from dataset.dataset import CaptionDataset
+from dataset.vocabulary import Vocabulary
 from scripts.models import basic, intermediate, transformer, swin
 from scripts.runner.config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY
 from scripts.scheduler import SchedulerWrapper
