@@ -5,7 +5,7 @@ from torch.nn import CrossEntropyLoss
 from config.config import logger
 from constants import PAD, CHECKPOINT_DIR, RESULTS_DIR
 from dataset.dataloader import CaptionLoader
-from runner.config import Runner, get_optimizer, get_scheduler
+from runner.runner import Runner, get_optimizer, get_scheduler
 
 
 class Sweeper(Runner):
