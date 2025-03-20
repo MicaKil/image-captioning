@@ -198,6 +198,9 @@ def train_xe(model: nn.Module, train_loader: CaptionLoader, device: torch.device
         total_tokens += num_tokens
         batch_progress.set_postfix({"loss": loss.item() / num_tokens if num_tokens > 0 else 0})
 
+    del images, captions
+    torch.cuda.empty_cache()
+
     return train_loss / total_tokens if total_tokens > 0 else 0
 
 
@@ -222,7 +225,6 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
 
     model.train()
     batch_progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{config["max_epochs"]} [RL Training]")
-    i = 0
     for images, _, images_id in batch_progress:
         images = images.to(device)
         optim.zero_grad()
@@ -253,7 +255,6 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
 
         del generated, log_probs, rewards  # Free GPU memory
         torch.cuda.empty_cache()  # Clear cache
-        i += 1
 
     return cur_loss / len(train_loader)
 

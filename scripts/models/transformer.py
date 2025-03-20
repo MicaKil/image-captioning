@@ -3,20 +3,17 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.models as models
 from einops import rearrange
-from torch import Tensor
 from torchvision.models import ResNet50_Weights
-import torch.nn.functional as F
 
 from constants import SOS, EOS, UNK, PAD
-from scripts.dataset.dataloader import CaptionLoader
 from scripts.dataset.vocabulary import Vocabulary
-from scripts.test import test
-from scripts.train import train
+from scripts.models.encoder import EncoderBase
 
 
-class Encoder(nn.Module):
+class Encoder(EncoderBase):
     """
     Encoder class that uses a pretrained ResNet-50 model to extract features from images.
     """
@@ -33,8 +30,8 @@ class Encoder(nn.Module):
         self.resnet = models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
         in_features = self.resnet.fc.in_features
         self.resnet = nn.Sequential(
-            *list(self.resnet.children())[:-1]  # Remove the last FC layer (Classification layer)
-        )  # Output shape: (batch, feature_dim, 1, 1)
+            *list(self.resnet.children())[:-2]  # Remove the last 2 layers (AvgPool and FC)
+        ) # Output shape: (batch, in_features, 7, 7)
 
         self.set_requires_grad(fine_tune)
 
@@ -43,30 +40,6 @@ class Encoder(nn.Module):
             nn.ReLU(),
             nn.Dropout2d(dropout)
         )
-
-    def set_requires_grad(self, fine_tune: str) -> None:
-        """
-        Set the requires_grad attribute of the parameters based on the fine_tune argument.
-        :param fine_tune: String indicating the fine-tuning strategy. Can be "full", "partial", or "none".
-        :return:
-        """
-        match fine_tune:
-            case "full":
-                return
-            case "partial":
-                # Freeze all layers except the last two layers of the ResNet-50 model
-                for param in self.resnet.parameters():
-                    param.requires_grad = False
-                if fine_tune:
-                    # Unfreeze the last two layers of the ResNet-50 model
-                    for layer in list(self.resnet.children())[-2:]:
-                        for param in layer.parameters():
-                            param.requires_grad = True
-                return
-            case _:
-                for param in self.resnet.parameters():
-                    param.requires_grad = False
-                return
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         """
@@ -394,7 +367,6 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         if max_length > self.max_length:
-            # logger.warning(f"Max sequence length ({max_length}) is greater than model's ({self.max_length}). Using model's max length.")
             max_length = self.max_length
 
         images = images.to(device)
@@ -408,20 +380,22 @@ class ImageCaptioningTransformer(nn.Module):
                 if beam_size > 1:
                     return self.beam_search(features, vocab, max_length, beam_size)
                 else:
-                    return self.temperature_sampling(features, vocab, max_length, temperature)
+                    return self.temperature_sampling(features, vocab, max_length, temperature)[:2]
 
         features = self.encoder(images)
         features = rearrange(features, 'b c h w -> b (h w) c')
         if beam_size > 1:
             return self.beam_search(features, vocab, max_length, beam_size)
         else:
-            return self.temperature_sampling(features, vocab, max_length, temperature)
+            return self.temperature_sampling(features, vocab, max_length, temperature)[:2]
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float]) -> tuple[list[str], Tensor]:
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float],
+                             collect_attn=False) -> tuple[list[str], torch.Tensor, list]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
         max_length is reached.
+        :param collect_attn:
         :param features:
         :param vocab:
         :param max_length:
@@ -432,19 +406,24 @@ class ImageCaptioningTransformer(nn.Module):
         tokens = torch.full((batch_size, 1), vocab.str_to_idx(SOS), device=features.device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=features.device)
         log_probs = torch.zeros(batch_size, device=features.device)
+        all_attn = []
 
         for _ in range(max_length):
             txt_emb = self.seq_embedding(tokens)
+            attn_step = []
             for layer in self.decoder_layers:
                 txt_emb = layer(features, txt_emb)
+                if collect_attn:
+                    attn = layer.cross_attention.attention_scores
+                    attn = attn.mean(dim=1).squeeze(1).squeeze(1)  # Average attention over heads and remove singleton dimensions
+                    attn_step.append(attn.detach().cpu().numpy())
+            if collect_attn:
+                all_attn.append(attn_step)
+
             logits = self.output_layer(txt_emb[:, -1, :])
 
-            # Penalize the logits for the last generated token (per batch element)
-            if tokens.size(1) > 1:
-                logits[torch.arange(batch_size), tokens[:, -1]] -= 1.0  # Reduce probability
-
             # Compute log probabilities (scaling logits if temperature is provided)
-            if temperature is not None and temperature != 0:
+            if temperature is not None and temperature > 0:
                 logits_scaled = logits / temperature
             else:
                 logits_scaled = logits
@@ -453,7 +432,11 @@ class ImageCaptioningTransformer(nn.Module):
             # Sample from the probability distribution
             # Since multinomial works on probabilities, we exponentiate the log probabilities.
             probs = log_probs_step.exp()
-            next_tokens = torch.multinomial(probs, 1)
+
+            if temperature is not None and temperature > 0:
+                next_tokens = torch.multinomial(probs, 1)
+            else:
+                next_tokens = logits_scaled.argmax(dim=-1, keepdim=True)
 
             # Gather the log probability of the sampled token.
             selected_log_prob = log_probs_step.gather(1, next_tokens).squeeze(1)
@@ -470,8 +453,10 @@ class ImageCaptioningTransformer(nn.Module):
             if finished.all():
                 break
 
+        # print(len(tokens[0])) # 12
+        # print(len(all_attn)) # 11
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
-        return captions, log_probs
+        return captions, log_probs, all_attn
 
     def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], torch.Tensor]:
         """
@@ -544,37 +529,3 @@ class ImageCaptioningTransformer(nn.Module):
             all_probs.append(sum(best_beam[2]))
 
         return captions, torch.tensor(all_probs, device=images.device)
-
-    # TRAINING ---------------------------------------------------------------------------------------------------------------------------------------
-
-    def train_model(self, train_loader: CaptionLoader, val_loader: CaptionLoader, device: torch.device, criterion: nn.Module, optimizer: torch.optim,
-                    scheduler: torch.optim.lr_scheduler, checkpoint_dir: str, use_wandb: bool, run_config: dict, resume_checkpoint: str) -> tuple:
-        """
-        Training loop for the model.
-
-        :param resume_checkpoint:
-        :param train_loader: DataLoader for the training set
-        :param val_loader: DataLoader for the validation set
-        :param device: Device to run the training on
-        :param criterion: Loss function
-        :param optimizer: Optimizer for training
-        :param scheduler: Learning rate scheduler
-        :param checkpoint_dir: Directory to save the best model
-        :param use_wandb: Whether to use Weights & Biases for logging
-        :param run_config: Configuration for the run
-        :return: Path to the best model
-        """
-        return train(self, train_loader, val_loader, device, criterion, optimizer, scheduler, checkpoint_dir, use_wandb, run_config, resume_checkpoint)
-
-    def test_model(self, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
-        """
-        Evaluate model on test set and log results
-        :param test_loader: Test data loader to use
-        :param device: Device to use (cpu or cuda)
-        :param save_dir: If not None, save results to this directory
-        :param tag: Tag to use for saving results
-        :param use_wandb: Whether to use Weights & Biases for logging
-        :param run_config: Configuration for the run if not using wandb
-        :return:
-        """
-        return test(self, test_loader, device, save_dir, tag, use_wandb, run_config)
