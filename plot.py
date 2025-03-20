@@ -6,8 +6,8 @@ from torchvision.transforms import v2
 
 from constants import ROOT, PATH_ALVARITO
 from dataset.vocabulary import Vocabulary
+from models.transformer import ImageCaptioningTransformer, Encoder
 from scripts.caption import preprocess_image, plot_attention, gen_caption
-from scripts.models.transformer import ImageCaptioningTransformer, Encoder
 
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]

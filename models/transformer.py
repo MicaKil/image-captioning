@@ -10,7 +10,7 @@ from torchvision.models import ResNet50_Weights
 
 from constants import SOS, EOS, UNK, PAD
 from dataset.vocabulary import Vocabulary
-from scripts.models.encoder import EncoderBase
+from models.encoder import EncoderBase
 
 
 class Encoder(EncoderBase):

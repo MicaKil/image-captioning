@@ -15,7 +15,7 @@ from constants import ROOT, CHECKPOINT_DIR, PAD, RESULTS_DIR
 from dataset.dataloader import CaptionLoader
 from dataset.dataset import CaptionDataset
 from dataset.vocabulary import Vocabulary
-from scripts.models import basic, intermediate, transformer, swin
+from models import intermediate, transformer, swin, basic
 from scripts.runner.config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY
 from scripts.scheduler import SchedulerWrapper
 from scripts.test import test

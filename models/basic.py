@@ -3,8 +3,8 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
-from scripts.models.encoder import EncoderBase
-from scripts.models.image_captioning import ImageCaptioner
+from models.encoder import EncoderBase
+from models.image_captioning import ImageCaptioner
 
 
 class Encoder(EncoderBase):

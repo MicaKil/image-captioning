@@ -5,8 +5,8 @@ from torchvision.models import ResNet50_Weights
 
 from constants import PAD, SOS, UNK
 from dataset.vocabulary import Vocabulary
-from scripts.models.encoder import EncoderBase
-from scripts.models.image_captioning import ImageCaptioner
+from models.encoder import EncoderBase
+from models.image_captioning import ImageCaptioner
 
 
 class Encoder(EncoderBase):

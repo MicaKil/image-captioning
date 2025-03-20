@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import Swin_V2_S_Weights
 
-from scripts.models.encoder import EncoderBase
+from models.encoder import EncoderBase
 
 
 class SwinEncoder(EncoderBase):
