@@ -6,7 +6,7 @@ STD = [0.229, 0.224, 0.225]
 
 TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((256, 256)),
+    v2.Resize((224, 224)),
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=MEAN, std=STD),
 ])
@@ -18,31 +18,31 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["intermediate", "coco"]
+TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-use_scheduler = True
+use_scheduler = False
 eval_bleu4 = False
 
 CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
-    "decoder": "LSTM" if TAGS[0] == "intermediate" else "Attention",
-    "batch_size": 64,
-    "embed_size": 512,
+    "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
+    "batch_size": 32,
+    "embed_size": None,
     "hidden_size": 512,
     "num_layers": 3,
     "num_heads": 4 if TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.1,
+    "encoder_dropout": 0.2,
     "dropout": 0.5,  # decoder dropout
-    "fine_tune_encoder": "partial",
+    "fine_tune_encoder": "full",
     "encoder_lr": 0.00001,
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
-    "optimizer": "Adam",
+    "optimizer": "AdamW",
     "max_epochs": 100,
     "patience": 10,
-    "gradient_clip": 2.0,
+    "gradient_clip": 1.0,
     "dataset": {
         "name": "coco",
         "version": "2025-02-26",
@@ -61,13 +61,13 @@ CONFIG = {
         }
     },
     "vocab": {
-        "freq_threshold": None,
+        "freq_threshold": 3,
         "tokenizer": "sp-bpe",
         "vocab_size": 8500 if TAGS[1] == "coco" else 3500
     },
     "max_caption_len": 60,
     "temperature": 0,
-    "beam_size": 3,
+    "beam_size": 5,
     "scheduler": {
         "type": "ReduceLROnPlateau",
         "factor": 0.5,
@@ -76,6 +76,5 @@ CONFIG = {
     "eval_bleu4": {
         "step": 5
     } if eval_bleu4 else None,
-    "rl_baseline": False,
-    "allow_rl_switch": True
+    "allow_rl_switch": False
 }

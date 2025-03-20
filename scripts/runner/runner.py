@@ -170,7 +170,7 @@ class Runner:
                     vocab = Vocabulary(tokenizer, freq_threshold, train_df["caption"], None)
             case "sp-bpe":
                 sp_model = os.path.join(ROOT, self.ds_dir, f"{config["dataset"]["name"]}.model")
-                vocab = Vocabulary(tokenizer, freq_threshold, text=None, sp_model_path=sp_model)
+                vocab = Vocabulary(tokenizer, None, text=None, sp_model_path=sp_model)
             case _:
                 raise ValueError("Invalid tokenizer type.")
 
