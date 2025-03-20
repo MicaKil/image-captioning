@@ -236,4 +236,5 @@ data/*
 /checkpoints/
 /results/
 
-secrets.txt
+# typst report
+template.pdf
