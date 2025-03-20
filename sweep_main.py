@@ -1,8 +1,8 @@
 import wandb
 
 from constants import FLICKR_VAL_CSV, FLICKR_TRAIN_CSV, FLICKR_TEST_CSV, FLICKR8K_IMG_DIR, FLICKR8K_DIR
-from scripts.sweeper.config import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
-from scripts.sweeper.sweeper import Sweeper
+from sweeper import DEFAULT_CONFIG, SWEEP_CONFIG, PROJECT, TAGS
+from sweeper.sweeper import Sweeper
 
 if __name__ == "__main__":
     sweep_id = wandb.sweep(sweep=SWEEP_CONFIG, project=PROJECT)
