@@ -3,10 +3,10 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.models as models
 from einops import rearrange
 from torchvision.models import ResNet50_Weights
-import torch.nn.functional as F
 
 from constants import SOS, EOS, UNK, PAD
 from scripts.dataset.vocabulary import Vocabulary
@@ -422,10 +422,6 @@ class ImageCaptioningTransformer(nn.Module):
 
             logits = self.output_layer(txt_emb[:, -1, :])
 
-            # Penalize the logits for the last generated token (per batch element)
-            if tokens.size(1) > 1:
-                logits[torch.arange(batch_size), tokens[:, -1]] -= 1.0  # Reduce probability
-
             # Compute log probabilities (scaling logits if temperature is provided)
             if temperature is not None and temperature > 0:
                 logits_scaled = logits / temperature
@@ -436,7 +432,11 @@ class ImageCaptioningTransformer(nn.Module):
             # Sample from the probability distribution
             # Since multinomial works on probabilities, we exponentiate the log probabilities.
             probs = log_probs_step.exp()
-            next_tokens = torch.multinomial(probs, 1)
+
+            if temperature is not None and temperature > 0:
+                next_tokens = torch.multinomial(probs, 1)
+            else:
+                next_tokens = logits_scaled.argmax(dim=-1, keepdim=True)
 
             # Gather the log probability of the sampled token.
             selected_log_prob = log_probs_step.gather(1, next_tokens).squeeze(1)

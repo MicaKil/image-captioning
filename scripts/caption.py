@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 from matplotlib import pyplot as plt
+from scipy.ndimage import zoom
 from torch import nn, Tensor
 from torchvision.transforms import v2
 
@@ -63,10 +64,10 @@ def plot_attention(image_tensor: torch.Tensor, caption: list[str], attentions: l
             ax = plt.subplot(num_steps, num_layers, step * num_layers + layer + 1)
             # Reshape attention to 7x7 and upscale to image size
             attn = attentions[step][layer].reshape(7, 7)
-            attn = np.kron(attn, np.ones((32, 32)))  # 7x7 -> 224x224
+            attn = zoom(attn, (256 / 7, 256 / 7))  # 7x7 -> 256x256
 
             ax.imshow(image)
-            ax.imshow(attn, cmap='jet', alpha=0.5)
+            ax.imshow(attn, cmap='jet', alpha=0.3)
             ax.set_title(f"Step {step + 1}: {caption[step]}\nLayer {layer + 1}")
             ax.axis('off')
     plt.tight_layout()
