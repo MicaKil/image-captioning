@@ -38,7 +38,9 @@ class SwinEncoder(EncoderBase):
         self.set_requires_grad(fine_tune)
 
     def set_requires_grad(self, fine_tune: str) -> None:
-        """Set gradient requirements for Swin layers"""
+        """
+        Set gradient requirements for Swin layers
+        """
         if fine_tune == "full":
             return  # All layers trainable
 
@@ -60,5 +62,6 @@ class SwinEncoder(EncoderBase):
         :return: Feature tensor (batch_size, embed_dim, H, W)
         """
         features = self.features(image)  # (batch_size, in_channels, 7, 7)
+        features = features.permute(0, 3, 1, 2)  # Convert to channels-first: (batch_size, in_channels, H, W)
         features = self.projection(features)  # (batch_size, embed_dim, 7, 7)
         return features
