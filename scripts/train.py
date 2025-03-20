@@ -12,8 +12,8 @@ from config.config import logger
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
 from dataset.vocabulary import Vocabulary
+from runner import TRANSFORM
 from scripts.caption import gen_caption, preprocess_image
-from scripts.runner.config import TRANSFORM
 from scripts.scheduler import SchedulerWrapper
 from scripts.utils import time_str, get_config
 

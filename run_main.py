@@ -2,8 +2,7 @@ import wandb
 
 from constants import COCO_IMGS_DIR, COCO_TRAIN_PKL, COCO_VAL_PKL, COCO_TEST_PKL, FLICKR8K_DIR, FLICKR_TRAIN_CSV, FLICKR_VAL_CSV, FLICKR_TEST_CSV, \
     FLICKR8K_IMG_DIR, COCO_DIR
-from scripts.runner.config import PROJECT, TAGS, CONFIG
-from scripts.runner.runner import Runner
+from runner import PROJECT, TAGS, CONFIG, Runner
 
 wandb.teardown()
 
