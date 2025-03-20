@@ -6,7 +6,7 @@ STD = [0.229, 0.224, 0.225]
 
 TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((224, 224)),
+    v2.Resize((256, 256)),
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=MEAN, std=STD),
 ])
@@ -26,12 +26,12 @@ eval_bleu4 = False
 
 CONFIG = {
     "model": TAGS[0],
-    "encoder": "resnet50",
+    "encoder": "swin",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
-    "batch_size": 32,
+    "batch_size": 64,
     "embed_size": None,
     "hidden_size": 512,
-    "num_layers": 3,
+    "num_layers": 2,
     "num_heads": 4 if TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.2,
     "dropout": 0.5,  # decoder dropout
@@ -62,7 +62,7 @@ CONFIG = {
     },
     "vocab": {
         "freq_threshold": 3,
-        "tokenizer": "sp-bpe",
+        "tokenizer": "word",
         "vocab_size": 8500 if TAGS[1] == "coco" else 3500
     },
     "max_caption_len": 60,
