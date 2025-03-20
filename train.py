@@ -13,7 +13,7 @@ from config.config import logger
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
 from dataset.vocabulary import Vocabulary
-from runner import TRANSFORM
+from runner.config import TRANSFORM
 from scheduler import SchedulerWrapper
 from utils import time_str, get_config
 
