@@ -1,11 +1,13 @@
 from collections import Counter
 from typing import Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 import torchvision.models as models
 from einops import rearrange
+from torch import Tensor
 from torchvision.models import ResNet50_Weights
 
 from constants import SOS, EOS, UNK, PAD
@@ -48,8 +50,10 @@ class Encoder(EncoderBase):
         :param image: Input image tensor of shape (batch_size, 3, 224, 224)
         :return:
         """
-        features = self.resnet(image)  # Shape: (batch_size, feature_dim, 1, 1)
+        features = self.resnet(image)  # Shape: (batch_size, feature_dim, 7, 7)
+        # print(f"1 features: {features.shape}")
         features = self.projection(features)  # Shape: (batch_size, embed_size, 1, 1)
+        # print(f"2 features: {features.shape}")
         return features
 
 
@@ -58,17 +62,17 @@ class SeqEmbedding(nn.Module):
     Combines token embeddings with positional embeddings to provide contextualized token representations.
     """
 
-    def __init__(self, vocab_size: int, max_length: int, embed_dim: int, pad_idx: int):
+    def __init__(self, vocab_size: int, max_len: int, embed_dim: int, pad_idx: int):
         """
         Initializes a token embedding (with padding support) and a positional embedding layer for a fixed maximum sequence length.
         :param vocab_size: Size of the vocabulary
-        :param max_length: Maximum length of the sequence
+        :param max_len: Maximum length of the sequence
         :param embed_dim: Depth of the embedding
         :param pad_idx: Index of the padding token
         """
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
-        self.pos_embedding = nn.Embedding(max_length, embed_dim)
+        self.pos_embedding = nn.Embedding(max_len, embed_dim)
 
     def forward(self, seq: torch.Tensor):
         """
@@ -142,9 +146,9 @@ class CrossAttention(nn.Module):
 
     def forward(self, txt_emb: torch.Tensor, img_features: torch.Tensor):
         """
-        Uses x as the decoder query and y as both key and value (image features), adds the attention output to x (residual connection), and normalizes
+        Uses x= txt_emb as the decoder query and y = image features as both key and value, adds the attention output to x (residual connection), and normalizes
         the result.
-        :param txt_emb: Decoder query, shape: (batch, seq, feature)
+        :param txt_emb: Decoder query, shape: (batch, seq, embed_dim)
         :param img_features: Key and value, shape: (batch, h*w, feature)
         :return:
         """
@@ -210,8 +214,11 @@ class DecoderLayer(nn.Module):
         :return:
         """
         txt_emb = self.self_attention(txt_emb)
+        # print(f"1 text_emb: {txt_emb.shape}")
         txt_emb = self.cross_attention(txt_emb, img_features)
+        # print(f"2 text_emb: {txt_emb.shape}")
         txt_emb = self.ff(txt_emb)
+        # print(f"3 text_emb: {txt_emb.shape}")
         return txt_emb
 
 
@@ -279,7 +286,7 @@ class ImageCaptioningTransformer(nn.Module):
     captions for input images.
     """
 
-    def __init__(self, encoder, vocab: Vocabulary, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2, max_length: int = 50,
+    def __init__(self, encoder, vocab: Vocabulary, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2, max_len: int = 50,
                  decoder_dropout: float = 0.5):
         """
         Sets up the vocabulary, assigns an external image encoder, creates the sequence embedding, a stack of decoder layers, and the output layer
@@ -289,15 +296,15 @@ class ImageCaptioningTransformer(nn.Module):
         :param hidden_size:
         :param num_layers:
         :param num_heads:
-        :param max_length:
+        :param max_len:
         :param decoder_dropout:
         """
         super().__init__()
         self.vocab = vocab
-        self.max_length = max_length
+        self.max_len = max_len
         self.encoder = encoder
 
-        self.seq_embedding = SeqEmbedding(len(vocab), max_length, hidden_size, vocab.str_to_idx(PAD))
+        self.seq_embedding = SeqEmbedding(len(vocab), max_len, hidden_size, vocab.str_to_idx(PAD))
 
         self.decoder_layers = nn.ModuleList([
             DecoderLayer(hidden_size, num_heads, decoder_dropout)
@@ -317,19 +324,27 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         # Extract image features
+        # print(f"images: {images.shape}")
         img_features = self.encoder(images)
-        # Encode image to features: (batch, channels, height, width) → (batch, h*w, features)
+        # print(f"img_features: {img_features.shape}")
+        # Encode image to features: (batch, features, height, width) → (batch, h*w, features)
         img_features = rearrange(img_features, 'b c h w -> b (h w) c')
+        # print(f"img_features: {img_features.shape}")
 
         # Embed text
+        # print(f"captions: {captions.shape}")
         txt_emb = self.seq_embedding(captions)
+        # print(f"text_emb: {txt_emb.shape}")
 
         # Process through decoder layers
         for layer in self.decoder_layers:
             txt_emb = layer(img_features, txt_emb)
 
+        # print(f"text_emb: {txt_emb.shape}")
+
         # Final output
         logits = self.output_layer(txt_emb)
+        # print(f"logits: {logits.shape}")
         return logits
 
     @staticmethod
@@ -351,22 +366,22 @@ class ImageCaptioningTransformer(nn.Module):
 
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
-    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, device: torch.device, temperature: Optional[float], beam_size: int,
+    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, device: torch.device, temp: Optional[float], beam_size: int,
                  no_grad: bool) -> tuple[list[str], torch.Tensor]:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
         :param images:
         :param vocab:
-        :param max_length:
+        :param max_len:
         :param device:
-        :param temperature:
+        :param temp:
         :param beam_size:
         :param no_grad:
         :return:
         """
-        if max_length > self.max_length:
-            max_length = self.max_length
+        if max_len > self.max_len:
+            max_len = self.max_len
 
         images = images.to(device)
 
@@ -377,28 +392,27 @@ class ImageCaptioningTransformer(nn.Module):
                 features = rearrange(features, 'b c h w -> b (h w) c')
 
                 if beam_size > 1:
-                    return self.beam_search(features, vocab, max_length, beam_size)
+                    return self.beam_search(features, vocab, max_len, beam_size)[:2]
                 else:
-                    return self.temperature_sampling(features, vocab, max_length, temperature)[:2]
+                    return self.temperature_sampling(features, vocab, max_len, temp)[:2]
 
         features = self.encoder(images)
         features = rearrange(features, 'b c h w -> b (h w) c')
         if beam_size > 1:
-            return self.beam_search(features, vocab, max_length, beam_size)
+            return self.beam_search(features, vocab, max_len, beam_size)[:2]
         else:
-            return self.temperature_sampling(features, vocab, max_length, temperature)[:2]
+            return self.temperature_sampling(features, vocab, max_len, temp)[:2]
 
-    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float],
-                             collect_attn=False) -> tuple[list[str], torch.Tensor, list]:
+    def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_len: int,
+                             temp: Optional[float]) -> tuple[list[str], torch.Tensor, list]:
         """
         Implements autoregressive generation using temperature sampling.
         Starts with the SOS token and iteratively appends tokens based on the output distribution, stopping when the EOS token is generated or
         max_length is reached.
-        :param collect_attn:
         :param features:
         :param vocab:
-        :param max_length:
-        :param temperature:
+        :param max_len:
+        :param temp:
         :return:
         """
         batch_size = features.size(0)
@@ -407,32 +421,30 @@ class ImageCaptioningTransformer(nn.Module):
         log_probs = torch.zeros(batch_size, device=features.device)
         all_attn = []
 
-        for _ in range(max_length):
+        for _ in range(max_len):
             txt_emb = self.seq_embedding(tokens)
             attn_step = []
             for layer in self.decoder_layers:
                 txt_emb = layer(features, txt_emb)
-                if collect_attn:
-                    attn = layer.cross_attention.attention_scores
-                    attn = attn.mean(dim=1).squeeze(1).squeeze(1)  # Average attention over heads and remove singleton dimensions
-                    attn_step.append(attn.detach().cpu().numpy())
-            if collect_attn:
-                all_attn.append(attn_step)
+                attn = layer.cross_attention.attention_scores
+                attn = attn.mean(dim=1).squeeze(1).squeeze(1)  # Average attention over heads and remove singleton dimensions
+                attn_step.append(attn.detach().cpu().numpy())
+            all_attn.append(attn_step)
 
             logits = self.output_layer(txt_emb[:, -1, :])
 
             # Compute log probabilities (scaling logits if temperature is provided)
-            if temperature is not None and temperature > 0:
-                logits_scaled = logits / temperature
+            if temp is not None and temp > 0:
+                logits_scaled = logits / temp
             else:
                 logits_scaled = logits
-            log_probs_step = F.log_softmax(logits_scaled, dim=-1)
+            log_probs_step = f.log_softmax(logits_scaled, dim=-1)
 
             # Sample from the probability distribution
             # Since multinomial works on probabilities, we exponentiate the log probabilities.
             probs = log_probs_step.exp()
 
-            if temperature is not None and temperature > 0:
+            if temp is not None and temp > 0:
                 next_tokens = torch.multinomial(probs, 1)
             else:
                 next_tokens = logits_scaled.argmax(dim=-1, keepdim=True)
@@ -452,12 +464,10 @@ class ImageCaptioningTransformer(nn.Module):
             if finished.all():
                 break
 
-        # print(len(tokens[0])) # 12
-        # print(len(all_attn)) # 11
         captions = [vocab.encode_as_words(seq.tolist()) for seq in tokens]
         return captions, log_probs, all_attn
 
-    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], torch.Tensor]:
+    def beam_search(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, beam_size: int) -> tuple[list[str], Tensor, list]:
         """
         Implements beam search to generate the most likely caption sequence.
         Repeats image features for each beam and, for each step, extends beams by considering the top probable next tokens, applying length
@@ -475,11 +485,12 @@ class ImageCaptioningTransformer(nn.Module):
 
         captions = []
         all_probs = []
+        all_attn = []
 
         # Process each image in the batch separately
         for b in range(batch_size):
             image = images[b].unsqueeze(0).repeat(beam_size, 1, 1)
-            beams = [(0.0, [sos_idx], [])]  # (score, sequence, log_probs)
+            beams = [(0.0, [sos_idx], [], [])]  # (score, sequence, log_probs)
 
             for t in range(max_len):
                 # Prepare current beam sequences, skipping extension for beams that already ended
@@ -495,21 +506,25 @@ class ImageCaptioningTransformer(nn.Module):
                 seq_tensor = torch.tensor(padded_seqs, device=image.device)
 
                 txt_emb = self.seq_embedding(seq_tensor)
+                step_attn = []
                 for layer in self.decoder_layers:
                     txt_emb = layer(image[:seq_tensor.size(0)], txt_emb)
+                    attn = layer.cross_attention.attention_scores
+                    attn = attn.mean(dim=1).squeeze(1).squeeze(1)
+                    step_attn.append(attn.detach().cpu().numpy())
                 logits = self.output_layer(txt_emb[:, -1, :])
-                step_log_probs = F.log_softmax(logits, dim=-1)  # (active_beams, vocab_size)
-
-                topk = beam_size
-                top_probs, top_indices = step_log_probs.topk(topk, dim=-1)
+                step_log_probs = f.log_softmax(logits, dim=-1)  # (active_beams, vocab_size)
+                avg_attn = np.mean(step_attn, axis=0)  # Average attention over layers
 
                 candidates = []
-                for i in range(seq_tensor.size(0)):
-                    for j in range(topk):
-                        new_score = active_beams[i][0] + top_probs[i, j].item()
-                        new_seq = active_beams[i][1] + [top_indices[i, j].item()]
-                        new_log_probs = active_beams[i][2] + [top_probs[i, j].item()]
-                        candidates.append((new_score, new_seq, new_log_probs))
+                for i, beam in enumerate(active_beams):
+                    top_probs, top_indices = step_log_probs[i].topk(beam_size)
+                    for j in range(beam_size):
+                        new_score = beam[0] + top_probs[j].item()
+                        new_seq = beam[1] + [top_indices[j].item()]
+                        new_log_probs = beam[2] + [top_probs[j].item()]
+                        new_attn = beam[3] + [avg_attn[i]]
+                        candidates.append((new_score, new_seq, new_log_probs, new_attn))
 
                 # Add beams that have already finished (without extension)
                 finished_beams = [beam for beam in beams if beam[1][-1] == eos_idx]
@@ -526,5 +541,6 @@ class ImageCaptioningTransformer(nn.Module):
             best_beam = max(beams, key=lambda x: x[0] / (len(x[1]) ** 0.5))
             captions.append(vocab.encode_as_words(best_beam[1]))
             all_probs.append(sum(best_beam[2]))
+            all_attn.append(best_beam[3])
 
-        return captions, torch.tensor(all_probs, device=images.device)
+        return captions, torch.tensor(all_probs, device=images.device), all_attn

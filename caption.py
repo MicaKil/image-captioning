@@ -1,3 +1,4 @@
+import os.path
 from typing import Optional
 
 import numpy as np
@@ -8,6 +9,7 @@ from scipy.ndimage import zoom
 from torch import nn, Tensor
 from torchvision.transforms import v2
 
+from constants import ROOT
 from dataset.vocabulary import Vocabulary
 
 
@@ -44,8 +46,6 @@ def plot_attention(image_tensor: torch.Tensor, caption: list[str], attentions: l
     :param std: Standard deviation values for normalization
     :param save_path: Path to save the plot (optional)
     """
-    # print(f"caption: {len(caption)}")
-    # print(f"ann: {len(attentions)}")
     assert len(attentions) == len(caption), "attentions length must match caption length"
     # Inverse normalize the image
     inverse_normalize = v2.Normalize(
@@ -58,21 +58,22 @@ def plot_attention(image_tensor: torch.Tensor, caption: list[str], attentions: l
     num_layers = len(attentions[0])
     num_steps = len(attentions)
 
-    plt.figure(figsize=(20, 20))
+    plt.figure(figsize=(24, num_steps*6), dpi=100)
+    # plt.suptitle(" ".join(caption), y=1.02, fontsize=14)
+
     for step in range(num_steps):
         for layer in range(num_layers):
             ax = plt.subplot(num_steps, num_layers, step * num_layers + layer + 1)
-            # Reshape attention to 7x7 and upscale to image size
-            attn = attentions[step][layer].reshape(7, 7)
-            attn = zoom(attn, (256 / 7, 256 / 7))  # 7x7 -> 256x256
+            attn = attentions[step][layer].reshape(8, 8)
+            attn = zoom(attn, (256 / 8, 256 / 8))  # 7x7 -> 256x256
 
             ax.imshow(image)
-            ax.imshow(attn, cmap='jet', alpha=0.3)
-            ax.set_title(f"Step {step + 1}: {caption[step]}\nLayer {layer + 1}")
+            ax.imshow(attn, cmap='Greys_r', alpha=0.7)
+            ax.set_title(f"Step {step + 1}: {caption[step]}\nLayer {layer + 1}", fontsize=12, pad=12)
             ax.axis('off')
-    plt.tight_layout()
+    plt.tight_layout(pad=3.0)
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(os.path.join(ROOT, save_path), bbox_inches='tight', dpi=150)
     plt.show()
 
 

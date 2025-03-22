@@ -26,7 +26,7 @@ eval_bleu4 = False
 
 CONFIG = {
     "model": TAGS[0],
-    "encoder": "swin",
+    "encoder": "resnet50",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
     "batch_size": 32,
     "embed_size": None,
