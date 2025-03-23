@@ -5,7 +5,7 @@ import torch
 from einops import rearrange
 from torchvision.transforms import v2
 
-from caption import preprocess_image, plot_attention, gen_caption
+from caption import preprocess_image, plot_attention
 from constants import ROOT, COCO_TRAIN_PKL, COCO_DIR
 from dataset.vocabulary import Vocabulary
 from models.transformer import ImageCaptioningTransformer, Encoder
@@ -32,19 +32,13 @@ if __name__ == "__main__":
     checkpoint = torch.load(os.path.join(ROOT, checkpoint_pth))
     model.load_state_dict(checkpoint['model_state'])
 
-    img = preprocess_image(str(os.path.join(ROOT, f"data/coco/images/COCO_val2014_000000105234.jpg")), TRANSFORM) # (B, C, H, W)
+    img = preprocess_image(str(os.path.join(ROOT, f"data/coco/images/COCO_val2014_000000119120.jpg")), TRANSFORM) # (B, C, H, W)
     model = model.to(DEVICE)
     model.eval()
     img = img.to(DEVICE)
     features = model.encoder(img)
     features = rearrange(features, 'b c h w -> b (h w) c')
-    captions, _, attns = model.beam_search(features, vocab, max_len=10, beam_size=5)
+    captions, _, attns = model.beam_search(features, vocab, max_len=20, beam_size=5)
 
     tokens = vocab.tokenize(captions[0])
-    print(captions[0])
-    print(f"len of tokens: {len(tokens)}")
-    print(f"len of attns: {len(attns)}")
-    plot_attention(img[0], tokens, attns[:-1], MEAN, STD, "plots/attention/test_001.png")
-
-    c, _ = gen_caption(model, img, vocab, max_length=60, device=DEVICE, temperature=0, beam_size=5, no_grad=True)
-    print(c)
+    plot_attention(img[0], captions[0], tokens, attns[0][:-1], MEAN, STD, 5, "test.png", "plots/attention/")
