@@ -22,7 +22,7 @@ match CONFIG["dataset"]["name"]:
 checkpoint_ = "checkpoints/transformer/LAST_2025-03-13_15-01_2-3249.pt"
 
 if __name__ == "__main__":
-    run = Runner(use_wandb=False,
+    run = Runner(use_wandb=True,
                  create_ds=False,
                  save_ds=False,
                  train_model=True,
