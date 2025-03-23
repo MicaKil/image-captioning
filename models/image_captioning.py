@@ -34,51 +34,49 @@ class ImageCaptioner(nn.Module):
         outputs = self.decoder(features, captions)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
         return outputs
 
-    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_length: int, temperature: Optional[float], beam_size: int, device: torch.device,
-                 no_grad: bool) -> list[str]:
+    def generate(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, temp: Optional[float], beam_size: int, device: torch.device, no_grad: bool) -> list[str]:
         self.eval()
         images = images.to(device)
         if no_grad:
             with torch.no_grad():
                 features = self.encoder(images)  # Encode the image (batch_size, embed_size)
                 if beam_size > 1:
-                    return self.beam_search(vocab, device, features, max_length, beam_size)
+                    return self.beam_search(vocab, device, features, max_len, beam_size)
                 else:
-                    return self.temperature_sampling(vocab, device, features, max_length, temperature)
+                    return self.temperature_sampling(vocab, device, features, max_len, temp)
 
         features = self.encoder(images)  # Encode the image (batch_size, embed_size)
         if beam_size > 1:
-            return self.beam_search(vocab, device, features, max_length, beam_size)
+            return self.beam_search(vocab, device, features, max_len, beam_size)
         else:
-            return self.temperature_sampling(vocab, device, features, max_length, temperature)
+            return self.temperature_sampling(vocab, device, features, max_len, temp)
 
-    def temperature_sampling(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int,
-                             temperature: Optional[float]) -> list[str]:
+    def temperature_sampling(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_len: int, temp: Optional[float]) -> list[str]:
         """
         Generate a caption using temperature-based sampling if temperature is not None, otherwise use greedy search.
 
         :param vocab: Vocabulary object with str_to_idx and idx_to_str mappings
         :param device: Device to use
         :param features: Encoded image features
-        :param max_length: Maximum caption length
-        :param temperature: Temperature for sampling (None for greedy search)
+        :param max_len: Maximum caption length
+        :param temp: Temperature for sampling (None for greedy search)
         :return: Generated caption as a list of token indices
         """
         batch_size = features.size(0)
         captions = torch.full((batch_size, 1), vocab.str_to_idx(SOS), dtype=torch.long, device=device)
         finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
-        for _ in range(max_length):
+        for _ in range(max_len):
             outputs = self.decoder(features, captions)  # (batch_size, seq_len, vocab_size)
             logits = outputs[:, -1, :]  # Get last predicted token (batch_size, vocab_size)
 
             # Choose next token
-            if temperature is None or temperature == 0.0:
+            if temp is None or temp == 0.0:
                 # Greedy search
                 next_tokens = torch.argmax(logits, dim=-1, keepdim=True)
             else:
                 # Temperature sampling
-                probs = torch.softmax(logits / temperature, dim=-1)
+                probs = torch.softmax(logits / temp, dim=-1)
                 next_tokens = torch.multinomial(probs, 1)
 
             # Mask finished sequences
@@ -91,14 +89,14 @@ class ImageCaptioner(nn.Module):
                 break
         return [vocab.encode_as_words(caption.tolist()) for caption in captions]
 
-    def beam_search(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_length: int, beam_size: int) -> list[str]:
+    def beam_search(self, vocab: Vocabulary, device: torch.device, features: torch.Tensor, max_len: int, beam_size: int) -> list[str]:
         """
         Generate a caption using beam search.
 
         :param vocab: Vocabulary object with str_to_idx and idx_to_str mappings
         :param device: Device to use
         :param features: Encoded image features
-        :param max_length: Maximum caption length
+        :param max_len: Maximum caption length
         :param beam_size: Beam size for beam search
         :return: Generated caption as a list of token indices
         """
@@ -112,7 +110,7 @@ class ImageCaptioner(nn.Module):
             img_features = features[i].unsqueeze(0)  # (beam_size, embed_size)
             beams = [(0.0, [sos_idx])]
 
-            for _ in range(max_length):
+            for _ in range(max_len):
                 candidates = []
                 for score, seq in beams:
                     if seq[-1] == eos_idx:

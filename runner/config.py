@@ -3,10 +3,10 @@ from torchvision.transforms import v2
 
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
-
+transform_resize = (256, 256)
 TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((256, 256)),
+    v2.Resize(transform_resize),
     v2.ToDtype(torch.float32, scale=True),
     v2.Normalize(mean=MEAN, std=STD),
 ])
@@ -18,7 +18,7 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["transformer", "coco"]
+TAGS = ["transformer", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
@@ -26,9 +26,10 @@ eval_bleu4 = False
 
 CONFIG = {
     "model": TAGS[0],
-    "encoder": "resnet50",
+    "encoder": "swin",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
     "batch_size": 64,
+    "transform_resize": transform_resize,
     "embed_size": None,
     "hidden_size": 512,
     "num_layers": 2,

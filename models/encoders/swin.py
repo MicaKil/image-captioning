@@ -77,6 +77,7 @@ class SwinEncoder(EncoderBase):
         :param image: Input tensor (batch_size, 3, 256, 256)
         :return: Feature tensor (batch_size, embed_dim, H, W)
         """
+        self.attention_weights = []  # Reset on each forward pass
         features = self.features(image)  # (batch_size, in_channels, 7, 7)
         features = features.permute(0, 3, 1, 2)  # Convert to channels-first: (batch_size, in_channels, H, W)
         features = self.projection(features)  # (batch_size, embed_dim, 7, 7)
