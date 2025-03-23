@@ -8,7 +8,8 @@ from torchvision.transforms import v2
 from caption import preprocess_image, plot_attention
 from constants import ROOT, COCO_TRAIN_PKL, COCO_DIR
 from dataset.vocabulary import Vocabulary
-from models.transformer import ImageCaptioningTransformer, Encoder
+from models.transformer import ImageCaptioningTransformer
+from models.encoders.transformer import Encoder
 
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]

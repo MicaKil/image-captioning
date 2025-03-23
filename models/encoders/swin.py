@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.models import Swin_V2_S_Weights
 
-from models.encoder import EncoderBase
+from models.encoders.base import EncoderBase
 
 
 class SwinEncoder(EncoderBase):
@@ -24,6 +24,9 @@ class SwinEncoder(EncoderBase):
         # Load pretrained Swin-S model
         self.swin = models.swin_v2_s(weights=Swin_V2_S_Weights.IMAGENET1K_V1)
 
+        self.attention_weights = []
+        self._register_attention_hooks()
+
         # Remove classification head and get feature dimension
         self.features = self.swin.features
         in_channels = self.swin.head.in_features
@@ -36,6 +39,19 @@ class SwinEncoder(EncoderBase):
         )
 
         self.set_requires_grad(fine_tune)
+
+    def _register_attention_hooks(self):
+        """Register hooks to capture attention weights from Swin blocks"""
+
+        def hook_fn(module, input, output):
+            # output[1] contains attention weights in Swin blocks
+            if len(output) > 1:
+                self.attention_weights.append(output[1].detach().cpu())
+
+        # Attach hooks to all Swin Transformer blocks
+        for block in self.swin.features:
+            if hasattr(block, "attn"):
+                block.attn.register_forward_hook(hook_fn)
 
     def set_requires_grad(self, fine_tune: str) -> None:
         """

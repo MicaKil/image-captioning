@@ -10,12 +10,16 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from wandb.sdk import Config
 from wandb.sdk.wandb_run import Run
 
+import models.encoders.basic
+import models.encoders.intermediate
+import models.encoders.transformer
 from config.config import logger
 from constants import ROOT, CHECKPOINT_DIR, PAD, RESULTS_DIR
 from dataset.dataloader import CaptionLoader
 from dataset.dataset import CaptionDataset
 from dataset.vocabulary import Vocabulary
-from models import intermediate, transformer, swin, basic
+from models import intermediate, transformer, basic
+from models.encoders import swin
 from runner.config import TRANSFORM, DEVICE, NUM_WORKERS, SHUFFLE, PIN_MEMORY
 from scheduler import SchedulerWrapper
 from test import test
@@ -235,15 +239,15 @@ class Runner:
             case "resnet50":
                 match config["model"]:
                     case "basic":
-                        encoder = basic.Encoder(embed_dim, fine_tune)
+                        encoder = models.encoders.basic.Encoder(embed_dim, fine_tune)
                         decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
                         return basic.BasicImageCaptioner(encoder, decoder)
                     case "intermediate":
-                        encoder = intermediate.Encoder(embed_dim, encoder_dropout, fine_tune)
+                        encoder = models.encoders.intermediate.Encoder(embed_dim, encoder_dropout, fine_tune)
                         decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
                         return intermediate.IntermediateImageCaptioner(encoder, decoder)
                     case "transformer":
-                        encoder = transformer.Encoder(hidden_size, encoder_dropout, fine_tune)
+                        encoder = models.encoders.transformer.Encoder(hidden_size, encoder_dropout, fine_tune)
                         return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
                                                                       self.max_seq_len(vocab), decoder_dropout)
                     case _:
