@@ -43,7 +43,7 @@ class SwinEncoder(EncoderBase):
     def _register_attention_hooks(self):
         """Register hooks to capture attention weights from Swin blocks"""
 
-        def hook_fn(module, input, output):
+        def hook_fn(output):
             # output[1] contains attention weights in Swin blocks
             if len(output) > 1:
                 self.attention_weights.append(output[1].detach().cpu())

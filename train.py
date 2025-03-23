@@ -8,7 +8,8 @@ from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
 import metrics as metrics
-from caption import gen_caption, preprocess_image
+from caption import gen_caption
+from plotter import preprocess_image
 from config.config import logger
 from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
