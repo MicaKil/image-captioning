@@ -73,7 +73,7 @@
 		if counter(page).get().first() == 1 [
 			#set page(
 				margin: (y: 4cm),
-				header: image("marcas-facu-ingenieria.png", width: 65%),
+				header: image("header-ingeniería.png", width: 65%),
 				header-ascent: 50%
 				)
 			#set align(center + horizon)
@@ -96,8 +96,6 @@
 			#date
 		]
 	}
-
-	set list(marker: [•], [‣], [◦])
 
 	// CONTENT
 

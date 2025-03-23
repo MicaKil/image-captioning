@@ -26,7 +26,7 @@ if __name__ == "__main__":
                  create_ds=False,
                  save_ds=False,
                  train_model=True,
-                 test_model=True,
+                 test_model=False,
                  checkpoint_pth=None,
                  img_dir=img_dir_,
                  ds_splits=ds_splits_,

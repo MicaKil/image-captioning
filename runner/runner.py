@@ -71,6 +71,7 @@ class Runner:
         train_dataset, val_dataset, test_dataset, vocab = self.get_datasets(config, date)
         pad_idx = vocab.str_to_idx(PAD)
         model = self.get_model(config, vocab, pad_idx)
+        # print(model)
         save_dir = RESULTS_DIR + config["model"]
 
         batch_size = config["batch_size"]
@@ -243,7 +244,8 @@ class Runner:
                         return intermediate.IntermediateImageCaptioner(encoder, decoder)
                     case "transformer":
                         encoder = transformer.Encoder(hidden_size, encoder_dropout, fine_tune)
-                        return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"], self.max_seq_len(vocab), decoder_dropout)
+                        return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
+                                                                      self.max_seq_len(vocab), decoder_dropout)
                     case _:
                         raise ValueError(f"Model {config['model']} not recognized")
             case "swin":
@@ -256,7 +258,8 @@ class Runner:
                         decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
                         return intermediate.IntermediateImageCaptioner(encoder, decoder)
                     case "transformer":
-                        return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"], self.max_seq_len(vocab), decoder_dropout)
+                        return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
+                                                                      self.max_seq_len(vocab), decoder_dropout)
                     case _:
                         raise ValueError(f"Model {config['model']} not recognized")
             case _:

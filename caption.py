@@ -1,3 +1,4 @@
+import os.path
 from typing import Optional
 
 import numpy as np
@@ -8,6 +9,7 @@ from scipy.ndimage import zoom
 from torch import nn, Tensor
 from torchvision.transforms import v2
 
+from constants import ROOT
 from dataset.vocabulary import Vocabulary
 
 
@@ -33,46 +35,54 @@ def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_l
                           no_grad=no_grad)
 
 
-def plot_attention(image_tensor: torch.Tensor, caption: list[str], attentions: list, mean: list[float], std: list[float], save_path: str = None):
+def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], attns: list, mean: list[float], std: list[float], columns,
+                   save_name: str = None, save_dir: str = None):
     """
     Plot attention maps over the image for each step in the caption generation process.
 
-    :param image_tensor: Original image tensor (after normalization)
-    :param caption: Generated caption (list of words)
-    :param attentions: List of attention maps (steps x layers x 49)
+    :param save_dir:
+    :param img_tensor: Original image tensor (after normalization)
+    :param caption: Generated caption
+    :param tokens: List of tokens in the caption
+    :param attns: List of attention maps (steps x layers x 49)
     :param mean: Mean values for normalization
     :param std: Standard deviation values for normalization
-    :param save_path: Path to save the plot (optional)
+    :param columns: The number of columns to display the attention maps
+    :param save_name: Path to save the plot (optional)
     """
-    # print(f"caption: {len(caption)}")
-    # print(f"ann: {len(attentions)}")
-    assert len(attentions) == len(caption), "attentions length must match caption length"
+    assert len(attns) == len(tokens), "attentions length must match caption length"
     # Inverse normalize the image
     inverse_normalize = v2.Normalize(
         mean=[-m / s for m, s in zip(mean, std)],
         std=[1 / s for s in std]
     )
-    image = inverse_normalize(image_tensor).cpu().numpy()
+    image = inverse_normalize(img_tensor).cpu().numpy()
     image = np.transpose(image, (1, 2, 0))
 
-    num_layers = len(attentions[0])
-    num_steps = len(attentions)
+    num_steps = len(attns)
 
-    plt.figure(figsize=(20, 20))
+    # height = (num_steps // columns + 1) * 3
+    # width = columns * 2
+    plt.figure(figsize=(10, 6), dpi=100)
+
     for step in range(num_steps):
-        for layer in range(num_layers):
-            ax = plt.subplot(num_steps, num_layers, step * num_layers + layer + 1)
-            # Reshape attention to 7x7 and upscale to image size
-            attn = attentions[step][layer].reshape(7, 7)
-            attn = zoom(attn, (256 / 7, 256 / 7))  # 7x7 -> 256x256
+        ax = plt.subplot(num_steps // columns + 1, columns, step + 1)
+        attn = attns[step].reshape(8, 8)
+        attn = zoom(attn, (256 / 8, 256 / 8))  # 7x7 -> 256x256
 
-            ax.imshow(image)
-            ax.imshow(attn, cmap='jet', alpha=0.3)
-            ax.set_title(f"Step {step + 1}: {caption[step]}\nLayer {layer + 1}")
-            ax.axis('off')
+        ax.imshow(image)
+        ax.imshow(attn, cmap='Greys_r', alpha=0.65)
+        ax.set_title(f"{tokens[step]}", fontsize=12, pad=6)
+        ax.axis('off')
+    plt.suptitle(caption, fontsize=16)
     plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path)
+    if save_name:
+        i = 0
+        while save_name in os.listdir(os.path.join(ROOT, save_dir)):
+            name = os.path.splitext(save_name)[0]
+            save_name = f"{name}_{i:03d}.png"
+            i += 1
+        plt.savefig(os.path.join(ROOT, save_dir, save_name), bbox_inches='tight', dpi=150)
     plt.show()
 
 
