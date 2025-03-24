@@ -19,14 +19,14 @@ match CONFIG["dataset"]["name"]:
     case _:
         raise ValueError("Dataset not recognized")
 
-checkpoint_ = "checkpoints/transformer/LAST_2025-03-13_15-01_2-3249.pt"
+checkpoint_ = "checkpoints/transformer/BEST_2025-03-23_20-58_2-4162.pt"
 
 if __name__ == "__main__":
     run = Runner(use_wandb=True,
                  create_ds=False,
                  save_ds=False,
                  train_model=True,
-                 test_model=False,
+                 test_model=True,
                  checkpoint_pth=None,
                  img_dir=img_dir_,
                  ds_splits=ds_splits_,
