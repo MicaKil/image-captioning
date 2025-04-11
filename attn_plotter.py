@@ -17,6 +17,12 @@ from dataset.vocabulary import Vocabulary
 from models import transformer
 from models.encoders import swin
 
+COLOR_INFO = "bright_blue"
+COLOR_SUCCESS = "bright_green"
+COLOR_WARNING = "yellow"
+COLOR_ERROR = "red"
+COLOR_HIGHLIGHT = "bright_white"
+
 
 def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], attns: list, mean: list[float], std: list[float], columns: int,
                    save_name: str = None, save_dir: str = None):
@@ -66,8 +72,8 @@ def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], at
             save_name = f"{name}_{i:03d}.png"
             i += 1
         plt.savefig(os.path.join(ROOT, save_dir, save_name), bbox_inches='tight', dpi=150)
-        click.secho(f"Saved attention plot to {click.format_filename(os.path.join(ROOT, save_dir, save_name))}", fg="green")
     plt.show()
+    return save_name
 
 
 def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:
@@ -166,31 +172,83 @@ def load_checkpoint(checkpoint_pth: str):
     return model, config, vocab
 
 
+def print_banner():
+    """Print a stylized application banner"""
+    click.secho("╭────────────────────────────────────────────╮", fg=COLOR_INFO)
+    click.secho("│          Attention Plot Generator          │", fg=COLOR_INFO)
+    click.secho("╰────────────────────────────────────────────╯", fg=COLOR_INFO)
+
+
+def format_path(path: str) -> str:
+    """Format a path for display in CLI output"""
+    return click.style(f"'{click.format_filename(path)}'", fg=COLOR_HIGHLIGHT)
+
+
 @click.command()
-@click.argument("img_pth", type=str)
-@click.argument("checkpoint_pth", type=str)
-@click.option("--save-name", type=str, default="test.png", help="Name of the generated image.")
-@click.option("--save-dir", type=str, default=f"{ROOT}\\plots\\attention\\", help="Directory to save the generated image.")
+@click.argument("img_pth", type=click.Path(exists=True, dir_okay=False))
+@click.argument("checkpoint_pth", type=click.Path(exists=True, dir_okay=False))
+@click.option("--save-name", type=str, default="test.png", help="Name for the output plot file.")
+@click.option("--save-dir", type=click.Path(file_okay=False), default=os.path.join(ROOT, "plots", "attention"),
+              help="Directory to save the generated plot.", show_default=True)
 def plot_app(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: str):
-    click.secho(f"Welcome to attention plotter!", fg="green")
-    model, config, vocab = load_checkpoint(checkpoint_pth)
-    transform_resize = config["transform_resize"]
+    print_banner()
 
-    MEAN = [0.485, 0.456, 0.406]
-    STD = [0.229, 0.224, 0.225]
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+        click.secho(f"📁 Created output directory: {format_path(save_dir)}", fg=COLOR_INFO)
+    click.secho("\n🚀 Starting image captioning pipeline:", fg=COLOR_INFO)
 
-    TRANSFORM = v2.Compose([
-        v2.ToImage(),
-        v2.Resize(transform_resize),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=MEAN, std=STD),
-    ])
+    try:
+        click.secho("⏳ Loading model checkpoint...", fg=COLOR_INFO)
+        model, config, vocab = load_checkpoint(checkpoint_pth)
+        click.secho(f"✅ Successfully loaded {format_path(checkpoint_pth)}", fg=COLOR_SUCCESS)
+    except Exception as e:
+        click.secho(f"❌ Failed to load checkpoint: {str(e)}", fg=COLOR_ERROR)
+        raise click.Abort()
 
-    img = preprocess_image(img_pth, TRANSFORM)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    captions, _, attns = gen_caption(model, img, vocab, 20, device, None, 5, True, True)
-    tokens = vocab.tokenize(captions[0])
-    plot_attention(img[0], captions[0], tokens, attns[0][:-1], MEAN, STD, 5, save_name, save_dir)
+    # Image processing
+    try:
+        click.secho("\n⏳ Processing image...", fg=COLOR_INFO)
+        transform_resize = config["transform_resize"]
+        MEAN = [0.485, 0.456, 0.406]
+        STD = [0.229, 0.224, 0.225]
+
+        TRANSFORM = v2.Compose([
+            v2.ToImage(),
+            v2.Resize(transform_resize),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=MEAN, std=STD),
+        ])
+
+        img = preprocess_image(img_pth, TRANSFORM)
+        click.secho(f"✅ Processed image: {format_path(img_pth)}", fg=COLOR_SUCCESS)
+    except Exception as e:
+        click.secho(f"❌ Image processing failed: {str(e)}", fg=COLOR_ERROR)
+        raise click.Abort()
+
+    # Generate caption and attention
+    try:
+        click.secho("\n⏳ Generating caption and attention maps...", fg=COLOR_INFO)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        captions, _, attns = gen_caption(model, img, vocab, 20, device, None, 5, True, True)
+        tokens = vocab.tokenize(captions[0])
+        click.secho("✅ Caption generated successfully!", fg=COLOR_SUCCESS)
+        click.secho(f"📝 Caption: {click.style(captions[0], fg=COLOR_HIGHLIGHT)}", fg=COLOR_INFO)
+    except Exception as e:
+        click.secho(f"❌ Caption generation failed: {str(e)}", fg=COLOR_ERROR)
+        raise click.Abort()
+
+    # Save and display results
+    try:
+        click.secho("\n⏳ Generating visualization...", fg=COLOR_INFO)
+        save_name = plot_attention(img[0], captions[0], tokens, attns[0][:-1], MEAN, STD, 5, save_name, save_dir)
+        final_path = os.path.join(save_dir, save_name)
+        click.secho(f"💾 Saved attention plot to {format_path(final_path)}", fg=COLOR_SUCCESS)
+    except Exception as e:
+        click.secho(f"❌ Visualization failed: {str(e)}", fg=COLOR_ERROR)
+        raise click.Abort()
+
+    click.secho("\n✨ Process completed successfully! ✨\n", fg=COLOR_SUCCESS, bold=True)
 
 
 if __name__ == "__main__":
