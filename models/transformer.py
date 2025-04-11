@@ -322,7 +322,7 @@ class ImageCaptioningTransformer(nn.Module):
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
     def generate(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, device: torch.device, temp: Optional[float], beam_size: int,
-                 no_grad: bool) -> tuple[list[str], torch.Tensor]:
+                 no_grad: bool, return_atnn=False) -> tuple:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
@@ -333,6 +333,7 @@ class ImageCaptioningTransformer(nn.Module):
         :param temp:
         :param beam_size:
         :param no_grad:
+        :param return_atnn:
         :return:
         """
         if max_len > self.max_len:
@@ -345,18 +346,21 @@ class ImageCaptioningTransformer(nn.Module):
             with torch.no_grad():
                 features = self.encoder(images)
                 features = rearrange(features, 'b c h w -> b (h w) c')
-
                 if beam_size > 1:
-                    return self.beam_search(features, vocab, max_len, beam_size)[:2]
+                    generated = self.beam_search(features, vocab, max_len, beam_size)
                 else:
-                    return self.temperature_sampling(features, vocab, max_len, temp)[:2]
-
-        features = self.encoder(images)
-        features = rearrange(features, 'b c h w -> b (h w) c')
-        if beam_size > 1:
-            return self.beam_search(features, vocab, max_len, beam_size)[:2]
+                    generated = self.temperature_sampling(features, vocab, max_len, temp)
         else:
-            return self.temperature_sampling(features, vocab, max_len, temp)[:2]
+            features = self.encoder(images)
+            features = rearrange(features, 'b c h w -> b (h w) c')
+            if beam_size > 1:
+                generated = self.beam_search(features, vocab, max_len, beam_size)
+            else:
+                generated = self.temperature_sampling(features, vocab, max_len, temp)
+
+        if return_atnn:
+            return generated
+        return generated[:2]  # Return only captions and log_probs
 
     def temperature_sampling(self, features: torch.Tensor, vocab: Vocabulary, max_len: int,
                              temp: Optional[float]) -> tuple[list[str], torch.Tensor, list]:

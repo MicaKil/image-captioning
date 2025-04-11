@@ -248,8 +248,9 @@ class Runner:
                         return intermediate.IntermediateImageCaptioner(encoder, decoder)
                     case "transformer":
                         encoder = t_encoder.Encoder(hidden_size, encoder_dropout, fine_tune)
+                        config["actual_max_seq_len"] = self.max_seq_len(vocab)
                         return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
-                                                                      self.max_seq_len(vocab), decoder_dropout)
+                                                                      config["actual_max_seq_len"], decoder_dropout)
                     case _:
                         raise ValueError(f"Model {config['model']} not recognized")
             case "swin":
@@ -262,8 +263,9 @@ class Runner:
                         decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
                         return intermediate.IntermediateImageCaptioner(encoder, decoder)
                     case "transformer":
+                        config["actual_max_seq_len"] = self.max_seq_len(vocab)
                         return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
-                                                                      self.max_seq_len(vocab), decoder_dropout)
+                                                                      config["actual_max_seq_len"], decoder_dropout)
                     case _:
                         raise ValueError(f"Model {config['model']} not recognized")
             case _:
