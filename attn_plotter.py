@@ -1,9 +1,9 @@
 import os.path
 
+import click
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as f
 from PIL import Image
 from matplotlib import pyplot as plt
 from scipy.ndimage import zoom
@@ -61,47 +61,13 @@ def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], at
     plt.tight_layout()
     if save_name:
         i = 0
+        name = os.path.splitext(save_name)[0]  # keep the name without extension
         while save_name in os.listdir(os.path.join(ROOT, save_dir)):
-            name = os.path.splitext(save_name)[0]
             save_name = f"{name}_{i:03d}.png"
             i += 1
         plt.savefig(os.path.join(ROOT, save_dir, save_name), bbox_inches='tight', dpi=150)
+        click.secho(f"Saved attention plot to {click.format_filename(os.path.join(ROOT, save_dir, save_name))}", fg="green")
     plt.show()
-
-
-def process_swin_attention(attentions: list, original_size=(256, 256)):
-    """
-    Process Swin's windowed attention into full image heatmaps
-
-    :param attentions: List of attention weights from Swin blocks
-    :param original_size: Original image size (H, W)
-    :return: Aggregated attention maps (L, H, W)
-    """
-    maps = []
-    for attn in attentions:
-        # attn shape: [batch, num_heads, num_windows, window_size, window_size]
-        batch, heads, windows, wh, ww = attn.shape
-        window_size = int(wh ** 0.5)
-
-        # Average across heads and windows
-        attn = attn.mean(dim=[1, 2])  # [batch, wh*ww, wh*ww]
-
-        # Reshape to spatial grid
-        grid_size = int(windows ** 0.5)
-        attn = attn.view(batch, grid_size, grid_size, window_size, window_size)
-        attn = attn.permute(0, 1, 3, 2, 4).contiguous()
-        attn = attn.view(batch,
-                         grid_size * window_size,
-                         grid_size * window_size)
-
-        # Upsample to original size
-        attn = f.interpolate(attn.unsqueeze(1),
-                             size=original_size,
-                             mode='bilinear').squeeze()
-        maps.append(attn)
-
-    # Average across layers
-    return torch.stack(maps).mean(dim=0)
 
 
 def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:
@@ -110,7 +76,7 @@ def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:
 
     :param img_path: Path to the image file
     :param transform: Transform to apply to the image
-    :return: Preprocessed image tensor of shape (1, 3, 224, 224)
+    :return: Preprocessed image tensor of shape (1, 3, H, W)
     """
     img = Image.open(img_path).convert("RGB")
     img = transform(img)
@@ -118,6 +84,14 @@ def preprocess_image(img_path: str, transform: v2.Compose) -> torch.Tensor:
 
 
 def max_seq_len(train_df, val_df, test_df, vocab):
+    """
+    Calculate the maximum sequence length for the dataset.
+    :param train_df: Dataframe containing training data.
+    :param val_df: Dataframe containing validation data.
+    :param test_df: Dataframe containing test data.
+    :param vocab: Vocabulary of the dataset.
+    :return: Integer representing the maximum sequence length.
+    """
     max_len = max(train_df["caption"].apply(lambda x: len(vocab.tokenize(x))).max(),
                   val_df["caption"].apply(lambda x: len(vocab.tokenize(x))).max(),
                   test_df["caption"].apply(lambda x: len(vocab.tokenize(x))).max())
@@ -126,10 +100,10 @@ def max_seq_len(train_df, val_df, test_df, vocab):
 
 def load_checkpoint(checkpoint_pth: str):
     """
-    Load the model from a checkpoint.
+    Load the model, configuration, and vocabulary from a checkpoint.
 
-    :param checkpoint_pth: Path to the checkpoint file
-    :return: Loaded model
+    :param checkpoint_pth: Path to the checkpoint file.
+    :return: Tuple containing the model, configuration, and vocabulary.
     """
     checkpoint = torch.load(checkpoint_pth)
     config = checkpoint["config"]
@@ -192,7 +166,13 @@ def load_checkpoint(checkpoint_pth: str):
     return model, config, vocab
 
 
-def plot_app(img_pth: str, checkpoint_pth: str, save_name="test.png", save_dir="plots/attention/"):
+@click.command()
+@click.argument("img_pth", type=str)
+@click.argument("checkpoint_pth", type=str)
+@click.option("--save-name", type=str, default="test.png", help="Name of the generated image.")
+@click.option("--save-dir", type=str, default=f"{ROOT}\\plots\\attention\\", help="Directory to save the generated image.")
+def plot_app(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: str):
+    click.secho(f"Welcome to attention plotter!", fg="green")
     model, config, vocab = load_checkpoint(checkpoint_pth)
     transform_resize = config["transform_resize"]
 
@@ -214,4 +194,4 @@ def plot_app(img_pth: str, checkpoint_pth: str, save_name="test.png", save_dir="
 
 
 if __name__ == "__main__":
-    pass
+    plot_app()
