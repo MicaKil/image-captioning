@@ -140,11 +140,17 @@ def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataF
 
 def flickr8k_sentence_piece():
     spm.SentencePieceTrainer.Train(
-        f'--input={os.path.join(ROOT, FLICKR_CORPUS)} --model_prefix=flickr8k --vocab_size=3500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf')
+        f'--input={os.path.join(ROOT, FLICKR_CORPUS)} --model_prefix=flickr8k --vocab_size=3500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf'
+    )
     spm.SentencePieceProcessor()
 
 
 def coco_sentence_piece():
     spm.SentencePieceTrainer.Train(
-        f'--input={os.path.join(ROOT, COCO_CORPUS)} --model_prefix=coco --vocab_size=8500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf')
+        f'--input={os.path.join(ROOT, COCO_CORPUS)} --model_prefix=coco_6500 --vocab_size=6500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf'
+    )
     spm.SentencePieceProcessor()
+
+
+if __name__ == "__main__":
+    coco_sentence_piece()

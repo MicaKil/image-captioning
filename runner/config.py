@@ -12,7 +12,7 @@ TRANSFORM = v2.Compose([
 ])
 
 # dataloaders
-NUM_WORKERS = 8
+NUM_WORKERS = 12
 SHUFFLE = True
 PIN_MEMORY = True
 
@@ -33,7 +33,7 @@ CONFIG = {
     "embed_size": None,
     "hidden_size": 512,
     "num_layers": 2,
-    "num_heads": 4 if TAGS[0] == "transformer" else None,
+    "num_heads": 8 if TAGS[0] == "transformer" else None,
     "encoder_dropout": 0.25,
     "dropout": 0.5,  # decoder dropout
     "fine_tune_encoder": "partial",
@@ -64,7 +64,7 @@ CONFIG = {
     "vocab": {
         "freq_threshold": 5,
         "tokenizer": "sp-bpe",
-        "vocab_size": 8500 if TAGS[1] == "coco" else 3500
+        "vocab_size": 6500 if TAGS[1] == "coco" else 3500
     },
     "max_caption_len": 60,
     "temperature": 0,
