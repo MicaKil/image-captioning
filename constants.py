@@ -28,7 +28,7 @@ COCO_TRAIN_PKL = "data/coco/coco_train.pkl"
 COCO_VAL_PKL = "data/coco/coco_val_15.pkl"
 COCO_TEST_PKL = "data/coco/coco_test_15.pkl"
 
-COCO_CORPUS =  "data/coco/corpus.txt"
+COCO_CORPUS = "data/coco/corpus.txt"
 
 # checkpoints
 CHECKPOINT_DIR = "checkpoints/"
@@ -42,4 +42,4 @@ EOS = "<EOS>"
 UNK = "<UNK>"
 
 # TEST_PIC
-PATH_ALVARITO = "data/mine/2025-02-21_22-33.png"
+CTRL_PIC = "data/mine/001.png"

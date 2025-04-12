@@ -11,7 +11,7 @@ import metrics as metrics
 from attn_plotter import preprocess_image
 from caption import gen_caption
 from config.config import logger
-from constants import ROOT, PATH_ALVARITO, PAD, UNK, SOS
+from constants import ROOT, CTRL_PIC, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
 from dataset.vocabulary import Vocabulary
 from runner.config import TRANSFORM
@@ -360,7 +360,7 @@ def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: 
     :param vocab: Vocabulary of the training set.
     :return: Prints the sample caption.
     """
-    img = preprocess_image(str(os.path.join(ROOT, PATH_ALVARITO)), TRANSFORM)
+    img = preprocess_image(str(os.path.join(ROOT, CTRL_PIC)), TRANSFORM)
     caption, _ = gen_caption(model, img, vocab, config["max_caption_len"], device, config["temperature"], config["beam_size"])
     logger.info(f"Sample caption: {caption[0]}")
 

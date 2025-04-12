@@ -190,7 +190,7 @@ def format_path(path: str) -> str:
 @click.option("--save-name", type=str, default="test.png", help="Name for the output plot file.")
 @click.option("--save-dir", type=click.Path(file_okay=False), default=os.path.join(ROOT, "plots", "attention"),
               help="Directory to save the generated plot.", show_default=True)
-def plot_app(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: str):
+def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: str):
     print_banner()
 
     if not os.path.exists(save_dir):
@@ -252,4 +252,4 @@ def plot_app(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: str):
 
 
 if __name__ == "__main__":
-    plot_app()
+    plot_attn_cli()
