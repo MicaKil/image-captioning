@@ -11,11 +11,6 @@ TRANSFORM = v2.Compose([
     v2.Normalize(mean=MEAN, std=STD),
 ])
 
-# dataloaders
-NUM_WORKERS = 4
-SHUFFLE = True
-PIN_MEMORY = True
-
 # run
 PROJECT = "image-captioning-v1"
 TAGS = ["transformer", "flickr8k"]
@@ -27,7 +22,7 @@ eval_bleu4 = False
 DEFAULT_CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
-    "decoder": "LSTM",
+    "decoder": "Attention",
     "batch_size": 64,
     "embed_size": None,
     "hidden_size": 512,
