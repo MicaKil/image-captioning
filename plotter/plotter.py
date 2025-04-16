@@ -70,39 +70,51 @@ def correlation_importance(class_name: str = "val_loss.min", model_name: str = "
     plt.show()
 
 
-def plot_validation_loss(model_name: str, dataset_name: str, min_y=2, max_y=6):
+def plot_validation_loss(model_names: list[str], dataset_name: str, min_y: float = 2, max_y: float = 6, save_fig: bool = True) -> None:
     val_loss = pd.read_csv("../plots/results/csv_source/val_loss_v4.csv")
-    experiments_filtered = filter_experiments(dataset_name, model_name)
-    experiments_names = experiments_filtered['Name'].unique()
-    val_loss_filter = [col for col in val_loss.columns if col in experiments_names]
-    val_loss_filtered = val_loss[val_loss_filter]
+
+    model_colors = sns.color_palette("pastel", n_colors=len(model_names))
+    color_dict = {model: model_colors[i] for i, model in enumerate(model_names)}
 
     plt.figure(figsize=(15, 10))
+    all_min_loss = []
+    for model in model_names:
+        experiments_filtered = filter_experiments(dataset_name, model)
+        experiments_names = experiments_filtered['Name'].unique()
+        val_loss_filter = [col for col in val_loss.columns if col in experiments_names]
+        val_loss_filtered = val_loss[val_loss_filter]
 
-    # Plot each validation loss curve
-    for col in val_loss_filtered.columns:
-        plt.plot(val_loss_filtered.index + 1, val_loss_filtered[col], label=col)
+        min_loss = val_loss_filtered.min().min()
+        all_min_loss.append(min_loss)
+        # Plot each validation loss curve
+        for col in val_loss_filtered.columns:
+            plt.plot(val_loss_filtered.index + 1, val_loss_filtered[col], color=color_dict[model])
 
-    # Horizontal line for minimum loss
-    min_loss = val_loss_filtered.min().min()  # Find overall minimum loss
-    plt.axhline(y=min_loss, color='0', linestyle='--', label=f'Minimum Loss ({min_loss:.2f})')
+        plt.axhline(y=min_loss, color='0', linestyle='--', label=f'{model} min loss ({min_loss:.2f})')
 
     plt.xlabel("Epoch")
     plt.ylabel("Validation Loss")
-    if model_name is None and dataset_name is None:
+    if model_names is None and dataset_name is None:
         plt.title("Validation Loss Comparison")
     elif dataset_name is None:
-        plt.title(f"Validation Loss Comparison for {model_name}")
-    elif model_name is None:
+        plt.title(f"Validation Loss Comparison for {model_names}")
+    elif model_names is None:
         plt.title(f"Validation Loss Comparison for {dataset_name}")
     else:
-        plt.title(f"Validation Loss Comparison for {model_name} on {dataset_name}")
+        plt.title(f"Validation Loss Comparison for {model_names} on {dataset_name}")
+
     plt.ylim(min_y, max_y)
     plt.grid(True, alpha=0.3)
-    plt.text(x=0.99, y=min_loss + 0.02, s=f'Min: {min_loss:.2f}', ha='right', va='bottom', color='0', transform=plt.gca().get_yaxis_transform())
-    # Show plot
+    for model, min_loss_ in zip(model_names, all_min_loss):
+        plt.text(x=0.99, y=min_loss_ + 0.001, s=f'{model} min: {min_loss_:.2f}', ha='right', va='bottom', color='0',
+                 transform=plt.gca().get_yaxis_transform())
+
+    handles = [plt.Line2D([0], [0], color=color_dict[model], lw=3) for model in model_names]
+    plt.legend(handles, model_names)
+
     plt.tight_layout()
-    plt.savefig(f"../plots/results/val_loss_{model_name}_{dataset_name}.png", dpi=300, bbox_inches='tight')
+    if save_fig:
+        plt.savefig(f"../plots/results/val_loss_{model_names}_{dataset_name}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -133,15 +145,16 @@ def create_boxplot(metric: str, model_names: list[str], dataset_name: str, min_y
 
         # Add text annotation
         stats_text = f"Mean: {mean_val:.2f}\nMin: {min_val:.2f}\nMax: {max_val:.2f}"
-        plt.text(0.25, 4.9, stats_text, verticalalignment='top', horizontalalignment='left', color='black', fontsize=10,
+        print(stats_text)
+        plt.text(0.25, 0, stats_text, verticalalignment='bottom', horizontalalignment='left', color='black', fontsize=10,
                  bbox=dict(facecolor='white', alpha=0.6, edgecolor='0', boxstyle='round,pad=0.65'))
         plt.xlabel(f"Model {model_name}")
         plt.ylabel(label[metric] if i == 0 else "")
         plt.ylim(min_y, max_y)
         plt.grid(True, alpha=0.3)
     plt.suptitle(f"Boxplot of {label[metric]} on {label[dataset_name]}")
-    plt.tight_layout(pad=0.5, rect=(0, 0, 0.98, 0.98))
-    # plt.savefig(f"../plots/results/boxplot_{metric}_{dataset_name}.png", dpi=300, bbox_inches='tight')
+    plt.tight_layout()  # rect=(0, 0, 0.98, 0.98)
+    plt.savefig(f"../plots/results/boxplot_{metric}_{dataset_name}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -184,7 +197,7 @@ def load_and_filter_correlation(class_name, model_name):
 
 
 def filter_experiments(dataset_name, model_name):
-    experiments = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv")
+    experiments = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v4.csv")
     experiments_filtered = experiments
     match model_name:
         case "ResNet50-LSTM":
@@ -205,6 +218,8 @@ def filter_experiments(dataset_name, model_name):
 
 
 if __name__ == "__main__":
-    create_boxplot("val_loss.min", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k")
-    create_boxplot("test_CIDEr.max", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k", -0.01, 0.5)
-    create_boxplot("test_BLEU-4.max", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k", -0.01, 0.2)
+    # create_boxplot("val_loss.min", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k")
+    # create_boxplot("test_CIDEr.max", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k", -0.01, 0.5)
+    # create_boxplot("test_BLEU-4.max", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k", -0.01, 0.2)
+    plot_validation_loss(["ResNet50-LSTM", "ResNet50-Attention"], "coco", 2.1, 2.8, False)
+    # plot_validation_loss("ResNet50-Attention", "coco", 2.1, 2.8, False)
