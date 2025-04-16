@@ -144,60 +144,74 @@ def correlation_importance(class_name: str = "val_loss.min", model_name: str = "
     plt.show()
 
 
-def plot_validation_loss(model_name: str = "ResNet50-LSTM", dataset_name: str = "flickr8k"):
-    # Read CSV
-    val_loss_df = pd.read_csv("../plots/results/csv_source/val_loss_v4.csv")
-    experiments_df = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv")
+def plot_validation_loss(model_name: str, dataset_name: str, min_y=2, max_y=6):
+    val_loss = pd.read_csv("../plots/results/csv_source/val_loss_v4.csv")
+    experiments = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv")
 
+    experiments_filtered = experiments
     match model_name:
         case "ResNet50-LSTM":
-            model_df = experiments_df[
-                (experiments_df['encoder'] == 'resnet50') & (experiments_df['decoder'] == 'LSTM') & (experiments_df['dataset.name'] == dataset_name)]
+            experiments_filtered = experiments[
+                (experiments['encoder'] == 'resnet50') & (experiments['decoder'] == 'LSTM')]
         case "ResNet50-Attention":
-            model_df = experiments_df[(experiments_df['encoder'] == 'resnet50') & (experiments_df['decoder'] == 'Attention') & (
-                    experiments_df['dataset.name'] == dataset_name)]
-        case "Swin-LSTM":
-            model_df = experiments_df[
-                (experiments_df['encoder'] == 'swin') & (experiments_df['decoder'] == 'LSTM') & (experiments_df['dataset.name'] == dataset_name)]
+            experiments_filtered = experiments[(experiments['encoder'] == 'resnet50') & (experiments['decoder'] == 'Attention') & (
+                    experiments['dataset.name'] == dataset_name)]
         case "Swin-Attention":
-            model_df = experiments_df[
-                (experiments_df['encoder'] == 'swin') & (experiments_df['decoder'] == 'Attention') & (experiments_df['dataset.name'] == dataset_name)]
-        case _:
-            raise ValueError(f"Invalid model name: {model_name}")
+            experiments_filtered = experiments[
+                (experiments['encoder'] == 'swin') & (experiments['decoder'] == 'Attention')]
 
-    # Filter validation loss columns
+    match dataset_name:
+        case "flickr8k":
+            experiments_filtered = experiments_filtered[experiments_filtered['dataset.name'] == 'flickr8k']
+        case "coco":
+            experiments_filtered = experiments_filtered[experiments_filtered['dataset.name'] == 'coco']
 
-    experiments_names = model_df['Name'].unique()
-    val_loss_filter = [col for col in val_loss_df.columns if col in experiments_names]
-    print(val_loss_filter)  # empty list? help??
-    filtered_val_loss_df = val_loss_df[val_loss_filter]
+    experiments_names = experiments_filtered['Name'].unique()
+    val_loss_filter = [col for col in val_loss.columns if col in experiments_names]
+    val_loss_filtered = val_loss[val_loss_filter]
 
-    # Create plot
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(15, 10))
 
     # Plot each validation loss curve
-    for col in filtered_val_loss_df.columns:
-        plt.plot(filtered_val_loss_df.index + 1, filtered_val_loss_df[col], label=col)
+    for col in val_loss_filtered.columns:
+        plt.plot(val_loss_filtered.index + 1, val_loss_filtered[col], label=col)
 
-    # Add labels and title
+    # Horizontal line for minimum loss
+    min_loss = val_loss_filtered.min().min()  # Find overall minimum loss
+    plt.axhline(y=min_loss, color='0', linestyle='--', label=f'Minimum Loss ({min_loss:.2f})')
+
     plt.xlabel("Epoch")
     plt.ylabel("Validation Loss")
-    plt.title(f"Validation Loss Comparison")
-    plt.ylim(0, 5)
+    if model_name is None and dataset_name is None:
+        plt.title("Validation Loss Comparison")
+    elif dataset_name is None:
+        plt.title(f"Validation Loss Comparison for {model_name}")
+    elif model_name is None:
+        plt.title(f"Validation Loss Comparison for {dataset_name}")
+    else:
+        plt.title(f"Validation Loss Comparison for {model_name} on {dataset_name}")
+    plt.ylim(min_y, max_y)
     plt.grid(True, alpha=0.3)
-
+    plt.text(x=0.99, y=min_loss + 0.02, s=f'Min: {min_loss:.2f}', ha='right', va='bottom', color='0', transform=plt.gca().get_yaxis_transform())
     # Show plot
     plt.tight_layout()
+    plt.savefig(f"../plots/results/val_loss_{model_name}_{dataset_name}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
-# Execute the function
+def create_boxplot(metric):
+    experiments = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv")
+    # Create the boxplot
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(data=experiments, y=metric)
+    plt.title(f"Boxplot of {metric}")
+    plt.ylabel(metric)
+
 
 if __name__ == "__main__":
-    plot_validation_loss("Swin-Attention")
-    # correlation_importance('val_loss.min', 'ResNet50-Attention')
-    # correlation_importance('test_CIDEr.max', 'ResNet50-Attention')
-    # correlation_importance('test_BLEU-4.max', 'ResNet50-Attention')
-    # correlation_importance('val_loss.min', 'ResNet50-LSTM')
-    # correlation_importance('test_CIDEr.max', 'ResNet50-LSTM')
-    # correlation_importance('test_BLEU-4.max', 'ResNet50-LSTM')
+    plot_validation_loss("ResNet50-LSTM", "flickr8k")
+    plot_validation_loss("ResNet50-Attention", "flickr8k")
+    plot_validation_loss("Swin-Attention", "flickr8k")
+    plot_validation_loss("ResNet50-LSTM", "coco", max_y=3)
+    plot_validation_loss("ResNet50-Attention", "coco", max_y=3)
+    plot_validation_loss("Swin-Attention", "coco", max_y=3)
