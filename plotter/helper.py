@@ -127,4 +127,7 @@ if __name__ == "__main__":
     # output_path = "../plots/results/val_loss.csv"
     # merge_csv_by_columns(file_paths, output_path)
 
-    remove_duplicate_columns("../plots/results/csv_source/val_loss.csv", "../plots/results/csv_source/val_loss_v2.csv")
+    # remove_duplicate_columns("../plots/results/csv_source/val_loss.csv", "../plots/results/csv_source/val_loss_v2.csv")
+    df = pd.read_csv("../plots/results/csv_source/val_loss_v3.csv")
+    df.columns = df.columns.str.strip()
+    df.to_csv("../plots/results/csv_source/val_loss_v4.csv", index=False)

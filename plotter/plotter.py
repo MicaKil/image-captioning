@@ -140,14 +140,64 @@ def correlation_importance(class_name: str = "val_loss.min", model_name: str = "
     plt.xlim(0, 1.8)
     plt.grid(axis='x', linestyle='--', alpha=0.5, color='#cccccc')  # X-axis grid
     plt.tight_layout()
-    # plt.savefig(f"../results/{model_name}_{class_name}_correlation_importance.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"../results/{model_name}_{class_name}_correlation_importance.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
+def plot_validation_loss(model_name: str = "ResNet50-LSTM", dataset_name: str = "flickr8k"):
+    # Read CSV
+    val_loss_df = pd.read_csv("../plots/results/csv_source/val_loss_v4.csv")
+    experiments_df = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv")
+
+    match model_name:
+        case "ResNet50-LSTM":
+            model_df = experiments_df[
+                (experiments_df['encoder'] == 'resnet50') & (experiments_df['decoder'] == 'LSTM') & (experiments_df['dataset.name'] == dataset_name)]
+        case "ResNet50-Attention":
+            model_df = experiments_df[(experiments_df['encoder'] == 'resnet50') & (experiments_df['decoder'] == 'Attention') & (
+                    experiments_df['dataset.name'] == dataset_name)]
+        case "Swin-LSTM":
+            model_df = experiments_df[
+                (experiments_df['encoder'] == 'swin') & (experiments_df['decoder'] == 'LSTM') & (experiments_df['dataset.name'] == dataset_name)]
+        case "Swin-Attention":
+            model_df = experiments_df[
+                (experiments_df['encoder'] == 'swin') & (experiments_df['decoder'] == 'Attention') & (experiments_df['dataset.name'] == dataset_name)]
+        case _:
+            raise ValueError(f"Invalid model name: {model_name}")
+
+    # Filter validation loss columns
+
+    experiments_names = model_df['Name'].unique()
+    val_loss_filter = [col for col in val_loss_df.columns if col in experiments_names]
+    print(val_loss_filter)  # empty list? help??
+    filtered_val_loss_df = val_loss_df[val_loss_filter]
+
+    # Create plot
+    plt.figure(figsize=(10, 8))
+
+    # Plot each validation loss curve
+    for col in filtered_val_loss_df.columns:
+        plt.plot(filtered_val_loss_df.index + 1, filtered_val_loss_df[col], label=col)
+
+    # Add labels and title
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Loss")
+    plt.title(f"Validation Loss Comparison")
+    plt.ylim(0, 5)
+    plt.grid(True, alpha=0.3)
+
+    # Show plot
+    plt.tight_layout()
+    plt.show()
+
+
+# Execute the function
+
 if __name__ == "__main__":
-    correlation_importance('val_loss.min', 'ResNet50-Attention')
-    correlation_importance('test_CIDEr.max', 'ResNet50-Attention')
-    correlation_importance('test_BLEU-4.max', 'ResNet50-Attention')
-    correlation_importance('val_loss.min', 'ResNet50-LSTM')
-    correlation_importance('test_CIDEr.max', 'ResNet50-LSTM')
-    correlation_importance('test_BLEU-4.max', 'ResNet50-LSTM')
+    plot_validation_loss("Swin-Attention")
+    # correlation_importance('val_loss.min', 'ResNet50-Attention')
+    # correlation_importance('test_CIDEr.max', 'ResNet50-Attention')
+    # correlation_importance('test_BLEU-4.max', 'ResNet50-Attention')
+    # correlation_importance('val_loss.min', 'ResNet50-LSTM')
+    # correlation_importance('test_CIDEr.max', 'ResNet50-LSTM')
+    # correlation_importance('test_BLEU-4.max', 'ResNet50-LSTM')
