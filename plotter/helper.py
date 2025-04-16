@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def clean_up_csv():
+def clean_up_results_csv():
     df = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00.csv")
 
     df.loc[df['model'].isnull(), 'model'] = 'basic'
@@ -14,6 +14,65 @@ def clean_up_csv():
     df.loc[df['epoch.max'].isnull(), 'epoch.max'] = df['epoch']
     df.drop(columns=['epoch'], inplace=True)
     df.to_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv", index=False)
+
+
+def clean_up_val_loss_csv():
+    df = pd.read_csv("../plots/results/csv_source/attn_8_wandb_export_2025-04-16T00_09_29.345-03_00.csv")
+    columns_to_drop = df.filter(regex=".*_step.*").columns
+    new = df.drop(columns=columns_to_drop)
+    new.to_csv("../plots/results/attn_8_wandb_export_2025-04-16T00_09_29.345-03_00_v2.csv", index=False)
+    columns_to_keep = new.filter(regex="val_loss$").columns
+    new2 = new[columns_to_keep]
+    new2.to_csv("../plots/results/attn_8_wandb_export_2025-04-16T00_09_29.345-03_00_v3.csv", index=False)
+    columns_to_drop = [col for col in new2.columns if new2[col].notnull().sum() == 1]
+    new3 = new2.drop(columns=columns_to_drop)
+    new3.to_csv("../plots/results/attn_8_wandb_export_2025-04-16T00_09_29.345-03_00_v4.csv", index=False)
+
+    df = pd.read_csv("../plots/results/csv_source/lstm_38_wandb_export_2025-04-16T00_16_18.415-03_00.csv")
+    columns_to_drop = df.filter(regex=".*_step.*").columns
+    new = df.drop(columns=columns_to_drop)
+    new.to_csv("../plots/results/lstm_38_wandb_export_2025-04-16T00_16_18.415-03_00_v2.csv", index=False)
+    columns_to_keep = new.filter(regex="val_loss$").columns
+    new2 = new[columns_to_keep]
+    new2.to_csv("../plots/results/lstm_38_wandb_export_2025-04-16T00_16_18.415-03_00_v3.csv", index=False)
+    columns_to_drop = [col for col in new2.columns if new2[col].notnull().sum() == 1]
+    new3 = new2.drop(columns=columns_to_drop)
+    new3.to_csv("../plots/results/lstm_38_wandb_export_2025-04-16T00_16_18.415-03_00_v4.csv", index=False)
+
+    df = pd.read_csv("../plots/results/csv_source/attn_50_wandb_export_2025-04-16T00_09_29.345-03_00.csv")
+    columns_to_drop = df.filter(regex=".*_step.*").columns
+    new = df.drop(columns=columns_to_drop)
+    new.to_csv("../plots/results/attn_50_wandb_export_2025-04-16T00_09_29.345-03_00_v2.csv", index=False)
+    columns_to_keep = new.filter(regex="val_loss$").columns
+    new2 = new[columns_to_keep]
+    new2.to_csv("../plots/results/attn_50_wandb_export_2025-04-16T00_09_29.345-03_00_v3.csv", index=False)
+    columns_to_drop = [col for col in new2.columns if new2[col].notnull().sum() == 1]
+    new3 = new2.drop(columns=columns_to_drop)
+    new3.to_csv("../plots/results/attn_50_wandb_export_2025-04-16T00_09_29.345-03_00_v4.csv", index=False)
+
+
+def merge_csv_by_columns(file_paths, output_path):
+    # Read all CSV files into a list of DataFrames
+    dataframes = [pd.read_csv(file_path) for file_path in file_paths]
+
+    # Concatenate the DataFrames by adding columns
+    merged_df = pd.concat(dataframes, axis=1)
+
+    # Save the merged DataFrame to a new CSV file
+    merged_df.to_csv(output_path, index=False)
+    print(f"Merged CSV saved to {output_path}")
+
+
+def remove_duplicate_columns(file_path, output_path):
+    # Load the CSV file
+    df = pd.read_csv(file_path)
+
+    # Remove duplicate columns
+    df = df.T.drop_duplicates().T
+
+    # Save the updated DataFrame to a new CSV file
+    df.to_csv(output_path, index=False)
+    print(f"Duplicate columns have been removed and saved to {output_path}")
 
 
 def count_experiments():
@@ -60,4 +119,12 @@ def count_experiments():
 
 
 if __name__ == "__main__":
-    count_experiments()
+    # file_paths = [
+    #     "../plots/results/attn_8_wandb_export_2025-04-16T00_09_29.345-03_00_v4.csv",
+    #     "../plots/results/attn_50_wandb_export_2025-04-16T00_09_29.345-03_00_v6.csv",
+    #     "../plots/results/lstm_38_wandb_export_2025-04-16T00_16_18.415-03_00_v4.csv"
+    # ]
+    # output_path = "../plots/results/val_loss.csv"
+    # merge_csv_by_columns(file_paths, output_path)
+
+    remove_duplicate_columns("../plots/results/csv_source/val_loss.csv", "../plots/results/csv_source/val_loss_v2.csv")
