@@ -113,7 +113,46 @@ def load_checkpoint(checkpoint_pth: str):
     """
     checkpoint = torch.load(checkpoint_pth)
     config = checkpoint["config"]
+    model, vocab = get_model_and_vocab(config)
+    model.load_state_dict(checkpoint['model_state'])
+    return model, config, vocab
 
+
+def plot_pic_and_caption(img_pth, model_pth, config):
+    if config:
+        model, vocab = get_model_and_vocab(config)
+        model.load_state_dict(torch.load(model_pth, weights_only=True))
+    else:
+        model, config, vocab = load_checkpoint(model_pth)
+
+    try:
+        transform_resize = config["transform_resize"]
+    except KeyError:
+        transform_resize = (256, 256)
+    MEAN = [0.485, 0.456, 0.406]
+    STD = [0.229, 0.224, 0.225]
+
+    TRANSFORM = v2.Compose([
+        v2.ToImage(),
+        v2.Resize(transform_resize),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=MEAN, std=STD),
+    ])
+
+    img = preprocess_image(img_pth, TRANSFORM)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    captions, _ = gen_caption(model, img, vocab, 20, device, None, 5, True, False)
+    print(captions)
+    # plot pic and add caption
+    plt.figure(figsize=(8, 8))
+    plt.imshow(Image.open(img_pth))
+    plt.axis("off")
+    plt.title(captions[0], fontsize=14, wrap=True)
+    plt.show()
+
+
+def get_model_and_vocab(config):
     ds_name = config["dataset"]["name"]
     match ds_name:
         case "flickr8k":
@@ -128,7 +167,6 @@ def load_checkpoint(checkpoint_pth: str):
             ds_dir = COCO_DIR
         case _:
             raise ValueError(f"Dataset '{ds_name}' not recognized")
-
     tokenizer = config["vocab"]["tokenizer"]
     freq_threshold = config["vocab"]["freq_threshold"]
     match tokenizer:
@@ -144,7 +182,6 @@ def load_checkpoint(checkpoint_pth: str):
             vocab = Vocabulary(tokenizer, None, text=None, sp_model_path=sp_model)
         case _:
             raise ValueError(f"Tokenizer '{tokenizer}' not recognized")
-
     fine_tune = config["fine_tune_encoder"]
     hidden_size = config["hidden_size"]
     decoder_dropout = config["dropout"]
@@ -167,9 +204,7 @@ def load_checkpoint(checkpoint_pth: str):
                 raise ValueError(f"Model '{config['model']}' not recognized")
         case _:
             raise ValueError(f"Encoder '{config['encoder']}' not recognized")
-
-    model.load_state_dict(checkpoint['model_state'])
-    return model, config, vocab
+    return model, vocab
 
 
 def print_banner():
@@ -252,4 +287,50 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
 
 
 if __name__ == "__main__":
-    plot_attn_cli()
+    c = {
+        "model": "transformer",
+        "encoder": "resnet50",
+        "decoder": "Attention",
+        "criterion": "CrossEntropyLoss",
+        "optimizer": "AdamW",
+        "batch_size": 64,
+        "embed_size": 512,
+        "hidden_size": 512,
+        "num_layers": 2,
+        "num_heads": 2,
+        "encoder_dropout": 0.1,
+        "dropout": 0.5,
+        "fine_tune_encoder": "partial",
+        "vocab": {
+            "freq_threshold": 3,
+            "tokenizer": "word",
+            "vocab_size": 3500
+        },
+        "dataset": {
+            "name": "flickr8k",
+            "version": "2025-02-16",
+            "split": {
+                "train": 80,
+                "val": 10,
+                "test": 10
+            }
+        },
+        "encoder_lr": 1e-5,
+        "decoder_lr": 1e-4,
+        "gradient_clip": 2.0,
+        "scheduler": {
+            "type": "ReduceLROnPlateau",
+            "factor": 0.5,
+            "patience": 10
+        },
+        "max_caption_len": 40,
+        "beam_size": 5,
+        "temperature": 0.0,
+    }
+
+    # m_pth = "report/models/atomic-voice-25_best_val_2025-02-26_04-56_2-6236.pt"
+    m_pth = "report/models/LAST_2025-03-26_04-05_2-1619.pt"
+    i_pth = "data/mine/005_cropped.jpg"
+    # i_pth = "data/flickr8k/images/1288909046_d2b2b62607.jpg"
+    # 2857558098_98e9249284.jpg
+    plot_pic_and_caption(i_pth, m_pth, None)
