@@ -1,6 +1,6 @@
 import click
 
-from attn_plotter import plot_attn_cli
+from plotter import plot_attn_cli
 from run_cli import run_cli
 
 
