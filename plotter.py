@@ -152,11 +152,14 @@ def plot_pic_and_caption(img_pth, model_pth, config):
     plt.show()
 
 
-def plot_pic_and_caption2(img_pth, caption):
-    plt.figure(figsize=(8, 8))
+def plot_pic_and_caption2(img_pth, caption, save_name=None):
+    plt.figure(figsize=(10, 10))
     plt.imshow(Image.open(img_pth))
     plt.axis("off")
-    plt.title(caption, fontsize=16, wrap=True)
+    plt.title(caption, fontsize=16, wrap=True, pad=10)
+    plt.tight_layout()
+    if save_name:
+        plt.savefig(save_name, bbox_inches='tight', dpi=300)
     plt.show()
 
 
@@ -381,30 +384,44 @@ if __name__ == "__main__":
     m_pth = "report/models/LAST_2025-03-26_04-05_2-1619.pt"
     m2_pth = "../report/models/earnest-sweep-11_LAST_2025-02-22_23-12_2-6011.pt"
 
-    i1 = "data/mine/001_cropped.jpg"
-    cc1 = f"LSTM: \Attention: "
     # a man and a woman are posing for a picture.
     # a group of young people pose for a picture.
+    # i1 = "data/mine/001_cropped.jpg"
+    # cc1 = f'LSTM: "a man and a woman are posing for a picture."\nAttention: "a group of young people pose for a picture."'
+    # plot_pic_and_caption2(i1, cc1, "report/pics/flickr8k_001.png")
+
     i2 = "data/mine/002_cropped.png"
-    cc2 = f"LSTM: \Attention: "
     # a woman is holding a baby in a white dress.
     # a man and a woman are dancing.
+    cc2 = f'LSTM: "a woman is holding a baby in a white dress."\nAttention: "a man and a woman are dancing."'
+    plot_pic_and_caption2(i2, cc2, "report/pics/flickr8k_002.png")
+
     i3 = "data/mine/003_cropped.jpg"
-    cc3 = f"LSTM: \Attention: "
     # a white dog is standing in a green room with its mouth open.
     # a white and white dog is playing in a kitchen.
+    cc3 = f'LSTM: "a white dog is standing in a green room with its mouth open."\nAttention: "a white and white dog is playing in a kitchen."'
+    plot_pic_and_caption2(i3, cc3, "report/pics/flickr8k_003.png")
+
     i4 = "data/mine/004_cropped.jpg"
-    cc4 = f"LSTM: \Attention: "
     # a man in a plaid shirt and a hat is standing in front of a large tree.
     # a man in a yellow shirt is standing in front of a yellow tent.
+    cc4 = f'LSTM: "a man in a plaid shirt and a hat is standing in front of a large tree."\nAttention: "a man in a yellow shirt is standing in front of a yellow tent."'
+    plot_pic_and_caption2(i4, cc4, "report/pics/flickr8k_004.png")
+
     i5 = "data/mine/005_cropped.jpg"
-    cc5 = f"LSTM: \Attention: "
     # a basketball player in a white uniform is dribbling a basketball.
     # a basketball player attempts to get the ball.
+    cc5 = f'LSTM: "a basketball player in a white uniform is dribbling a basketball."\nAttention: "a basketball player attempts to get the ball."'
+    plot_pic_and_caption2(i5, cc5, "report/pics/flickr8k_005.png")
+
     i6 = "data/mine/006_cropped.jpg"
-    cc6 = f"LSTM: \Attention: "
     # a person is sitting on a bench with a skateboard in the background.
     # a group of people are standing on a skateboard.
+    cc6 = f'LSTM: "a person is sitting on a bench with a skateboard in the background."\nAttention: "a group of people are standing on a skateboard."'
+    plot_pic_and_caption2(i6, cc6, "report/pics/flickr8k_006.png")
+
     i7 = "data/mine/007_cropped.jpg"
-    cc7 = f"LSTM: \Attention: "
+    # a young girl is standing on a balance beam with a tennis ball in his hand.
     # a young man in a blue shirt is standing on the beach.
+    cc7 = f'LSTM: "a young girl is standing on a balance beam with a tennis ball in his hand."\nAttention: "a young man in a blue shirt is standing on the beach."'
+    plot_pic_and_caption2(i7, cc7, "report/pics/flickr8k_007.png")
