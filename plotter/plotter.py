@@ -118,14 +118,15 @@ def plot_validation_loss(model_names: list[str], dataset_name: str, min_y: float
     plt.show()
 
 
-def create_boxplot(metric: str, model_names: list[str], dataset_name: str, min_y: float = 2.3, max_y: float = 5):
+def create_boxplot(metric: str, model_names: list[str], dataset_name: str, min_y: float = 2.3, max_y: float = 5, x_pos: float = 0.25,
+                   y_pos: float = 0, v_align='top', save_fig: bool = True) -> None:
     experiments_filtered = []
     # experiments_filtered = filter_experiments(dataset_name, model_names)
     for model_name in model_names:
         experiments = filter_experiments(dataset_name, model_name)
         experiments_filtered.append(experiments)
     # Create the boxplot
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(6, 10))
     label = {
         "num_heads": "Num Heads",
         "val_loss.min": "Validation Loss",
@@ -146,7 +147,7 @@ def create_boxplot(metric: str, model_names: list[str], dataset_name: str, min_y
         # Add text annotation
         stats_text = f"Mean: {mean_val:.2f}\nMin: {min_val:.2f}\nMax: {max_val:.2f}"
         print(stats_text)
-        plt.text(0.25, 0, stats_text, verticalalignment='bottom', horizontalalignment='left', color='black', fontsize=10,
+        plt.text(x_pos, y_pos, stats_text, verticalalignment=v_align, horizontalalignment='right', color='black', fontsize=10,
                  bbox=dict(facecolor='white', alpha=0.6, edgecolor='0', boxstyle='round,pad=0.65'))
         plt.xlabel(f"Model {model_name}")
         plt.ylabel(label[metric] if i == 0 else "")
@@ -154,7 +155,8 @@ def create_boxplot(metric: str, model_names: list[str], dataset_name: str, min_y
         plt.grid(True, alpha=0.3)
     plt.suptitle(f"Boxplot of {label[metric]} on {label[dataset_name]}")
     plt.tight_layout()  # rect=(0, 0, 0.98, 0.98)
-    plt.savefig(f"../plots/results/boxplot_{metric}_{dataset_name}.png", dpi=300, bbox_inches='tight')
+    if save_fig:
+        plt.savefig(f"../plots/results/boxplot_{metric}_{dataset_name}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -218,8 +220,7 @@ def filter_experiments(dataset_name, model_name):
 
 
 if __name__ == "__main__":
-    # create_boxplot("val_loss.min", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k")
-    # create_boxplot("test_CIDEr.max", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k", -0.01, 0.5)
-    # create_boxplot("test_BLEU-4.max", ["ResNet50-LSTM", "ResNet50-Attention"], "flickr8k", -0.01, 0.2)
-    plot_validation_loss(["ResNet50-LSTM", "ResNet50-Attention"], "coco", 2.1, 2.8, False)
-    # plot_validation_loss("ResNet50-Attention", "coco", 2.1, 2.8, False)
+    create_boxplot("val_loss.min", ["ResNet50-Attention"], "coco", 2.07, 2.42, x_pos=0.45, y_pos=2.405, save_fig=True)
+    create_boxplot("test_CIDEr.max", ["ResNet50-Attention"], "coco", 0.49, 0.83, x_pos=0.45, y_pos=0.51, v_align="bottom", save_fig=True)
+    create_boxplot("test_BLEU-4.max", ["ResNet50-Attention"], "coco", 0.1, 0.36, x_pos=0.45, y_pos=0.345, v_align="top", save_fig=True)
+    # plot_validation_loss(["ResNet50-LSTM", "ResNet50-Attention"], "coco", 2.1, 2.8, True)
