@@ -128,7 +128,7 @@ def plot_pic_and_caption(img_pth, model_pth, config):
     try:
         transform_resize = config["transform_resize"]
     except KeyError:
-        transform_resize = (256, 256)
+        transform_resize = (224, 224)
     MEAN = [0.485, 0.456, 0.406]
     STD = [0.229, 0.224, 0.225]
 
@@ -328,9 +328,54 @@ if __name__ == "__main__":
         "temperature": 0.0,
     }
 
+    c2 = {
+        "model": "intermediate",
+        "encoder": "resnet50",
+        "decoder": "LSTM",
+        "criterion": "CrossEntropyLoss",
+        "optimizer": "Adam",
+        "batch_size": 64,
+        "embed_size": 1024,
+        "hidden_size": 256,
+        "num_layers": 2,
+        "num_heads": 2,
+        "encoder_dropout": 0.5,
+        "dropout": 0.5,
+        "freeze_encoder": True,
+        "vocab": {
+            "freq_threshold": 3,
+            "tokenizer": "word",
+            "vocab_size": 3500
+        },
+        "dataset": {
+            "name": "flickr8k",
+            "version": "2025-02-16",
+            "split": {
+                "train": 80,
+                "val": 10,
+                "test": 10
+            }
+        },
+        "encoder_lr": 0.00001,
+        "decoder_lr": 0.0001,
+        "gradient_clip": 2.0,
+        # "scheduler": {
+        #     "type": None,
+        #     "factor": None,
+        #     "patience": None
+        # },
+        "max_caption_len": 30,
+        "beam_size": 5,
+        "temperature": 0.0,
+    }
+
     # m_pth = "report/models/atomic-voice-25_best_val_2025-02-26_04-56_2-6236.pt"
     m_pth = "report/models/LAST_2025-03-26_04-05_2-1619.pt"
-    i_pth = "data/mine/005_cropped.jpg"
-    # i_pth = "data/flickr8k/images/1288909046_d2b2b62607.jpg"
+    m2_pth = "../report/models/earnest-sweep-11_LAST_2025-02-22_23-12_2-6011.pt"
+
+    # i_pth = "data/mine/005_cropped.jpg"
+    # a boy is standing in front of a waterfall.
+    i_pth = "data/flickr8k/images/279728508_6bd7281f3c.jpg"
+    plot_pic_and_caption(i_pth, m2_pth, c2)
+
     # 2857558098_98e9249284.jpg
-    plot_pic_and_caption(i_pth, m_pth, None)
