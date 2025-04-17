@@ -152,6 +152,14 @@ def plot_pic_and_caption(img_pth, model_pth, config):
     plt.show()
 
 
+def plot_pic_and_caption2(img_pth, caption):
+    plt.figure(figsize=(8, 8))
+    plt.imshow(Image.open(img_pth))
+    plt.axis("off")
+    plt.title(caption, fontsize=16, wrap=True)
+    plt.show()
+
+
 def get_model_and_vocab(config):
     ds_name = config["dataset"]["name"]
     match ds_name:
@@ -373,9 +381,30 @@ if __name__ == "__main__":
     m_pth = "report/models/LAST_2025-03-26_04-05_2-1619.pt"
     m2_pth = "../report/models/earnest-sweep-11_LAST_2025-02-22_23-12_2-6011.pt"
 
-    # i_pth = "data/mine/005_cropped.jpg"
-    # a boy is standing in front of a waterfall.
-    i_pth = "data/flickr8k/images/279728508_6bd7281f3c.jpg"
-    plot_pic_and_caption(i_pth, m2_pth, c2)
-
-    # 2857558098_98e9249284.jpg
+    i1 = "data/mine/001_cropped.jpg"
+    cc1 = f"LSTM: \Attention: "
+    # a man and a woman are posing for a picture.
+    # a group of young people pose for a picture.
+    i2 = "data/mine/002_cropped.png"
+    cc2 = f"LSTM: \Attention: "
+    # a woman is holding a baby in a white dress.
+    # a man and a woman are dancing.
+    i3 = "data/mine/003_cropped.jpg"
+    cc3 = f"LSTM: \Attention: "
+    # a white dog is standing in a green room with its mouth open.
+    # a white and white dog is playing in a kitchen.
+    i4 = "data/mine/004_cropped.jpg"
+    cc4 = f"LSTM: \Attention: "
+    # a man in a plaid shirt and a hat is standing in front of a large tree.
+    # a man in a yellow shirt is standing in front of a yellow tent.
+    i5 = "data/mine/005_cropped.jpg"
+    cc5 = f"LSTM: \Attention: "
+    # a basketball player in a white uniform is dribbling a basketball.
+    # a basketball player attempts to get the ball.
+    i6 = "data/mine/006_cropped.jpg"
+    cc6 = f"LSTM: \Attention: "
+    # a person is sitting on a bench with a skateboard in the background.
+    # a group of people are standing on a skateboard.
+    i7 = "data/mine/007_cropped.jpg"
+    cc7 = f"LSTM: \Attention: "
+    # a young man in a blue shirt is standing on the beach.
