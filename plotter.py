@@ -121,18 +121,18 @@ def load_checkpoint(checkpoint_pth: str):
     return model, config, vocab
 
 
-def gen_pic_and_caption(img_pth, lstm_pth, attn_pth, lstm_config=None, attn_config=None, save_name=None):
+def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label: str, lstm_config=None, attn_config=None, save_name=None):
     if lstm_config:
         lstm_model, vocab_lstm = get_model_and_vocab(lstm_config)
-        lstm_model.load_state_dict(torch.load(lstm_pth, weights_only=True))
+        lstm_model.load_state_dict(torch.load(model1, weights_only=True))
     else:
-        lstm_model, lstm_config, vocab_lstm = load_checkpoint(lstm_pth)
+        lstm_model, lstm_config, vocab_lstm = load_checkpoint(model1)
 
     if attn_config:
         attn_model, vocab_attn = get_model_and_vocab(attn_config)
-        attn_model.load_state_dict(torch.load(attn_pth, weights_only=True))
+        attn_model.load_state_dict(torch.load(model2, weights_only=True))
     else:
-        attn_model, attn_config, vocab_attn = load_checkpoint(attn_pth)
+        attn_model, attn_config, vocab_attn = load_checkpoint(model2)
 
     try:
         transform_resize_lstm = lstm_config["transform_resize"]
@@ -164,11 +164,11 @@ def gen_pic_and_caption(img_pth, lstm_pth, attn_pth, lstm_config=None, attn_conf
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     caption_lstm, _ = gen_caption(lstm_model, img_lstm, vocab_lstm, 20, device, None, 5, True, False)
-    print(f"LSTM Caption: {caption_lstm[0]}")
+    print(f"{model1_label} Caption: {caption_lstm[0]}")
     caption_attn, _ = gen_caption(attn_model, img_attn, vocab_attn, 20, device, None, 5, True, False)
-    print(f"Attention Caption: {caption_attn[0]}")
+    print(f"{model2_label} Caption: {caption_attn[0]}")
 
-    captions = f'LSTM: "{caption_lstm[0]}"\nAttention: "{caption_attn[0]}"'
+    captions = f'{model1_label}: "{caption_lstm[0]}"\n{model2_label}: "{caption_attn[0]}"'
     plt.figure(figsize=(10, 10))
     plt.imshow(Image.open(img_pth))
     plt.axis("off")
@@ -345,19 +345,19 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
 
 
 if __name__ == "__main__":
-    lstm = "report/models/COCO_L_BEST_2025-03-17_17-22_2-3502.pt"
-    attn = "report/models/COCO_T_BEST_2025-03-20_12-40_2-1685.pt"
+    flickr = "report/models/SWIN_FLICKR_LAST_2025-03-23_21-32_2-5733.pt"
+    coco = "report/models/SWIN_COCO_LAST_2025-03-26_04-05_2-1619.pt"
     i1 = "data/mine/001_cropped.jpg"
-    gen_pic_and_caption(i1, lstm, attn, save_name="report/pics/coco_001.png")
+    gen_pic_and_caption(i1, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_001.png")
     i2 = "data/mine/002_cropped.png"
-    gen_pic_and_caption(i2, lstm, attn, save_name="report/pics/coco_002.png")
+    gen_pic_and_caption(i2, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_002.png")
     i3 = "data/mine/003_cropped.jpg"
-    gen_pic_and_caption(i3, lstm, attn, save_name="report/pics/coco_003.png")
+    gen_pic_and_caption(i3, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_003.png")
     i4 = "data/mine/004_cropped.jpg"
-    gen_pic_and_caption(i4, lstm, attn, save_name="report/pics/coco_004.png")
+    gen_pic_and_caption(i4, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_004.png")
     i5 = "data/mine/005_cropped.jpg"
-    gen_pic_and_caption(i5, lstm, attn, save_name="report/pics/coco_005.png")
+    gen_pic_and_caption(i5, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_005.png")
     i6 = "data/mine/006_cropped.jpg"
-    gen_pic_and_caption(i6, lstm, attn, save_name="report/pics/coco_006.png")
+    gen_pic_and_caption(i6, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_006.png")
     i7 = "data/mine/007_cropped.jpg"
-    gen_pic_and_caption(i7, lstm, attn, save_name="report/pics/coco_007.png")
+    gen_pic_and_caption(i7, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_007.png")

@@ -70,7 +70,7 @@ def correlation_importance(class_name: str = "val_loss.min", model_name: str = "
     plt.show()
 
 
-def plot_validation_loss(model_names: list[str], dataset_name: str, min_y: float = 2, max_y: float = 6, save_fig: bool = True) -> None:
+def plot_val_loss(model_names: list[str], dataset_name: str, min_y: float = None, max_y: float = None, save_fig: bool = True) -> None:
     val_loss = pd.read_csv("../plots/results/csv_source/val_loss_v4.csv")
 
     model_colors = sns.color_palette("pastel", n_colors=len(model_names))
@@ -97,11 +97,11 @@ def plot_validation_loss(model_names: list[str], dataset_name: str, min_y: float
     if model_names is None and dataset_name is None:
         plt.title("Validation Loss Comparison")
     elif dataset_name is None:
-        plt.title(f"Validation Loss Comparison for {model_names}")
+        plt.title(f"Validation Loss Comparison for {" and ".join(model_names)}")
     elif model_names is None:
         plt.title(f"Validation Loss Comparison for {dataset_name}")
     else:
-        plt.title(f"Validation Loss Comparison for {model_names} on {dataset_name}")
+        plt.title(f"Validation Loss Comparison for {" and ".join(model_names)} on {dataset_name}")
 
     plt.ylim(min_y, max_y)
     plt.grid(True, alpha=0.3)
@@ -114,12 +114,60 @@ def plot_validation_loss(model_names: list[str], dataset_name: str, min_y: float
 
     plt.tight_layout()
     if save_fig:
-        plt.savefig(f"../plots/results/val_loss_{model_names}_{dataset_name}.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"../plots/results/val_loss_{"_".join(model_names)}_{dataset_name}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
-def create_boxplot(metric: str, model_names: list[str], dataset_name: str, min_y: float = 2.3, max_y: float = 5, x_pos: float = 0.25,
-                   y_pos: float = 0, v_align='top', save_fig: bool = True) -> None:
+def plot_val_loss_by_ds(model_name: str, dataset_names: list[str], min_y: float = None, max_y: float = None, save_fig: bool = True) -> None:
+    val_loss = pd.read_csv("../plots/results/csv_source/val_loss_v4.csv")
+
+    dataset_colors = sns.color_palette("pastel", n_colors=len(dataset_names))
+    color_dict = {model: dataset_colors[i] for i, model in enumerate(dataset_names)}
+
+    plt.figure(figsize=(15, 10))
+    all_min_loss = []
+    for dataset in dataset_names:
+        experiments_filtered = filter_experiments(dataset, model_name)
+        experiments_names = experiments_filtered['Name'].unique()
+        val_loss_filter = [col for col in val_loss.columns if col in experiments_names]
+        val_loss_filtered = val_loss[val_loss_filter]
+
+        min_loss = val_loss_filtered.min().min()
+        all_min_loss.append(min_loss)
+        # Plot each validation loss curve
+        for col in val_loss_filtered.columns:
+            plt.plot(val_loss_filtered.index + 1, val_loss_filtered[col], color=color_dict[dataset])
+
+        plt.axhline(y=min_loss, color='0', linestyle='--', label=f'{dataset} min loss ({min_loss:.2f})')
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Loss")
+    if model_name is None and dataset_names is None:
+        plt.title("Validation Loss Comparison")
+    elif dataset_names is None:
+        plt.title(f"Validation Loss Comparison for {model_name}")
+    elif model_name is None:
+        plt.title(f"Validation Loss Comparison for {" and ".join(dataset_names)}")
+    else:
+        plt.title(f"Validation Loss Comparison for {model_name} on {" and ".join(dataset_names)}")
+
+    plt.ylim(min_y, max_y)
+    plt.grid(True, alpha=0.3)
+    for dataset, min_loss_ in zip(dataset_names, all_min_loss):
+        plt.text(x=0.99, y=min_loss_ + 0.001, s=f'{dataset} min: {min_loss_:.2f}', ha='right', va='bottom', color='0',
+                 transform=plt.gca().get_yaxis_transform())
+
+    handles = [plt.Line2D([0], [0], color=color_dict[dataset], lw=3) for dataset in dataset_names]
+    plt.legend(handles, dataset_names)
+
+    plt.tight_layout()
+    if save_fig:
+        plt.savefig(f"../plots/results/val_loss_{model_name}_{"_".join(dataset_names)}.png", dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+def boxplot(metric: str, model_names: list[str], dataset_name: str, min_y: float = None, max_y: float = None, x_pos: float = 0.25,
+            y_pos: float = 0, v_align='top', save_fig: bool = True) -> None:
     experiments_filtered = []
     # experiments_filtered = filter_experiments(dataset_name, model_names)
     for model_name in model_names:
@@ -220,7 +268,4 @@ def filter_experiments(dataset_name, model_name):
 
 
 if __name__ == "__main__":
-    create_boxplot("val_loss.min", ["ResNet50-Attention"], "coco", 2.07, 2.42, x_pos=0.45, y_pos=2.405, save_fig=True)
-    create_boxplot("test_CIDEr.max", ["ResNet50-Attention"], "coco", 0.49, 0.83, x_pos=0.45, y_pos=0.51, v_align="bottom", save_fig=True)
-    create_boxplot("test_BLEU-4.max", ["ResNet50-Attention"], "coco", 0.1, 0.36, x_pos=0.45, y_pos=0.345, v_align="top", save_fig=True)
-    # plot_validation_loss(["ResNet50-LSTM", "ResNet50-Attention"], "coco", 2.1, 2.8, True)
+    plot_val_loss_by_ds("Swin-Attention", ["flickr8k", "coco"], save_fig=True)

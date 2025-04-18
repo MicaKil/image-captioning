@@ -51,7 +51,7 @@ class SwinEncoder(EncoderBase):
         # Attach hooks to all Swin Transformer blocks
         for block in self.swin.features:
             if hasattr(block, "attn"):
-                block.attn.register_forward_hook(hook_fn)
+                block.coco.register_forward_hook(hook_fn)
 
     def set_requires_grad(self, fine_tune: str) -> None:
         """
