@@ -232,6 +232,8 @@ fabric.properties
 # Project
 data/*
 *.pkl
+*.pt
+*.pth
 /wandb/
 /checkpoints/
 /results/

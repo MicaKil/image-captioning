@@ -179,17 +179,6 @@ def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label
     plt.show()
 
 
-def plot_pic_and_caption(img_pth, caption, save_name=None):
-    plt.figure(figsize=(10, 10))
-    plt.imshow(Image.open(img_pth))
-    plt.axis("off")
-    plt.title(caption, fontsize=16, wrap=True, pad=10)
-    plt.tight_layout()
-    if save_name:
-        plt.savefig(save_name, bbox_inches='tight', dpi=300)
-    plt.show()
-
-
 def get_model_and_vocab(config):
     ds_name = config["dataset"]["name"]
     match ds_name:
@@ -300,24 +289,42 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
         raise click.Abort()
 
     # Image processing
+    # try:
+    #     click.secho("\n⏳ Processing image...", fg=COLOR_INFO)
+    #     transform_resize = config["transform_resize"]
+    #     mean = [0.485, 0.456, 0.406]
+    #     std = [0.229, 0.224, 0.225]
+    #
+    #     transform = v2.Compose([
+    #         v2.ToImage(),
+    #         v2.Resize(transform_resize),
+    #         v2.ToDtype(torch.float32, scale=True),
+    #         v2.Normalize(mean=mean, std=std),
+    #     ])
+    #
+    #     img = preprocess_image(img_pth, transform)
+    #     click.secho(f"✅ Processed image: {format_path(img_pth)}", fg=COLOR_SUCCESS)
+    # except Exception as e:
+    #     click.secho(f"❌ Image processing failed: {str(e)}", fg=COLOR_ERROR)
+    #     raise click.Abort()
+
+    click.secho("\n⏳ Processing image...", fg=COLOR_INFO)
     try:
-        click.secho("\n⏳ Processing image...", fg=COLOR_INFO)
         transform_resize = config["transform_resize"]
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
+    except KeyError:
+        transform_resize = (256, 256)
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
 
-        transform = v2.Compose([
-            v2.ToImage(),
-            v2.Resize(transform_resize),
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=mean, std=std),
-        ])
+    transform = v2.Compose([
+        v2.ToImage(),
+        v2.Resize(transform_resize),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=mean, std=std),
+    ])
 
-        img = preprocess_image(img_pth, transform)
-        click.secho(f"✅ Processed image: {format_path(img_pth)}", fg=COLOR_SUCCESS)
-    except Exception as e:
-        click.secho(f"❌ Image processing failed: {str(e)}", fg=COLOR_ERROR)
-        raise click.Abort()
+    img = preprocess_image(img_pth, transform)
+    click.secho(f"✅ Processed image: {format_path(img_pth)}", fg=COLOR_SUCCESS)
 
     # Generate caption and attention
     try:
@@ -345,19 +352,19 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
 
 
 if __name__ == "__main__":
-    flickr = "report/models/SWIN_FLICKR_LAST_2025-03-23_21-32_2-5733.pt"
-    coco = "report/models/SWIN_COCO_LAST_2025-03-26_04-05_2-1619.pt"
+    trans_coco = "report/models/COCO_T_BEST_2025-03-20_12-40_2-1685.pt"
+    swin_coco = "report/models/SWIN_COCO_LAST_2025-03-26_04-05_2-1619.pt"
     i1 = "data/mine/001_cropped.jpg"
-    gen_pic_and_caption(i1, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_001.png")
+    # gen_pic_and_caption(i1, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_001.png")
     i2 = "data/mine/002_cropped.png"
-    gen_pic_and_caption(i2, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_002.png")
+    #     gen_pic_and_caption(i2, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_002.png")
     i3 = "data/mine/003_cropped.jpg"
-    gen_pic_and_caption(i3, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_003.png")
+    #     gen_pic_and_caption(i3, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_003.png")
     i4 = "data/mine/004_cropped.jpg"
-    gen_pic_and_caption(i4, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_004.png")
+    #     gen_pic_and_caption(i4, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_004.png")
     i5 = "data/mine/005_cropped.jpg"
-    gen_pic_and_caption(i5, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_005.png")
+    #     gen_pic_and_caption(i5, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_005.png")
     i6 = "data/mine/006_cropped.jpg"
-    gen_pic_and_caption(i6, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_006.png")
+    #     gen_pic_and_caption(i6, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_006.png")
     i7 = "data/mine/007_cropped.jpg"
-    gen_pic_and_caption(i7, flickr, coco, "Flickr8k", "COCO", save_name="report/pics/swin_007.png")
+    #     gen_pic_and_caption(i7, flickr, swin_coco, "Flickr8k", "COCO", save_name="report/pics/swin_007.png")
