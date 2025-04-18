@@ -1,4 +1,5 @@
 import os.path
+import os.path
 
 import click
 import numpy as np
@@ -9,12 +10,14 @@ from matplotlib import pyplot as plt
 from scipy.ndimage import zoom
 from torchvision.transforms import v2
 
+import models.encoders.basic as b_encoder
+import models.encoders.intermediate as i_encoder
 import models.encoders.transformer as t_encoder
 from caption import gen_caption
-from constants import FLICKR8K_DIR, COCO_DIR, ROOT, FLICKR_TRAIN_CSV, FLICKR_TEST_CSV, FLICKR_VAL_CSV, COCO_TRAIN_PKL, COCO_TEST_PKL, \
-    COCO_VAL_PKL
+from constants import FLICKR8K_DIR, COCO_DIR, FLICKR_TRAIN_CSV, FLICKR_TEST_CSV, FLICKR_VAL_CSV, COCO_TRAIN_PKL, COCO_TEST_PKL, COCO_VAL_PKL, ROOT, \
+    PAD
 from dataset.vocabulary import Vocabulary
-from models import transformer
+from models import intermediate, transformer, basic
 from models.encoders import swin
 
 COLOR_INFO = "bright_blue"
@@ -111,48 +114,72 @@ def load_checkpoint(checkpoint_pth: str):
     :param checkpoint_pth: Path to the checkpoint file.
     :return: Tuple containing the model, configuration, and vocabulary.
     """
-    checkpoint = torch.load(checkpoint_pth)
+    checkpoint = torch.load(checkpoint_pth, weights_only=False)
     config = checkpoint["config"]
     model, vocab = get_model_and_vocab(config)
     model.load_state_dict(checkpoint['model_state'])
     return model, config, vocab
 
 
-def plot_pic_and_caption(img_pth, model_pth, config):
-    if config:
-        model, vocab = get_model_and_vocab(config)
-        model.load_state_dict(torch.load(model_pth, weights_only=True))
+def gen_pic_and_caption(img_pth, lstm_pth, attn_pth, lstm_config=None, attn_config=None, save_name=None):
+    if lstm_config:
+        lstm_model, vocab_lstm = get_model_and_vocab(lstm_config)
+        lstm_model.load_state_dict(torch.load(lstm_pth, weights_only=True))
     else:
-        model, config, vocab = load_checkpoint(model_pth)
+        lstm_model, lstm_config, vocab_lstm = load_checkpoint(lstm_pth)
+
+    if attn_config:
+        attn_model, vocab_attn = get_model_and_vocab(attn_config)
+        attn_model.load_state_dict(torch.load(attn_pth, weights_only=True))
+    else:
+        attn_model, attn_config, vocab_attn = load_checkpoint(attn_pth)
 
     try:
-        transform_resize = config["transform_resize"]
+        transform_resize_lstm = lstm_config["transform_resize"]
     except KeyError:
-        transform_resize = (224, 224)
-    MEAN = [0.485, 0.456, 0.406]
-    STD = [0.229, 0.224, 0.225]
+        transform_resize_lstm = (224, 224)
 
-    TRANSFORM = v2.Compose([
+    try:
+        transform_resize_attn = attn_config["transform_resize"]
+    except KeyError:
+        transform_resize_attn = (224, 224)
+
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    transform_lstm = v2.Compose([
         v2.ToImage(),
-        v2.Resize(transform_resize),
+        v2.Resize(transform_resize_lstm),
         v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=MEAN, std=STD),
+        v2.Normalize(mean=mean, std=std),
+    ])
+    transform_attn = v2.Compose([
+        v2.ToImage(),
+        v2.Resize(transform_resize_attn),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=mean, std=std),
     ])
 
-    img = preprocess_image(img_pth, TRANSFORM)
+    img_lstm = preprocess_image(img_pth, transform_lstm)
+    img_attn = preprocess_image(img_pth, transform_attn)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    captions, _ = gen_caption(model, img, vocab, 20, device, None, 5, True, False)
-    print(captions)
-    # plot pic and add caption
-    plt.figure(figsize=(8, 8))
+    caption_lstm, _ = gen_caption(lstm_model, img_lstm, vocab_lstm, 20, device, None, 5, True, False)
+    print(f"LSTM Caption: {caption_lstm[0]}")
+    caption_attn, _ = gen_caption(attn_model, img_attn, vocab_attn, 20, device, None, 5, True, False)
+    print(f"Attention Caption: {caption_attn[0]}")
+
+    captions = f'LSTM: "{caption_lstm[0]}"\nAttention: "{caption_attn[0]}"'
+    plt.figure(figsize=(10, 10))
     plt.imshow(Image.open(img_pth))
     plt.axis("off")
-    plt.title(captions[0], fontsize=14, wrap=True)
+    plt.title(captions, fontsize=16, wrap=True, pad=10)
+    if save_name:
+        plt.savefig(save_name, bbox_inches='tight', dpi=300)
+    plt.tight_layout()
     plt.show()
 
 
-def plot_pic_and_caption2(img_pth, caption, save_name=None):
+def plot_pic_and_caption(img_pth, caption, save_name=None):
     plt.figure(figsize=(10, 10))
     plt.imshow(Image.open(img_pth))
     plt.axis("off")
@@ -193,28 +220,48 @@ def get_model_and_vocab(config):
             vocab = Vocabulary(tokenizer, None, text=None, sp_model_path=sp_model)
         case _:
             raise ValueError(f"Tokenizer '{tokenizer}' not recognized")
+    embed_dim = config["embed_size"]
     fine_tune = config["fine_tune_encoder"]
     hidden_size = config["hidden_size"]
     decoder_dropout = config["dropout"]
     encoder_dropout = config["encoder_dropout"]
     num_layers = config["num_layers"]
+    pad_idx = vocab.str_to_idx(PAD)
     match config["encoder"]:
         case "resnet50":
-            if config["model"] == "transformer":
-                encoder = t_encoder.Encoder(hidden_size, encoder_dropout, fine_tune)
-                model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
-                                                               max_seq_len(train_df, test_df, val_df, vocab), decoder_dropout)
-            else:
-                raise ValueError(f"Model '{config['model']}' not recognized")
+            match config["model"]:
+                case "basic":
+                    encoder = b_encoder.Encoder(embed_dim, fine_tune)
+                    decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
+                    model = basic.BasicImageCaptioner(encoder, decoder)
+                case "intermediate":
+                    encoder = i_encoder.Encoder(embed_dim, encoder_dropout, fine_tune)
+                    decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
+                    model = intermediate.IntermediateImageCaptioner(encoder, decoder)
+                case "transformer":
+                    encoder = t_encoder.Encoder(hidden_size, encoder_dropout, fine_tune)
+                    config["actual_max_seq_len"] = max_seq_len(train_df, test_df, val_df, vocab)
+                    model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
+                                                                   config["actual_max_seq_len"], decoder_dropout)
+                case _:
+                    raise ValueError(f"Model {config['model']} not recognized")
         case "swin":
             encoder = swin.SwinEncoder(hidden_size, encoder_dropout, fine_tune)
-            if config["model"] == "transformer":
-                model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
-                                                               max_seq_len(train_df, test_df, val_df, vocab), decoder_dropout)
-            else:
-                raise ValueError(f"Model '{config['model']}' not recognized")
+            match config["model"]:
+                case "basic":
+                    decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
+                    model = basic.BasicImageCaptioner(encoder, decoder)
+                case "intermediate":
+                    decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
+                    model = intermediate.IntermediateImageCaptioner(encoder, decoder)
+                case "transformer":
+                    config["actual_max_seq_len"] = max_seq_len(train_df, test_df, val_df, vocab)
+                    model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
+                                                                   config["actual_max_seq_len"], decoder_dropout)
+                case _:
+                    raise ValueError(f"Model {config['model']} not recognized")
         case _:
-            raise ValueError(f"Encoder '{config['encoder']}' not recognized")
+            raise ValueError(f"Encoder {config['encoder']} not recognized")
     return model, vocab
 
 
@@ -256,17 +303,17 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
     try:
         click.secho("\n⏳ Processing image...", fg=COLOR_INFO)
         transform_resize = config["transform_resize"]
-        MEAN = [0.485, 0.456, 0.406]
-        STD = [0.229, 0.224, 0.225]
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
 
-        TRANSFORM = v2.Compose([
+        transform = v2.Compose([
             v2.ToImage(),
             v2.Resize(transform_resize),
             v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=MEAN, std=STD),
+            v2.Normalize(mean=mean, std=std),
         ])
 
-        img = preprocess_image(img_pth, TRANSFORM)
+        img = preprocess_image(img_pth, transform)
         click.secho(f"✅ Processed image: {format_path(img_pth)}", fg=COLOR_SUCCESS)
     except Exception as e:
         click.secho(f"❌ Image processing failed: {str(e)}", fg=COLOR_ERROR)
@@ -287,7 +334,7 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
     # Save and display results
     try:
         click.secho("\n⏳ Generating visualization...", fg=COLOR_INFO)
-        save_name = plot_attention(img[0], captions[0], tokens, attns[0][:-1], MEAN, STD, 5, save_name, save_dir)
+        save_name = plot_attention(img[0], captions[0], tokens, attns[0][:-1], mean, std, 5, save_name, save_dir)
         final_path = os.path.join(save_dir, save_name)
         click.secho(f"💾 Saved attention plot to {format_path(final_path)}", fg=COLOR_SUCCESS)
     except Exception as e:
@@ -298,130 +345,19 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
 
 
 if __name__ == "__main__":
-    c = {
-        "model": "transformer",
-        "encoder": "resnet50",
-        "decoder": "Attention",
-        "criterion": "CrossEntropyLoss",
-        "optimizer": "AdamW",
-        "batch_size": 64,
-        "embed_size": 512,
-        "hidden_size": 512,
-        "num_layers": 2,
-        "num_heads": 2,
-        "encoder_dropout": 0.1,
-        "dropout": 0.5,
-        "fine_tune_encoder": "partial",
-        "vocab": {
-            "freq_threshold": 3,
-            "tokenizer": "word",
-            "vocab_size": 3500
-        },
-        "dataset": {
-            "name": "flickr8k",
-            "version": "2025-02-16",
-            "split": {
-                "train": 80,
-                "val": 10,
-                "test": 10
-            }
-        },
-        "encoder_lr": 1e-5,
-        "decoder_lr": 1e-4,
-        "gradient_clip": 2.0,
-        "scheduler": {
-            "type": "ReduceLROnPlateau",
-            "factor": 0.5,
-            "patience": 10
-        },
-        "max_caption_len": 40,
-        "beam_size": 5,
-        "temperature": 0.0,
-    }
-
-    c2 = {
-        "model": "intermediate",
-        "encoder": "resnet50",
-        "decoder": "LSTM",
-        "criterion": "CrossEntropyLoss",
-        "optimizer": "Adam",
-        "batch_size": 64,
-        "embed_size": 1024,
-        "hidden_size": 256,
-        "num_layers": 2,
-        "num_heads": 2,
-        "encoder_dropout": 0.5,
-        "dropout": 0.5,
-        "freeze_encoder": True,
-        "vocab": {
-            "freq_threshold": 3,
-            "tokenizer": "word",
-            "vocab_size": 3500
-        },
-        "dataset": {
-            "name": "flickr8k",
-            "version": "2025-02-16",
-            "split": {
-                "train": 80,
-                "val": 10,
-                "test": 10
-            }
-        },
-        "encoder_lr": 0.00001,
-        "decoder_lr": 0.0001,
-        "gradient_clip": 2.0,
-        # "scheduler": {
-        #     "type": None,
-        #     "factor": None,
-        #     "patience": None
-        # },
-        "max_caption_len": 30,
-        "beam_size": 5,
-        "temperature": 0.0,
-    }
-
-    # m_pth = "report/models/atomic-voice-25_best_val_2025-02-26_04-56_2-6236.pt"
-    m_pth = "report/models/LAST_2025-03-26_04-05_2-1619.pt"
-    m2_pth = "../report/models/earnest-sweep-11_LAST_2025-02-22_23-12_2-6011.pt"
-
-    # a man and a woman are posing for a picture.
-    # a group of young people pose for a picture.
-    # i1 = "data/mine/001_cropped.jpg"
-    # cc1 = f'LSTM: "a man and a woman are posing for a picture."\nAttention: "a group of young people pose for a picture."'
-    # plot_pic_and_caption2(i1, cc1, "report/pics/flickr8k_001.png")
-
+    lstm = "report/models/COCO_L_BEST_2025-03-17_17-22_2-3502.pt"
+    attn = "report/models/COCO_T_BEST_2025-03-20_12-40_2-1685.pt"
+    i1 = "data/mine/001_cropped.jpg"
+    gen_pic_and_caption(i1, lstm, attn, save_name="report/pics/coco_001.png")
     i2 = "data/mine/002_cropped.png"
-    # a woman is holding a baby in a white dress.
-    # a man and a woman are dancing.
-    cc2 = f'LSTM: "a woman is holding a baby in a white dress."\nAttention: "a man and a woman are dancing."'
-    plot_pic_and_caption2(i2, cc2, "report/pics/flickr8k_002.png")
-
+    gen_pic_and_caption(i2, lstm, attn, save_name="report/pics/coco_002.png")
     i3 = "data/mine/003_cropped.jpg"
-    # a white dog is standing in a green room with its mouth open.
-    # a white and white dog is playing in a kitchen.
-    cc3 = f'LSTM: "a white dog is standing in a green room with its mouth open."\nAttention: "a white and white dog is playing in a kitchen."'
-    plot_pic_and_caption2(i3, cc3, "report/pics/flickr8k_003.png")
-
+    gen_pic_and_caption(i3, lstm, attn, save_name="report/pics/coco_003.png")
     i4 = "data/mine/004_cropped.jpg"
-    # a man in a plaid shirt and a hat is standing in front of a large tree.
-    # a man in a yellow shirt is standing in front of a yellow tent.
-    cc4 = f'LSTM: "a man in a plaid shirt and a hat is standing in front of a large tree."\nAttention: "a man in a yellow shirt is standing in front of a yellow tent."'
-    plot_pic_and_caption2(i4, cc4, "report/pics/flickr8k_004.png")
-
+    gen_pic_and_caption(i4, lstm, attn, save_name="report/pics/coco_004.png")
     i5 = "data/mine/005_cropped.jpg"
-    # a basketball player in a white uniform is dribbling a basketball.
-    # a basketball player attempts to get the ball.
-    cc5 = f'LSTM: "a basketball player in a white uniform is dribbling a basketball."\nAttention: "a basketball player attempts to get the ball."'
-    plot_pic_and_caption2(i5, cc5, "report/pics/flickr8k_005.png")
-
+    gen_pic_and_caption(i5, lstm, attn, save_name="report/pics/coco_005.png")
     i6 = "data/mine/006_cropped.jpg"
-    # a person is sitting on a bench with a skateboard in the background.
-    # a group of people are standing on a skateboard.
-    cc6 = f'LSTM: "a person is sitting on a bench with a skateboard in the background."\nAttention: "a group of people are standing on a skateboard."'
-    plot_pic_and_caption2(i6, cc6, "report/pics/flickr8k_006.png")
-
+    gen_pic_and_caption(i6, lstm, attn, save_name="report/pics/coco_006.png")
     i7 = "data/mine/007_cropped.jpg"
-    # a young girl is standing on a balance beam with a tennis ball in his hand.
-    # a young man in a blue shirt is standing on the beach.
-    cc7 = f'LSTM: "a young girl is standing on a balance beam with a tennis ball in his hand."\nAttention: "a young man in a blue shirt is standing on the beach."'
-    plot_pic_and_caption2(i7, cc7, "report/pics/flickr8k_007.png")
+    gen_pic_and_caption(i7, lstm, attn, save_name="report/pics/coco_007.png")

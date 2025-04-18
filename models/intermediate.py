@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from constants import PAD, SOS, UNK
 from dataset.vocabulary import Vocabulary
-from models.image_captioning import ImageCaptioner
+from models.image_captioner import ImageCaptioner
 
 
 class Decoder(nn.Module):
