@@ -7,7 +7,7 @@ import wandb
 from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
-from caption import gen_caption
+from captioner import gen_caption
 from config.config import logger
 from constants import ROOT
 from dataset.dataloader import CaptionLoader

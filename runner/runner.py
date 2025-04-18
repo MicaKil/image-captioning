@@ -60,10 +60,10 @@ class Runner:
         Run the training and testing pipeline
         """
 
-        if self.train_model == self.test_model == False:
-            raise ValueError("At least one of train_model or test_model must be True.")
-        if self.test_model and not self.train_model and self.checkpoint is None:
-            raise ValueError("If only testing a model, a saved model (checkpoint) must be provided.")
+        # if self.train_model == self.test_model == False:
+        #     raise ValueError("At least one of train_model or test_model must be True.")
+        # if self.test_model and not self.train_model and self.checkpoint is None:
+        #     raise ValueError("If only testing a model, a saved model (checkpoint) must be provided.")
 
         date = date_str()
         if self.use_wandb:
@@ -75,7 +75,8 @@ class Runner:
         train_dataset, val_dataset, test_dataset, vocab = self.get_datasets(config, date)
         pad_idx = vocab.str_to_idx(PAD)
         model = self.get_model(config, vocab, pad_idx)
-        # print(model)
+        print("Model summary:")
+        print(model)
         save_dir = RESULTS_DIR + config["model"]
 
         batch_size = config["batch_size"]

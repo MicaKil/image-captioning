@@ -1,8 +1,9 @@
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import pandas as pd
 import plotly
 import plotly.express as px
 import seaborn as sns
-from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.inspection import permutation_importance
 
@@ -265,6 +266,65 @@ def filter_experiments(dataset_name, model_name):
         case "coco":
             experiments_filtered = experiments_filtered[experiments_filtered['dataset.name'] == 'coco']
     return experiments_filtered
+
+
+def resnet50_lstm_diagram():
+    # Create the diagram
+    fig, ax = plt.subplots(figsize=(14, 10))
+    ax.axis("off")
+
+    # Helper function to draw a box
+    def draw_box(x, y, text, width=2.5, height=0.8, color="skyblue"):
+        rect = patches.FancyBboxPatch(
+            (x, y), width, height,
+            boxstyle="round,pad=0.1", edgecolor="black", facecolor=color
+        )
+        ax.add_patch(rect)
+        ax.text(x + width / 2, y + height / 2, text, ha="center", va="center", fontsize=10)
+
+    # Coordinates for layers
+    y = 8
+    draw_box(4, y, "Input Image\n(3, 224, 224)", color="lightyellow")
+    y -= 1.5
+    draw_box(4, y, "Pretrained ResNet-50\n(Features: 2048)", color="lightgreen")
+    y -= 1.5
+    draw_box(4, y, "Flatten\n(2048)", color="lightgreen")
+    y -= 1.5
+    draw_box(4, y, "Linear + ReLU + Dropout\n(2048 → embed_dim)", color="lightgreen")
+    y -= 1.5
+    draw_box(4, y, "Image Features (embed_dim)", color="lightblue")
+
+    # Decoder branch
+    y -= 1.5
+    draw_box(1, y, "Initialize h, c\nfrom Features", color="orange")
+    draw_box(4, y, "Caption Tokens\n(batch, seq_len)", color="lightyellow")
+    draw_box(7, y, "Embedding Layer\n(embed_dim)", color="orange")
+
+    y -= 1.5
+    draw_box(4, y, "LSTM\n(embed_dim → hidden_size)", color="salmon")
+    y -= 1.5
+    draw_box(4, y, "LayerNorm", color="salmon")
+    y -= 1.5
+    draw_box(4, y, "Linear\n(hidden_size → vocab_size)", color="salmon")
+    y -= 1.5
+    draw_box(4, y, "Caption Output", color="lightblue")
+
+    # Draw arrows
+    def arrow(x1, y1, x2, y2):
+        ax.annotate('', xy=(x2, y2), xytext=(x1, y1),
+                    arrowprops=dict(facecolor='black', arrowstyle='->', lw=1.5))
+
+    arrow(5.25, 8.4, 5.25, 8.0)  # input to resnet
+    arrow(5.25, 8.0 - 1.5, 5.25, 8.0 - 3.0)  # resnet to linear
+    arrow(5.25, 8.0 - 3.0, 5.25, 8.0 - 4.5)  # to image features
+
+    # Decoder arrows
+    arrow(5.25, y + 6.5, 2.25, y + 6.5)  # features to init h, c
+    arrow(5.25, y + 6.5, 5.25, y + 6.5)  # features to LSTM
+    arrow(5.25, y + 6.5, 8.25, y + 6.5)  # caption tokens to embedding
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["transformer", "coco"]
+TAGS = ["intermediate", "flickr8k"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
@@ -26,11 +26,11 @@ eval_bleu4 = False
 
 CONFIG = {
     "model": TAGS[0],
-    "encoder": "swin",
+    "encoder": "resnet50",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
     "batch_size": 64,
     "transform_resize": transform_resize,
-    "embed_size": None,
+    "embed_size": 512,
     "hidden_size": 512,
     "num_layers": 2,
     "num_heads": 8 if TAGS[0] == "transformer" else None,
@@ -66,7 +66,7 @@ CONFIG = {
         "tokenizer": "sp-bpe",
         "vocab_size": 6500 if TAGS[1] == "coco" else 3500
     },
-    "max_caption_len": 60,
+    "max_caption_len": 30,
     "temperature": 0,
     "beam_size": 5,
     "scheduler": {
