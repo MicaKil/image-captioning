@@ -36,9 +36,9 @@ class SeqEmbedding(nn.Module):
         :return: Embedded sequence with positional encoding
         """
         positions = torch.arange(seq.size(1), device=seq.device).unsqueeze(0)
-        pos_emb = self.pos_embedding(positions)  # (1, seq_len, depth)
-        tok_emb = self.token_embedding(seq)  # (batch_size, seq_len, depth)
-        return tok_emb + pos_emb  # (batch_size, seq_len, depth)
+        pos_emb = self.pos_embedding(positions)  # (1, seq_len, embed_dim)
+        tok_emb = self.token_embedding(seq)  # (batch_size, seq_len, embed_dim)
+        return tok_emb + pos_emb  # (batch_size, seq_len, embed_dim)
 
 
 class CausalSelfAttention(nn.Module):
@@ -169,11 +169,8 @@ class DecoderLayer(nn.Module):
         :return:
         """
         txt_emb = self.self_attention(txt_emb)
-        # print(f"1 text_emb: {txt_emb.shape}")
         txt_emb = self.cross_attention(txt_emb, img_features)
-        # print(f"2 text_emb: {txt_emb.shape}")
         txt_emb = self.ff(txt_emb)
-        # print(f"3 text_emb: {txt_emb.shape}")
         return txt_emb
 
 
@@ -226,13 +223,13 @@ class Output(nn.Module):
         log_probs[self.banned_indices] = -1e9
         self.linear.bias.data = log_probs
 
-    def forward(self, x):
+    def forward(self, txt_emb):
         """
         Applies the linear transformation to x, producing logits over the vocabulary.
-        :param x:
+        :param txt_emb:
         :return:
         """
-        return self.linear(x)
+        return self.linear(txt_emb)
 
 
 class ImageCaptioningTransformer(nn.Module):
@@ -279,27 +276,19 @@ class ImageCaptioningTransformer(nn.Module):
         :return:
         """
         # Extract image features
-        # print(f"images: {images.shape}")
         img_features = self.encoder(images)
-        # print(f"img_features: {img_features.shape}")
         # Encode image to features: (batch, features, height, width) → (batch, h*w, features)
         img_features = rearrange(img_features, 'b c h w -> b (h w) c')
-        # print(f"img_features: {img_features.shape}")
 
         # Embed text
-        # print(f"captions: {captions.shape}")
         txt_emb = self.seq_embedding(captions)
-        # print(f"text_emb: {txt_emb.shape}")
 
         # Process through decoder layers
         for layer in self.decoder_layers:
             txt_emb = layer(img_features, txt_emb)
 
-        # print(f"text_emb: {txt_emb.shape}")
-
         # Final output
         logits = self.output_layer(txt_emb)
-        # print(f"logits: {logits.shape}")
         return logits
 
     @staticmethod

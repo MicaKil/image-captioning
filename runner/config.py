@@ -30,7 +30,7 @@ CONFIG = {
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
     "batch_size": 64,
     "transform_resize": transform_resize,
-    "embed_size": 512,
+    "embed_size": 256,
     "hidden_size": 512,
     "num_layers": 2,
     "num_heads": 8 if TAGS[0] == "transformer" else None,

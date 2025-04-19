@@ -42,7 +42,5 @@ class Encoder(EncoderBase):
         :return:
         """
         features = self.resnet(image)  # Shape: (batch_size, feature_dim, 7, 7)
-        # print(f"1 features: {features.shape}")
         features = self.projection(features)  # Shape: (batch_size, embed_size, 1, 1)
-        # print(f"2 features: {features.shape}")
         return features
