@@ -234,6 +234,7 @@ fabric.properties
 *.pkl
 *.pt
 *.pth
+*.pdf
 /wandb/
 /checkpoints/
 /results/
@@ -241,3 +242,5 @@ fabric.properties
 /plots/
 /.idea/
 /.vs/
+/.vscode/
+*.properties

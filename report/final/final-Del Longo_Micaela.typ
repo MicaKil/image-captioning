@@ -128,7 +128,7 @@ El vocabulario generado cuenta con los siguientes tokens especiales:
 - `SOS`: Start of Sentence (Inicio de oración).
 - `EOS`: End of Sentence (Fin de oración).
 - `PAD`: Padding (Relleno).
-- `UNK`: Unknow Desconocido (no pertenece al vocabulario).
+- `UNK`: Unknown Desconocido (no pertenece al vocabulario).
 
 Para crear los vocabularios en ambos casos solo se utilizó el dataset de entrenamiento para evitar exponer el modelo a datos no vistos durante el entrenamiento, inflando artificialmente las métricas de rendimiento y afectando la integridad de la evaluación.
 
