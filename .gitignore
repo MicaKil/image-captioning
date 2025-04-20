@@ -230,13 +230,14 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 # Project
-data/*
+/data/*
 *.pkl
 *.pt
 *.pth
 /wandb/
 /checkpoints/
 /results/
-
-# typst report
-template.pdf
+/report_plotter/
+/plots/
+/.idea/
+/.vs/
