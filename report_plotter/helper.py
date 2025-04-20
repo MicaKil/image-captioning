@@ -116,18 +116,3 @@ def count_experiments():
     print(f"resnet50 + LSTM + Coco: {len(df[(df['encoder'] == 'resnet50') & (df['decoder'] == 'LSTM') & (df['dataset.name'] == 'coco')])}")
     print(f"resnet50 + Attention + Coco: {len(df[(df['encoder'] == 'resnet50') & (df['decoder'] == 'Attention') & (df['dataset.name'] == 'coco')])}")
     print(f"swin + Attention + Coco: {len(df[(df['encoder'] == 'swin') & (df['decoder'] == 'Attention') & (df['dataset.name'] == 'coco')])}")
-
-
-if __name__ == "__main__":
-    # file_paths = [
-    #     "../plots/results/attn_8_wandb_export_2025-04-16T00_09_29.345-03_00_v4.csv",
-    #     "../plots/results/attn_50_wandb_export_2025-04-16T00_09_29.345-03_00_v6.csv",
-    #     "../plots/results/lstm_38_wandb_export_2025-04-16T00_16_18.415-03_00_v4.csv"
-    # ]
-    # output_path = "../plots/results/val_loss.csv"
-    # merge_csv_by_columns(file_paths, output_path)
-
-    # remove_duplicate_columns("../plots/results/csv_source/val_loss.csv", "../plots/results/csv_source/val_loss_v2.csv")
-    df = pd.read_csv("../plots/results/csv_source/val_loss_v3.csv")
-    df.columns = df.columns.str.strip()
-    df.to_csv("../plots/results/csv_source/val_loss_v4.csv", index=False)

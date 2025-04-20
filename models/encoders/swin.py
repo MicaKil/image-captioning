@@ -24,9 +24,6 @@ class SwinEncoder(EncoderBase):
         # Load pretrained Swin-S model
         self.swin = models.swin_v2_s(weights=Swin_V2_S_Weights.IMAGENET1K_V1)
 
-        self.attention_weights = []
-        self._register_attention_hooks()
-
         # Remove classification head and get feature dimension
         self.features = self.swin.features
         in_channels = self.swin.head.in_features
@@ -39,19 +36,6 @@ class SwinEncoder(EncoderBase):
         )
 
         self.set_requires_grad(fine_tune)
-
-    def _register_attention_hooks(self):
-        """Register hooks to capture attention weights from Swin blocks"""
-
-        def hook_fn(output):
-            # output[1] contains attention weights in Swin blocks
-            if len(output) > 1:
-                self.attention_weights.append(output[1].detach().cpu())
-
-        # Attach hooks to all Swin Transformer blocks
-        for block in self.swin.features:
-            if hasattr(block, "attn"):
-                block.attn.register_forward_hook(hook_fn)
 
     def set_requires_grad(self, fine_tune: str) -> None:
         """
@@ -77,7 +61,6 @@ class SwinEncoder(EncoderBase):
         :param image: Input tensor (batch_size, 3, 256, 256)
         :return: Feature tensor (batch_size, embed_dim, H, W)
         """
-        self.attention_weights = []  # Reset on each forward pass
         features = self.features(image)  # (batch_size, in_channels, 7, 7)
         features = features.permute(0, 3, 1, 2)  # Convert to channels-first: (batch_size, in_channels, H, W)
         features = self.projection(features)  # (batch_size, embed_dim, 7, 7)

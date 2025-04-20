@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import wandb
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from wandb.sdk import Config
 from wandb.sdk.wandb_run import Run
@@ -402,6 +402,6 @@ def get_optimizer(config: dict | Config, model: nn.Module) -> torch.optim:
         case "Adam":
             return Adam(params)
         case "AdamW":
-            return Adam(params)
+            return AdamW(params)
         case _:
             raise ValueError(f"Optimizer {config['optimizer']} not recognized")

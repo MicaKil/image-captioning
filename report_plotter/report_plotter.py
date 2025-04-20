@@ -13,7 +13,7 @@ def parallel_coordinates(class_name: str = "val_loss.min", model_name: str = "Re
     fig.show()
 
 
-def correlation_importance(class_name: str = "val_loss.min", model_name: str = "ResNet50-LSTM"):
+def correlation_importance(class_name: str = "val_loss.min", model_name: str = "ResNet50-LSTM", save_fig=False):
     labels, experiments = load_and_filter_correlation(class_name, model_name)
 
     # Calculate correlations
@@ -41,7 +41,7 @@ def correlation_importance(class_name: str = "val_loss.min", model_name: str = "
     print("\nPermutation Importance:")
     print(importance_df.to_string(index=False, float_format="%.3f"))
 
-    diverging_palette = sns.diverging_palette(h_neg=260, h_pos=140, s=80, l=60, n=7, sep=1, center="light")
+    diverging_palette = sns.color_palette("GnBu", n_colors=7)
 
     plt.figure(figsize=(9, 3))
     plt.suptitle(f"{labels[class_name]} Correlation and Permutation Importance in {model_name}")
@@ -66,7 +66,8 @@ def correlation_importance(class_name: str = "val_loss.min", model_name: str = "
     plt.xlim(0, 1.8)
     plt.grid(axis='x', linestyle='--', alpha=0.5, color='#cccccc')  # X-axis grid
     plt.tight_layout()
-    plt.savefig(f"../results/{model_name}_{class_name}_correlation_importance.png", dpi=300, bbox_inches='tight')
+    if save_fig:
+        plt.savefig(f"../results/{model_name}_{class_name}_correlation_importance.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -209,7 +210,7 @@ def boxplot(metric: str, model_names: list[str], dataset_name: str, min_y: float
 
 
 def load_and_filter_correlation(class_name, model_name):
-    df = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v3.csv")
+    df = pd.read_csv("../results/wandb_export_2025-04-13T21_58_18.628-03_00_v4.csv")
     columns_to_analyze = ['num_layers', 'hidden_size', 'encoder_dropout', 'dropout', 'encoder_lr', 'decoder_lr']
     match model_name:
         case "ResNet50-LSTM":
