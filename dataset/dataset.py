@@ -11,7 +11,7 @@ from dataset.vocabulary import Vocabulary
 
 class CaptionDataset(Dataset):
     """
-    Custom Dataset for loading Flickr images and captions.
+    Custom Dataset for loading Flickr and COCO images and captions.
     """
 
     def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None, target_transform=None):

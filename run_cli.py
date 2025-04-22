@@ -46,7 +46,8 @@ def print_run_config(config: dict):
 
     # Advanced Settings
     click.secho("\nAdvanced Parameters:", fg=COLOR_HIGHLIGHT)
-    click.echo(f"  • Dropout: {click.style(config['dropout'], fg=COLOR_INFO)}")
+    click.echo(f"  • Encoder Dropout: {click.style(config['encoder_dropout'], fg=COLOR_INFO)}")
+    click.echo(f"  • Decoder Dropout: {click.style(config['dropout'], fg=COLOR_INFO)}")
     click.echo(f"  • Gradient Clip: {click.style(config['gradient_clip'], fg=COLOR_INFO)}")
     click.echo(f"  • Patience: {click.style(config['patience'], fg=COLOR_INFO)} epochs")
 

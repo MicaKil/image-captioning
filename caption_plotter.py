@@ -27,57 +27,57 @@ COLOR_ERROR = "red"
 COLOR_HIGHLIGHT = "bright_white"
 
 
-def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label: str, lstm_config=None, attn_config=None, save_name=None):
+def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label: str, model1_config=None, model2_config=None, save_name=None):
     """
     Generate captions for an image using two different models and display the results comparatively.
     """
-    if lstm_config:
-        lstm_model, vocab_lstm = get_model_and_vocab(lstm_config)
+    if model1_config:
+        lstm_model, vocab_lstm = get_model_and_vocab(model1_config)
         lstm_model.load_state_dict(torch.load(model1, weights_only=True))
     else:
-        lstm_model, lstm_config, vocab_lstm = load_checkpoint(model1)
+        lstm_model, model1_config, vocab_lstm = load_checkpoint(model1)
 
-    if attn_config:
-        attn_model, vocab_attn = get_model_and_vocab(attn_config)
+    if model2_config:
+        attn_model, vocab_attn = get_model_and_vocab(model2_config)
         attn_model.load_state_dict(torch.load(model2, weights_only=True))
     else:
-        attn_model, attn_config, vocab_attn = load_checkpoint(model2)
+        attn_model, model2_config, vocab_attn = load_checkpoint(model2)
 
     try:
-        transform_resize_lstm = lstm_config["transform_resize"]
+        transform_resize_lstm = model1_config["transform_resize"]
     except KeyError:
         transform_resize_lstm = (224, 224)
 
     try:
-        transform_resize_attn = attn_config["transform_resize"]
+        transform_resize_attn = model2_config["transform_resize"]
     except KeyError:
-        transform_resize_attn = (224, 224)
+        transform_resize_attn = (256, 256)
 
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
-    transform_lstm = v2.Compose([
+    transform1 = v2.Compose([
         v2.ToImage(),
         v2.Resize(transform_resize_lstm),
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(mean=mean, std=std),
     ])
-    transform_attn = v2.Compose([
+    transform2 = v2.Compose([
         v2.ToImage(),
         v2.Resize(transform_resize_attn),
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(mean=mean, std=std),
     ])
 
-    img_lstm = preprocess_image(img_pth, transform_lstm)
-    img_attn = preprocess_image(img_pth, transform_attn)
+    img1 = preprocess_image(img_pth, transform1)
+    img2 = preprocess_image(img_pth, transform2)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    caption_lstm, _ = gen_caption(lstm_model, img_lstm, vocab_lstm, 20, device, None, 5, True, False)
-    print(f"{model1_label} Caption: {caption_lstm[0]}")
-    caption_attn, _ = gen_caption(attn_model, img_attn, vocab_attn, 20, device, None, 5, True, False)
-    print(f"{model2_label} Caption: {caption_attn[0]}")
+    caption1, _ = gen_caption(lstm_model, img1, vocab_lstm, 20, device, None, 5, True, False)
+    print(f"{model1_label} Caption: {caption1[0]}")
+    caption2, _ = gen_caption(attn_model, img2, vocab_attn, 20, device, None, 5, True, False)
+    print(f"{model2_label} Caption: {caption2[0]}")
 
-    captions = f'{model1_label}: "{caption_lstm[0]}"\n{model2_label}: "{caption_attn[0]}"'
+    captions = f'{model1_label}: "{caption1[0]}"\n{model2_label}: "{caption2[0]}"'
     plt.figure(figsize=(10, 10))
     plt.imshow(Image.open(img_pth))
     plt.axis("off")
@@ -93,10 +93,11 @@ def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label
 @click.command()
 @click.argument("img_pth", type=click.Path(exists=True, dir_okay=False))
 @click.argument("checkpoint_pth", type=click.Path(exists=True, dir_okay=False))
+@click.option("--no-attn", is_flag=True, help="Disable attention visualization.")
 @click.option("--save-name", type=str, default="test.png", help="Name for the output plot file.")
-@click.option("--save-dir", type=click.Path(file_okay=False), default=os.path.join(ROOT, "plots", "attention"),
+@click.option("--save-dir", type=click.Path(file_okay=False), default=os.path.join(ROOT, "plots", "app"),
               help="Directory to save the generated plot.", show_default=True)
-def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: str):
+def plot_cli(img_pth: str, checkpoint_pth: str, no_attn: bool, save_name: str, save_dir: str):
     print_banner()
 
     if not os.path.exists(save_dir):
@@ -154,7 +155,10 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
     try:
         click.secho("\n⏳ Generating caption and attention maps...", fg=COLOR_INFO)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        captions, _, attns = gen_caption(model, img, vocab, 20, device, None, 5, True, True)
+        if no_attn:
+            captions, _ = gen_caption(model, img, vocab, 20, device, None, 5, True, False)
+        else:
+            captions, _, attns = gen_caption(model, img, vocab, 20, device, None, 5, True, True)
         tokens = vocab.tokenize(captions[0])
         click.secho("✅ Caption generated successfully!", fg=COLOR_SUCCESS)
         click.secho(f"📝 Caption: {click.style(captions[0], fg=COLOR_HIGHLIGHT)}", fg=COLOR_INFO)
@@ -165,7 +169,17 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
     # Save and display results
     try:
         click.secho("\n⏳ Generating visualization...", fg=COLOR_INFO)
-        save_name = plot_attention(img[0], captions[0], tokens, attns[0][:-1], mean, std, 5, save_name, save_dir)
+        if no_attn:
+            plot = plt.figure(figsize=(10, 10))
+            plt.imshow(Image.open(img_pth))
+            plt.axis("off")
+            plt.title(captions[0], fontsize=16, wrap=True, pad=10)
+            plt.tight_layout()
+        else:
+            plot = plot_attention(img[0], captions[0], tokens, attns[0][:-1], mean, std, 5)
+        save_name = gen_save_name(save_dir, save_name)
+        plot.savefig(os.path.join(save_dir, save_name), bbox_inches='tight', dpi=300)
+        plot.show()
         final_path = os.path.join(save_dir, save_name)
         click.secho(f"💾 Saved attention plot to {format_path(final_path)}", fg=COLOR_SUCCESS)
     except Exception as e:
@@ -175,8 +189,8 @@ def plot_attn_cli(img_pth: str, checkpoint_pth: str, save_name: str, save_dir: s
     click.secho("\n✨ Process completed successfully! ✨\n", fg=COLOR_SUCCESS, bold=True)
 
 
-def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], attns: list, mean: list[float], std: list[float], columns: int,
-                   save_name: str = None, save_dir: str = None):
+def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], attns: list, mean: list[float], std: list[float],
+                   columns: int) -> plt.Figure:
     """
     Plot attention maps over the image for each step in the caption generation process.
 
@@ -187,8 +201,6 @@ def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], at
     :param mean: Mean values for normalization
     :param std: Standard deviation values for normalization
     :param columns: The number of columns to display the attention maps
-    :param save_name: Path to save the plot (optional)
-    :param save_dir:
     """
     assert len(attns) == len(tokens), "attentions length must match caption length"
     # Inverse normalize the image
@@ -199,12 +211,8 @@ def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], at
     image = inverse_normalize(img_tensor).cpu().numpy()
     image = np.transpose(image, (1, 2, 0))
 
+    plot = plt.figure(figsize=(10, 6), dpi=300)
     num_steps = len(attns)
-
-    # height = (num_steps // columns + 1) * 3
-    # width = columns * 2
-    plt.figure(figsize=(10, 6), dpi=100)
-
     for step in range(num_steps):
         ax = plt.subplot(num_steps // columns + 1, columns, step + 1)
         attn = attns[step].reshape(8, 8)
@@ -216,14 +224,15 @@ def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], at
         ax.axis('off')
     plt.suptitle(caption, fontsize=16)
     plt.tight_layout()
-    if save_name:
-        i = 0
-        name = os.path.splitext(save_name)[0]  # keep the name without extension
-        while save_name in os.listdir(os.path.join(ROOT, save_dir)):
-            save_name = f"{name}_{i:03d}.png"
-            i += 1
-        plt.savefig(os.path.join(ROOT, save_dir, save_name), bbox_inches='tight', dpi=150)
-    plt.show()
+    return plot
+
+
+def gen_save_name(save_dir, save_name):
+    i = 0
+    name = os.path.splitext(save_name)[0]  # keep the name without extension
+    while save_name in os.listdir(os.path.join(ROOT, save_dir)):
+        save_name = f"{name}_{i:03d}.png"
+        i += 1
     return save_name
 
 
@@ -358,3 +367,7 @@ def load_checkpoint(checkpoint_pth: str):
     model, vocab = get_model_and_vocab(config)
     model.load_state_dict(checkpoint['model_state'])
     return model, config, vocab
+
+
+if __name__ == "__main__":
+    plot_cli()

@@ -18,7 +18,7 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["intermediate", "flickr8k"]
+TAGS = ["intermediate", "flickr8k", "best-lstm-config"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
@@ -28,22 +28,22 @@ CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
-    "batch_size": 64,
+    "batch_size": 128,
     "transform_resize": transform_resize,
-    "embed_size": 256,
-    "hidden_size": 512,
+    "embed_size": 1024,
+    "hidden_size": 256,
     "num_layers": 2,
     "num_heads": 8 if TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.25,
+    "encoder_dropout": 0.5,
     "dropout": 0.5,  # decoder dropout
     "fine_tune_encoder": "partial",
     "encoder_lr": 0.00001,
     "decoder_lr": 0.0001,
     "criterion": "CrossEntropyLoss",
-    "optimizer": "AdamW",
+    "optimizer": "AdamW" if TAGS[0] == "transformer" else "Adam",
     "max_epochs": 100,
-    "patience": 10,
-    "gradient_clip": 1.0,
+    "patience": 20,
+    "gradient_clip": 2.0,
     "dataset": {
         "name": "coco",
         "version": "2025-02-26",
@@ -62,8 +62,8 @@ CONFIG = {
         }
     },
     "vocab": {
-        "freq_threshold": 5,
-        "tokenizer": "sp-bpe",
+        "freq_threshold": 3,
+        "tokenizer": "word",  # "sp-bpe",
         "vocab_size": 6500 if TAGS[1] == "coco" else 3500
     },
     "max_caption_len": 30,

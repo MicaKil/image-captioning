@@ -42,4 +42,4 @@ EOS = "<EOS>"
 UNK = "<UNK>"
 
 # TEST_PIC
-CTRL_PIC = "data/mine/001.jpg"
+CTRL_PIC = "data/mine/003_cropped.jpg"
