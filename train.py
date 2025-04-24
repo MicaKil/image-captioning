@@ -8,12 +8,12 @@ from nltk.translate.bleu_score import SmoothingFunction
 from tqdm import tqdm
 
 import metrics as metrics
-from caption_plotter import preprocess_image
 from captioner import gen_caption
 from config.config import logger
 from constants import ROOT, CTRL_PIC, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
 from dataset.vocabulary import Vocabulary
+from plotters.captions import preprocess_image
 from runner.config import TRANSFORM
 from scheduler import SchedulerWrapper
 from utils import time_str, get_config

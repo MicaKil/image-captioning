@@ -18,7 +18,7 @@ PIN_MEMORY = True
 
 # run
 PROJECT = "image-captioning-v1"
-TAGS = ["intermediate", "flickr8k", "best-lstm-config"]
+TAGS = ["transformer", "flickr8k", "best-attn-config"]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 use_scheduler = False
@@ -28,13 +28,13 @@ CONFIG = {
     "model": TAGS[0],
     "encoder": "resnet50",
     "decoder": "Attention" if TAGS[0] == "transformer" else "LSTM",
-    "batch_size": 128,
+    "batch_size": 256,
     "transform_resize": transform_resize,
-    "embed_size": 1024,
-    "hidden_size": 256,
+    "embed_size": 512,
+    "hidden_size": 512,
     "num_layers": 2,
-    "num_heads": 8 if TAGS[0] == "transformer" else None,
-    "encoder_dropout": 0.5,
+    "num_heads": 2 if TAGS[0] == "transformer" else None,
+    "encoder_dropout": 0.1,
     "dropout": 0.5,  # decoder dropout
     "fine_tune_encoder": "partial",
     "encoder_lr": 0.00001,
@@ -42,7 +42,7 @@ CONFIG = {
     "criterion": "CrossEntropyLoss",
     "optimizer": "AdamW" if TAGS[0] == "transformer" else "Adam",
     "max_epochs": 100,
-    "patience": 20,
+    "patience": 10,
     "gradient_clip": 2.0,
     "dataset": {
         "name": "coco",
@@ -66,7 +66,7 @@ CONFIG = {
         "tokenizer": "word",  # "sp-bpe",
         "vocab_size": 6500 if TAGS[1] == "coco" else 3500
     },
-    "max_caption_len": 30,
+    "max_caption_len": 40,
     "temperature": 0,
     "beam_size": 5,
     "scheduler": {

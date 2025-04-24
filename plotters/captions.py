@@ -88,7 +88,7 @@ def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label
     plt.show()
 
 
-# ATTENTION PLOTTER CLI ------------------------------------------------------------------------------------------------------------------------------
+# PLOTTER CLI ------------------------------------------------------------------------------------------------------------------------------
 
 @click.command()
 @click.argument("img_pth", type=click.Path(exists=True, dir_okay=False))

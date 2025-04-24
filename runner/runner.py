@@ -184,7 +184,7 @@ class Runner:
         val_dataset = CaptionDataset(img_dir, val_df, vocab, transform=TRANSFORM)
         test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
-        if self.save_ds:
+        if self.save_ds and tokenizer == "word":
             # save datasets to disk
             self.save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)
             # save vocab to disk
