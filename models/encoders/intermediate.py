@@ -3,12 +3,12 @@ from torch import nn as nn
 from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
-from models.encoders.base import EncoderBase
+import models.encoders.base as base
 
 
-class Encoder(EncoderBase):
+class Encoder(base.Encoder):
     """
-    Encoder class that uses a pretrained ResNet-50 model to extract features from images.
+    Encoder class that uses a pretrained ResNet-50 model to extract features from images. Slightly more advanced than the basic encoder.
     """
 
     def __init__(self, embed_dim: int, dropout: float, fine_tune: str) -> None:
@@ -34,7 +34,6 @@ class Encoder(EncoderBase):
             nn.ReLU(),
             nn.Dropout(dropout)
         )
-
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
         """

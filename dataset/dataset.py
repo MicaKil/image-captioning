@@ -16,11 +16,14 @@ class CaptionDataset(Dataset):
 
     def __init__(self, img_dir: str, df_captions: pd.DataFrame, vocab: Vocabulary, transform=None, target_transform=None):
         """
-        :param img_dir: Path to the directory containing the images
-        :param df_captions: DataFrame containing the images file name and captions. Header must have "file_name" and "caption".
-        :param vocab: Vocabulary object to use if provided
-        :param transform: Transform to apply to the images
-        :param target_transform: Transform to apply to the target captions
+        Initialize the CaptionDataset. Any dataset can be used as long as it has a DataFrame with image file names and captions.
+
+        :param img_dir: Path to the directory containing the images.
+        :param df_captions: DataFrame containing the image file names and captions.
+                            The DataFrame must have columns "file_name" and "caption".
+        :param vocab: Vocabulary object used for encoding captions.
+        :param transform: Optional transform to apply to the images.
+        :param target_transform: Optional transform to apply to the target captions.
         """
         self.img_dir = img_dir
         self.transform = transform
@@ -32,24 +35,31 @@ class CaptionDataset(Dataset):
     def __len__(self):
         """
         Return the number of samples in the dataset.
-        :return: Number of samples
+
+        :return: Number of samples in the dataset.
         """
         return len(self.captions)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, str]:
         """
-        Get a sample (image, caption, image ID) from the dataset.
-        :param idx: Index of the sample to retrieve
-        :return: Tuple containing the image tensor, caption tensor, and image ID
+        Retrieve a sample from the dataset.
+
+        :param idx: Index of the sample to retrieve.
+        :return: A tuple containing:
+                 - img: The image tensor (RGB format).
+                 - caption: The encoded caption tensor with SOS and EOS tokens.
+                 - file_name: The file name of the image.
         """
+        # Load and decode the image from the file path
         img = decode_image(str(os.path.join(self.img_dir, self.file_names[idx])), mode=ImageReadMode.RGB)
         if self.transform:
-            img = self.transform(img)
+            img = self.transform(img)  # Apply the image transform if provided
 
+        # Encode the caption with SOS and EOS tokens
         caption = [self.vocab.str_to_idx(SOS)] + self.vocab.encode_as_ids(self.captions[idx]) + [self.vocab.str_to_idx(EOS)]
-        caption = torch.tensor(caption, dtype=torch.long)
+        caption = torch.tensor(caption, dtype=torch.long)  # Convert the caption to a tensor
 
         if self.target_transform:
-            caption = self.target_transform(caption)
+            caption = self.target_transform(caption)  # Apply the target transform if provided
 
         return img, caption, self.file_names[idx]

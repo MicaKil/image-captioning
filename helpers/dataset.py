@@ -9,6 +9,10 @@ from tqdm import tqdm
 from config.config import logger
 from constants import ROOT, FLICKR8K_CSV_FILE, FLICKR_CORPUS, PAD, SOS, EOS, UNK, COCO_CORPUS
 
+"""
+Collection of functions to process datasets different datasets into a common format for the Dataset class.
+"""
+
 
 def load_flickr_captions(ann_path: str, save_captions=False) -> pd.DataFrame:
     """
@@ -139,6 +143,9 @@ def split_dataframe(df: pd.DataFrame, split_lengths: list[int]) -> list[pd.DataF
 
 
 def flickr8k_sentence_piece():
+    """
+    Train a SentencePiece model on the Flickr8k dataset.
+    """
     spm.SentencePieceTrainer.Train(
         f'--input={os.path.join(ROOT, FLICKR_CORPUS)} --model_prefix=flickr8k --vocab_size=3500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf'
     )
@@ -146,6 +153,9 @@ def flickr8k_sentence_piece():
 
 
 def coco_sentence_piece():
+    """
+    Train a SentencePiece model on the COCO dataset.
+    """
     spm.SentencePieceTrainer.Train(
         f'--input={os.path.join(ROOT, COCO_CORPUS)} --model_prefix=coco_6500 --vocab_size=6500 --pad_id=0 --bos_id=1 --eos_id=2 --unk_id=3 --pad_piece={PAD} --bos_piece={SOS} --eos_piece={EOS} --unk_piece={UNK} --model_type=bpe --normalization_rule_name=nfkc_cf'
     )

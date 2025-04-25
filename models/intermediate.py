@@ -1,20 +1,20 @@
 import torch
 import torch.nn as nn
 
+import models.image_captioner as image_captioner
 from constants import PAD, SOS, UNK
 from dataset.vocabulary import Vocabulary
-from models.image_captioner import ImageCaptioner
+from models.encoders import intermediate as inter_encoder
 
 
 class Decoder(nn.Module):
     """
-    Decoder class that uses an LSTM to generate captions for images.
+    Decoder class that uses an LSTM to generate captions for images. Slightly more advanced than the basic decoder.
     """
 
     def __init__(self, embed_dim: int, hidden_size: int, vocab: Vocabulary, dropout: float, num_layers: int, padding_idx: int) -> None:
         """
         Constructor for the DecoderLSTM class
-
         :param embed_dim: Size of the word embeddings
         :param hidden_size: Size of the hidden state of the LSTM
         :param vocab:
@@ -44,7 +44,6 @@ class Decoder(nn.Module):
     def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the decoder
-
         :param features: Image feature vectors
         :param captions: Caption word indices
         :return: Predicted word indices
@@ -67,14 +66,13 @@ class Decoder(nn.Module):
         return outputs
 
 
-class IntermediateImageCaptioner(ImageCaptioner):
-    def __init__(self, encoder: nn.Module, decoder: nn.Module):
+class ImageCaptioner(image_captioner.ImageCaptioner):
+    def __init__(self, encoder: inter_encoder.Encoder, decoder: Decoder) -> None:
         super().__init__(encoder, decoder)
 
     def calc_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
         """
         Calculate the loss for the given outputs and targets.
-
         :param outputs: Predicted word indices (batch_size, padded_length, vocab_size)
         :param targets: Target word indices (batch_size, padded_length)
         :param criterion: Loss function

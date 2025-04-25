@@ -293,11 +293,11 @@ def get_model_and_vocab(config):
                 case "basic":
                     encoder = b_encoder.Encoder(embed_dim, fine_tune)
                     decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
-                    model = basic.BasicImageCaptioner(encoder, decoder)
+                    model = basic.ImageCaptioner(encoder, decoder)
                 case "intermediate":
                     encoder = i_encoder.Encoder(embed_dim, encoder_dropout, fine_tune)
                     decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
-                    model = intermediate.IntermediateImageCaptioner(encoder, decoder)
+                    model = intermediate.ImageCaptioner(encoder, decoder)
                 case "transformer":
                     encoder = t_encoder.Encoder(hidden_size, encoder_dropout, fine_tune)
                     config["actual_max_seq_len"] = max_seq_len(train_df, test_df, val_df, vocab)
@@ -307,14 +307,14 @@ def get_model_and_vocab(config):
                     raise ValueError(f"Model {config['model']} not recognized")
 
         case "swin":
-            encoder = swin.SwinEncoder(hidden_size, encoder_dropout, fine_tune)
+            encoder = swin.Encoder(hidden_size, encoder_dropout, fine_tune)
             match config["model"]:
                 case "basic":
                     decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
-                    model = basic.BasicImageCaptioner(encoder, decoder)
+                    model = basic.ImageCaptioner(encoder, decoder)
                 case "intermediate":
                     decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
-                    model = intermediate.IntermediateImageCaptioner(encoder, decoder)
+                    model = intermediate.ImageCaptioner(encoder, decoder)
                 case "transformer":
                     config["actual_max_seq_len"] = max_seq_len(train_df, test_df, val_df, vocab)
                     model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],

@@ -13,7 +13,7 @@ from config.config import logger
 from constants import ROOT, CTRL_PIC, PAD, UNK, SOS
 from dataset.dataloader import CaptionLoader
 from dataset.vocabulary import Vocabulary
-from plotters.captions import preprocess_image
+from plotter.captions import preprocess_image
 from runner.config import TRANSFORM
 from scheduler import SchedulerWrapper
 from utils import time_str, get_config

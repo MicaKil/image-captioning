@@ -10,6 +10,7 @@ from torch import Tensor
 
 from constants import SOS, EOS, UNK, PAD
 from dataset.vocabulary import Vocabulary
+from models.encoders import transformer as t_encoder, swin as swin
 
 
 class SeqEmbedding(nn.Module):
@@ -238,7 +239,8 @@ class ImageCaptioningTransformer(nn.Module):
     captions for input images.
     """
 
-    def __init__(self, encoder, vocab: Vocabulary, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2, max_len: int = 50,
+    def __init__(self, encoder: t_encoder.Encoder | swin.Encoder, vocab: Vocabulary, hidden_size: int = 256, num_layers: int = 2, num_heads: int = 2,
+                 max_len: int = 50,
                  decoder_dropout: float = 0.5):
         """
         Sets up the vocabulary, assigns an external image encoder, creates the sequence embedding, a stack of decoder layers, and the output layer
@@ -311,7 +313,7 @@ class ImageCaptioningTransformer(nn.Module):
     # INFERENCE --------------------------------------------------------------------------------------------------------------------------------------
 
     def generate(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, device: torch.device, temp: Optional[float], beam_size: int,
-                 no_grad: bool, return_atnn=False) -> tuple:
+                 no_grad: bool, return_attn=False) -> tuple:
         """
         Switches the model to evaluation mode and encodes the input image.
         Depending on the beam_size parameter, it either uses beam search or temperature sampling to generate captions.
@@ -322,7 +324,7 @@ class ImageCaptioningTransformer(nn.Module):
         :param temp:
         :param beam_size:
         :param no_grad:
-        :param return_atnn:
+        :param return_attn:
         :return:
         """
         if max_len > self.max_len:
@@ -347,7 +349,7 @@ class ImageCaptioningTransformer(nn.Module):
             else:
                 generated = self.temperature_sampling(features, vocab, max_len, temp)
 
-        if return_atnn:
+        if return_attn:
             return generated
         return generated[:2]  # Return only captions and log_probs
 

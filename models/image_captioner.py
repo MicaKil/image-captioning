@@ -5,14 +5,16 @@ from torch import nn as nn
 
 from constants import SOS, EOS, PAD
 from dataset.vocabulary import Vocabulary
+from models import basic as basic_decoder, intermediate as inter_decoder
+from models.encoders import basic as basic_encoder, intermediate as inter_encoder
 
 
 class ImageCaptioner(nn.Module):
     """
-    Image captioning model that combines an Encoder and Decoder.
+    Common base class for the ImageCaptioner. This class is inherited by different image captioning implementations.
     """
 
-    def __init__(self, encoder: nn.Module, decoder: nn.Module):
+    def __init__(self, encoder: basic_encoder.Encoder | inter_encoder.Encoder, decoder: basic_decoder.Decoder | inter_decoder.Decoder) -> None:
         """
         Constructor for the ImageCaptioning class
         :param encoder: Encoder model
@@ -35,7 +37,7 @@ class ImageCaptioner(nn.Module):
         return outputs
 
     def generate(self, images: torch.Tensor, vocab: Vocabulary, max_len: int, temp: Optional[float], beam_size: int, device: torch.device,
-                 no_grad: bool, return_atnn=None) -> tuple:
+                 no_grad: bool, return_attn=None) -> tuple:
         self.eval()
         images = images.to(device)
         if no_grad:

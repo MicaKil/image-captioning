@@ -242,11 +242,11 @@ class Runner:
                     case "basic":
                         encoder = b_encoder.Encoder(embed_dim, fine_tune)
                         decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
-                        return basic.BasicImageCaptioner(encoder, decoder)
+                        return basic.ImageCaptioner(encoder, decoder)
                     case "intermediate":
                         encoder = i_encoder.Encoder(embed_dim, encoder_dropout, fine_tune)
                         decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
-                        return intermediate.IntermediateImageCaptioner(encoder, decoder)
+                        return intermediate.ImageCaptioner(encoder, decoder)
                     case "transformer":
                         encoder = t_encoder.Encoder(hidden_size, encoder_dropout, fine_tune)
                         config["actual_max_seq_len"] = self.max_seq_len(vocab)
@@ -255,14 +255,14 @@ class Runner:
                     case _:
                         raise ValueError(f"Model {config['model']} not recognized")
             case "swin":
-                encoder = swin.SwinEncoder(hidden_size, encoder_dropout, fine_tune)
+                encoder = swin.Encoder(hidden_size, encoder_dropout, fine_tune)
                 match config["model"]:
                     case "basic":
                         decoder = basic.Decoder(embed_dim, hidden_size, len(vocab), decoder_dropout, num_layers, pad_idx)
-                        return basic.BasicImageCaptioner(encoder, decoder)
+                        return basic.ImageCaptioner(encoder, decoder)
                     case "intermediate":
                         decoder = intermediate.Decoder(embed_dim, hidden_size, vocab, decoder_dropout, num_layers, pad_idx)
-                        return intermediate.IntermediateImageCaptioner(encoder, decoder)
+                        return intermediate.ImageCaptioner(encoder, decoder)
                     case "transformer":
                         config["actual_max_seq_len"] = self.max_seq_len(vocab)
                         return transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
