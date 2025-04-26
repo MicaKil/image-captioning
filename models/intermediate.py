@@ -14,13 +14,14 @@ class Decoder(nn.Module):
 
     def __init__(self, embed_dim: int, hidden_size: int, vocab: Vocabulary, dropout: float, num_layers: int, padding_idx: int) -> None:
         """
-        Constructor for the DecoderLSTM class
-        :param embed_dim: Size of the word embeddings
-        :param hidden_size: Size of the hidden state of the LSTM
-        :param vocab:
-        :param dropout: Dropout probability
-        :param num_layers: Number of layers in the LSTM
-        :param padding_idx: Index of the padding token in the vocabulary
+        Constructor for the Decoder class.
+
+        :param embed_dim: Size of the word embeddings.
+        :param hidden_size: Size of the hidden state of the LSTM.
+        :param vocab: Vocabulary object containing mappings for tokens.
+        :param dropout: Dropout probability for regularization.
+        :param num_layers: Number of layers in the LSTM.
+        :param padding_idx: Index of the padding token in the vocabulary.
         """
         super().__init__()
         self.num_layers = num_layers
@@ -38,47 +39,58 @@ class Decoder(nn.Module):
         self.layer_norm = nn.LayerNorm(hidden_size)
 
         self.linear = nn.Linear(hidden_size, self.vocab_size)
-        self.linear.bias.data.zero_()  # Initialize bias to zeros
-        self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens to -1e9 initially
+        self.linear.bias.data.zero_()  # Initialize bias to zeros.
+        self.linear.bias.data[self.banned_indices] = -1e9  # Set banned tokens' bias to -1e9 initially.
 
     def forward(self, features: torch.Tensor, captions: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of the decoder
-        :param features: Image feature vectors
-        :param captions: Caption word indices
-        :return: Predicted word indices
-        """
+        Perform the forward pass of the decoder.
 
+        :param features: Image feature vectors of shape (batch_size, embed_dim).
+        :param captions: Caption word indices of shape (batch_size, max_caption_length).
+        :return: Predicted word indices of shape (batch_size, max_caption_length + 1, vocab_size).
+        """
         # Initialize hidden and cell states using image features
         batch_size = features.size(0)
         h = self.init_h(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()
         c = self.init_c(features).view(batch_size, self.num_layers, self.hidden_size).permute(1, 0, 2).contiguous()
 
         # Embed and pack sequences
-        embeddings = self.embed(captions)  # Shape: (batch_size, max_caption_length, embed_size)
+        embeddings = self.embed(captions)  # Shape: (batch_size, max_caption_length, embed_dim).
         embeddings = self.dropout(embeddings)
 
         # LSTM forward
         lstm_out, _ = self.lstm(embeddings, (h, c))
         lstm_out = self.layer_norm(lstm_out)
 
-        outputs = self.linear(lstm_out)  # Shape: (batch_size, max_caption_length + 1, vocab_size)
+        outputs = self.linear(lstm_out)  # Shape: (batch_size, max_caption_length + 1, vocab_size).
         return outputs
 
 
 class ImageCaptioner(image_captioner.ImageCaptioner):
+    """
+    ImageCaptioner class that combines an encoder and a decoder to generate captions for images.
+    """
+
     def __init__(self, encoder: inter_encoder.Encoder, decoder: Decoder) -> None:
+        """
+        Initialize the ImageCaptioner class.
+
+        :param encoder: Encoder object to extract image features.
+        :param decoder: Decoder object to generate captions from features.
+        """
         super().__init__(encoder, decoder)
 
     def calc_loss(self, outputs: torch.Tensor, targets: torch.Tensor, criterion: nn.Module) -> torch.Tensor:
         """
         Calculate the loss for the given outputs and targets.
-        :param outputs: Predicted word indices (batch_size, padded_length, vocab_size)
-        :param targets: Target word indices (batch_size, padded_length)
-        :param criterion: Loss function
-        :return: Loss value
+
+        :param outputs: Predicted word indices of shape (batch_size, padded_length, vocab_size).
+        :param targets: Target word indices of shape (batch_size, padded_length).
+        :param criterion: Loss function to compute the loss.
+        :return: Loss value as a scalar tensor.
         """
         return criterion(
-            outputs.reshape(-1, outputs.size(-1)),  # Shape: (batch_size * (seq_len - 1), vocab_size)
-            targets.reshape(-1)  # Shape: (batch_size * (seq_len - 1))
+            outputs.reshape(-1, outputs.size(-1)),  # Reshape outputs to (batch_size * (seq_len - 1), vocab_size).
+            targets.reshape(-1)  # Reshape targets to (batch_size * (seq_len - 1)).
         )

@@ -301,8 +301,8 @@ def get_model_and_vocab(config):
                 case "transformer":
                     encoder = t_encoder.Encoder(hidden_size, encoder_dropout, fine_tune)
                     config["actual_max_seq_len"] = max_seq_len(train_df, test_df, val_df, vocab)
-                    model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
-                                                                   config["actual_max_seq_len"], decoder_dropout)
+                    model = transformer.ImageCaptioner(encoder, vocab, hidden_size, num_layers, config["num_heads"],
+                                                       config["actual_max_seq_len"], decoder_dropout)
                 case _:
                     raise ValueError(f"Model {config['model']} not recognized")
 
@@ -317,8 +317,8 @@ def get_model_and_vocab(config):
                     model = intermediate.ImageCaptioner(encoder, decoder)
                 case "transformer":
                     config["actual_max_seq_len"] = max_seq_len(train_df, test_df, val_df, vocab)
-                    model = transformer.ImageCaptioningTransformer(encoder, vocab, hidden_size, num_layers, config["num_heads"],
-                                                                   config["actual_max_seq_len"], decoder_dropout)
+                    model = transformer.ImageCaptioner(encoder, vocab, hidden_size, num_layers, config["num_heads"],
+                                                       config["actual_max_seq_len"], decoder_dropout)
                 case _:
                     raise ValueError(f"Model {config['model']} not recognized")
 
