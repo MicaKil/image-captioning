@@ -18,6 +18,7 @@ from utils import time_str, get_config
 def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, save_dir: str, tag: str, use_wandb: bool, run_config: dict) -> tuple:
     """
     Evaluate model on test set and log results
+
     :param model: Model to evaluate
     :param test_loader: Test data loader to use
     :param device: Device to use (cpu or cuda)
@@ -77,6 +78,7 @@ def test(model: nn.Module, test_loader: CaptionLoader, device: torch.device, sav
 def log_and_save(metrics: dict, results: pd.DataFrame, save_dir: str, tag: str, use_wandb: bool) -> None:
     """
     Log results and metrics to wandb and save them to disk
+
     :param metrics: Metrics to log and save
     :param results: Results to log and save
     :param save_dir: If not None, save results to this directory

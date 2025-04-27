@@ -134,6 +134,7 @@ def resume(model: nn.Module, device: torch.device, optimizer: torch.optim, sched
            checkpoint_path: str) -> tuple[float, int, int, bool]:
     """
     Resume training from a checkpoint
+
     :param model: The model to resume training
     :param device: Device to run the training on
     :param optimizer: Optimizer for training
@@ -209,6 +210,7 @@ def train_rl(model: nn.Module, train_loader: CaptionLoader, device: torch.device
              run_config: dict) -> float:
     """
     Reinforcement learning training with CIDEr optimization
+
     :param model:
     :param train_loader:
     :param device:
@@ -316,6 +318,7 @@ def eval_load(model: nn.Module, val_loader: CaptionLoader, device: torch.device,
 def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor, criterion: nn.Module, vocab: Vocabulary) -> tuple[torch.Tensor, int]:
     """
     Performs a forward pass through the model.
+
     :param model: The model to perform the forward pass.
     :param images: Batch of images. Shape: (batch_size, 3, 224, 224)
     :param captions: Batch of captions. Shape (batch_size, seq_len)
@@ -354,6 +357,7 @@ def forward_pass(model: nn.Module, images: torch.Tensor, captions: torch.Tensor,
 def sample_caption(config: dict, device: torch.device, model: nn.Module, vocab: Vocabulary) -> None:
     """
     Generate a sample caption.
+
     :param config: Run configuration.
     :param device: Device to run the model.
     :param model: Model to generate the caption.
@@ -369,6 +373,7 @@ def save_checkpoint(model: nn.Module, path: str, optim: torch.optim, scheduler: 
                     epoch: int, epochs_no_improve: int, config: dict, use_rl) -> dict:
     """
     Checkpoint the model
+
     :param use_rl:
     :param model: Current model
     :param path: Path to save the checkpoint

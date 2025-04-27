@@ -27,54 +27,42 @@ COLOR_ERROR = "red"
 COLOR_HIGHLIGHT = "bright_white"
 
 
-def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label: str, model1_config=None, model2_config=None, save_name=None):
+def captions_for_2models(img_pth: str, checkpoint1, checkpoint2, model1_label: str, model2_label: str, model1_config: dict = None,
+                         model2_config: dict = None, save_name: str = None):
     """
     Generate captions for an image using two different models and display the results comparatively.
+
+    :param img_pth: Path to the input image file.
+    :param checkpoint1: Path to the checkpoint file for the first model.
+    :param checkpoint2: Path to the checkpoint file for the second model.
+    :param model1_label: Label for the first model (used in the output display).
+    :param model2_label: Label for the second model (used in the output display).
+    :param model1_config: Configuration dictionary for the first model (optional).
+    :param model2_config: Configuration dictionary for the second model (optional).
+    :param save_name: Name of the file to save the output visualization (optional).
     """
     if model1_config:
-        lstm_model, vocab_lstm = get_model_and_vocab(model1_config)
-        lstm_model.load_state_dict(torch.load(model1, weights_only=True))
+        model1, vocab1 = get_model_and_vocab(model1_config)
+        model1.load_state_dict(torch.load(checkpoint1, weights_only=True))
     else:
-        lstm_model, model1_config, vocab_lstm = load_checkpoint(model1)
+        model1, model1_config, vocab1 = load_checkpoint(checkpoint1)
 
     if model2_config:
-        attn_model, vocab_attn = get_model_and_vocab(model2_config)
-        attn_model.load_state_dict(torch.load(model2, weights_only=True))
+        model2, vocab2 = get_model_and_vocab(model2_config)
+        model2.load_state_dict(torch.load(checkpoint2, weights_only=True))
     else:
-        attn_model, model2_config, vocab_attn = load_checkpoint(model2)
+        model2, model2_config, vocab2 = load_checkpoint(checkpoint2)
 
-    try:
-        transform_resize_lstm = model1_config["transform_resize"]
-    except KeyError:
-        transform_resize_lstm = (224, 224)
-
-    try:
-        transform_resize_attn = model2_config["transform_resize"]
-    except KeyError:
-        transform_resize_attn = (256, 256)
-
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-    transform1 = v2.Compose([
-        v2.ToImage(),
-        v2.Resize(transform_resize_lstm),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=mean, std=std),
-    ])
-    transform2 = v2.Compose([
-        v2.ToImage(),
-        v2.Resize(transform_resize_attn),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=mean, std=std),
-    ])
+    _, _, transform1 = transform_config(model1_config)
+    _, _, transform2 = transform_config(model2_config)
 
     img1 = preprocess_image(img_pth, transform1)
     img2 = preprocess_image(img_pth, transform2)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    caption1, _ = gen_caption(lstm_model, img1, vocab_lstm, 20, device, None, 5, True, False)
+    caption1, _ = gen_caption(model1, img1, vocab1, 20, device, None, 5, True, False)
     print(f"{model1_label} Caption: {caption1[0]}")
-    caption2, _ = gen_caption(attn_model, img2, vocab_attn, 20, device, None, 5, True, False)
+    caption2, _ = gen_caption(model2, img2, vocab2, 20, device, None, 5, True, False)
     print(f"{model2_label} Caption: {caption2[0]}")
 
     captions = f'{model1_label}: "{caption1[0]}"\n{model2_label}: "{caption2[0]}"'
@@ -98,6 +86,16 @@ def gen_pic_and_caption(img_pth, model1, model2, model1_label: str, model2_label
 @click.option("--save-dir", type=click.Path(file_okay=False), default=os.path.join(ROOT, "plots", "app"),
               help="Directory to save the generated plot.", show_default=True)
 def plot_cli(img_pth: str, checkpoint_pth: str, no_attn: bool, save_name: str, save_dir: str):
+    """
+    Command-line interface for generating and visualizing image captions.
+
+    :param img_pth: Path to the input image file.
+    :param checkpoint_pth: Path to the model checkpoint file.
+    :param no_attn: Flag to disable attention visualization.
+    :param save_name: Name for the output plot file.
+    :param save_dir: Directory to save the generated plot.
+    :return: None.
+    """
     print_banner()
 
     if not os.path.exists(save_dir):
@@ -134,19 +132,7 @@ def plot_cli(img_pth: str, checkpoint_pth: str, no_attn: bool, save_name: str, s
     #     raise click.Abort()
 
     click.secho("\n⏳ Processing image...", fg=COLOR_INFO)
-    try:
-        transform_resize = config["transform_resize"]
-    except KeyError:
-        transform_resize = (256, 256)
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    transform = v2.Compose([
-        v2.ToImage(),
-        v2.Resize(transform_resize),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=mean, std=std),
-    ])
+    mean, std, transform = transform_config(config)
 
     img = preprocess_image(img_pth, transform)
     click.secho(f"✅ Processed image: {format_path(img_pth)}", fg=COLOR_SUCCESS)
@@ -189,6 +175,28 @@ def plot_cli(img_pth: str, checkpoint_pth: str, no_attn: bool, save_name: str, s
     click.secho("\n✨ Process completed successfully! ✨\n", fg=COLOR_SUCCESS, bold=True)
 
 
+def transform_config(config: dict) -> tuple[list[float], list[float], v2.Compose]:
+    """
+    Generate image transformation configurations using the provided model configuration.
+
+    :param config: Model configuration dictionary.
+    :return: Tuple containing mean, standard deviation, and a composed transform.
+    """
+    try:
+        transform_resize = config["transform_resize"]
+    except KeyError:
+        transform_resize = (256, 256)
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    transform = v2.Compose([
+        v2.ToImage(),
+        v2.Resize(transform_resize),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=mean, std=std),
+    ])
+    return mean, std, transform
+
+
 def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], attns: list, mean: list[float], std: list[float],
                    columns: int) -> plt.Figure:
     """
@@ -227,7 +235,14 @@ def plot_attention(img_tensor: torch.Tensor, caption: str, tokens: list[str], at
     return plot
 
 
-def gen_save_name(save_dir, save_name):
+def gen_save_name(save_dir: str, save_name: str):
+    """
+    Generate a unique save name for the output file if a file with the same name exists.
+
+    :param save_dir: Directory to save the file.
+    :param save_name: Initial desired file name.
+    :return: Unique file name.
+    """
     i = 0
     name = os.path.splitext(save_name)[0]  # keep the name without extension
     while save_name in os.listdir(os.path.join(ROOT, save_dir)):
@@ -237,20 +252,33 @@ def gen_save_name(save_dir, save_name):
 
 
 def print_banner():
-    """Print a stylized application banner"""
+    """
+    Print a stylized banner for the CLI.
+    """
     click.secho("╭────────────────────────────────────────────╮", fg=COLOR_INFO)
     click.secho("│          Attention Plot Generator          │", fg=COLOR_INFO)
     click.secho("╰────────────────────────────────────────────╯", fg=COLOR_INFO)
 
 
 def format_path(path: str) -> str:
-    """Format a path for display in CLI output"""
+    """
+    Format a file path for display in CLI output.
+
+    :param path: The file path.
+    :return: Formatted string of the file path.
+    """
     return click.style(f"'{click.format_filename(path)}'", fg=COLOR_HIGHLIGHT)
 
 
 # HELPERS --------------------------------------------------------------------------------------------------------------------------------------------
 
-def get_model_and_vocab(config):
+def get_model_and_vocab(config: dict):
+    """
+    Retrieve the model and vocabulary based on the dataset name from the configuration.
+
+    :param config: Model configuration dictionary.
+    :return: Tuple containing the model and vocabulary.
+    """
     ds_name = config["dataset"]["name"]
     match ds_name:
         case "flickr8k":

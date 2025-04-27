@@ -17,7 +17,7 @@ def get_references(df: pd.DataFrame, image_ids: list) -> list:
     return references
 
 
-def get_cider_score(all_hypotheses: list, all_references: list)  -> tuple[float, list]:
+def get_cider_score(all_hypotheses: list, all_references: list) -> tuple[float, list]:
     """
     Calculate CIDEr score for a list of hypotheses and references
     :param all_hypotheses: Hypotheses (generated captions) to evaluate

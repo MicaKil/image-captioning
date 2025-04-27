@@ -9,7 +9,8 @@ from dataset.vocabulary import Vocabulary
 def gen_caption(model: nn.Module, images: torch.Tensor, vocab: Vocabulary, max_len: int = 30, device: torch.device = torch.device("cpu"),
                 temp: Optional[float] = None, beam_size: int = 1, no_grad=True, return_attn=False) -> tuple:
     """
-    Common interface for generating captions using different algorithms and models. Generates a caption for a batch of images using greedy search, temperature-based sampling, or beam search.
+    Common interface for generating captions using different algorithms and models. Generates a caption for a batch of images using greedy search,
+    temperature-based sampling, or beam search.
 
     :param model: Trained model for image captioning
     :param images: Preprocessed batch of image tensors (B, C, H, W)

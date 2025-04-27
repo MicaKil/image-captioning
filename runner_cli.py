@@ -16,7 +16,15 @@ COLOR_HIGHLIGHT = "bright_white"
 # checkpoint_ = "checkpoints/transformer/BEST_2025-03-23_20-58_2-4162.pt"
 
 def print_run_config(config: dict):
-    """Display the run configuration in a structured format"""
+    """
+    Display the run configuration in a structured format.
+
+    This function prints the details of the current run configuration, including
+    model architecture, training setup, dataset configuration, advanced parameters,
+    feature flags, and hardware setup.
+
+    :param config: A dictionary containing the run configuration parameters.
+    """
     click.secho("\n🔧 Current Run Configuration:", fg=COLOR_INFO, bold=True)
 
     # Model Configuration
@@ -86,6 +94,20 @@ def print_banner():
 @click.option("--save-ds", is_flag=True, help="Save processed dataset")
 @click.option("--create-ds", is_flag=True, help="Create new dataset splits")
 def run_cli(use_wandb, checkpoint, train, test, save_ds, create_ds):
+    """
+    Command-line interface for running the image captioning pipeline.
+
+    This function sets up the pipeline for training and testing an image captioning model.
+    It allows enabling/disabling specific features like Weights & Biases logging, dataset
+    creation, and saving processed datasets.
+
+    :param use_wandb: Flag to enable Weights & Biases logging.
+    :param checkpoint: Path to a checkpoint file for resuming training.
+    :param train: Flag to enable or disable training.
+    :param test: Flag to enable or disable testing.
+    :param save_ds: Flag to save the processed dataset.
+    :param create_ds: Flag to create new dataset splits.
+    """
     print_banner()
 
     if use_wandb:

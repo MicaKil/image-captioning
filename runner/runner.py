@@ -1,3 +1,7 @@
+"""
+Module for running training and testing pipelines on image captioning models.
+"""
+
 import os.path
 from typing import Optional
 
@@ -28,19 +32,27 @@ from utils import date_str
 
 
 class Runner:
+    """
+    Runner class responsible for setting up datasets, models, training, and testing pipelines.
+    """
+
     def __init__(self, use_wandb: bool, create_ds: bool, save_ds: bool, train_model: bool, test_model: bool, checkpoint_pth: Optional[str],
                  img_dir: str, ds_splits: tuple[str, str, str], ds_dir: str, project: str, run_tags: list[str], run_config: dict):
         """
-        :param use_wandb: Whether to use wandb
-        :param create_ds: Whether to create a new dataset or load an existing one. Saves the dataset to disk if a new one is created
-        :param save_ds: Whether to save the datasets to disk
-        :param train_model: Whether to train the model
-        :param test_model: Whether to test the model
-        :param checkpoint_pth: Tuple containing the model path and the model tag. If not None, a new model is created.
-        :param img_dir: Path to the image directory of the dataset
-        :param ds_splits: List with the paths to the train, val, and test dataframes
-        :param ds_dir: Path to the directory where the datasets are
-        :return:
+        Initialize the Runner with configuration parameters.
+
+        :param use_wandb: Whether to use wandb for experiment tracking.
+        :param create_ds: Flag for creating a new dataset.
+        :param save_ds: Flag for saving the dataset to disk.
+        :param train_model: Flag for training the model.
+        :param test_model: Flag for testing the model.
+        :param checkpoint_pth: Optional checkpoint path to load a saved model.
+        :param img_dir: Directory path for dataset images.
+        :param ds_splits: Tuple with paths for train, validation, and test dataframes.
+        :param ds_dir: Directory for dataset files.
+        :param project: Wandb project name.
+        :param run_tags: List of tags for the run.
+        :param run_config: Configuration dictionary for the run parameters.
         """
         self.use_wandb = use_wandb
         self.create_ds = create_ds
@@ -57,13 +69,15 @@ class Runner:
 
     def run(self):
         """
-        Run the training and testing pipeline
+        Run the training and testing pipeline.
+
+        Sets up the wandb run, datasets, model, optimizer, scheduler, and triggers training and testing processes.
         """
 
-        # if self.train_model == self.test_model == False:
-        #     raise ValueError("At least one of train_model or test_model must be True.")
-        # if self.test_model and not self.train_model and self.checkpoint is None:
-        #     raise ValueError("If only testing a model, a saved model (checkpoint) must be provided.")
+        if self.train_model == self.test_model == False:
+            raise ValueError("At least one of train_model or test_model must be True.")
+        if self.test_model and not self.train_model and self.checkpoint is None:
+            raise ValueError("If only testing a model, a saved model (checkpoint) must be provided.")
 
         date = date_str()
         if self.use_wandb:
@@ -86,7 +100,7 @@ class Runner:
                 wandb.run.summary["trainable_parameters"] = parameter_count
             logger.info(f"Number of trainable parameters: {parameter_count}")
 
-            # dataloaders
+            # Initialize data loaders for training and validation sets.
             train_dataloader = CaptionLoader(train_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
             val_dataloader = CaptionLoader(val_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
 
@@ -98,13 +112,13 @@ class Runner:
                                              CHECKPOINT_DIR + config["model"], self.use_wandb, config, self.checkpoint)
 
             if self.test_model:
-                # test last model
+                # Test last model checkpoint.
                 test_dataloader = CaptionLoader(test_dataset, batch_size, NUM_WORKERS, SHUFFLE, PIN_MEMORY)
                 test(model, test_dataloader, DEVICE, save_dir, "LAST", self.use_wandb, config)
                 if self.use_wandb:
                     wandb.finish()
 
-                # test best model
+                # Test best model checkpoint.
                 if best_path is not None:
                     if self.use_wandb:
                         self.init_wandb_run()
@@ -137,8 +151,9 @@ class Runner:
 
     def init_wandb_run(self) -> Run:
         """
-        Initialize wandb run
-        :return: Wandb run
+        Initialize a new wandb run with defined metrics.
+
+        :return: Wandb run object.
         """
         wandb_run = wandb.init(project=self.project, tags=self.run_tags, config=self.run_config)
         wandb_run.define_metric("train_loss", summary="min")
@@ -153,10 +168,11 @@ class Runner:
 
     def get_datasets(self, config: dict | Config, date: Optional[str]) -> tuple[CaptionDataset, CaptionDataset, CaptionDataset, Vocabulary]:
         """
-        Creates or loads the datasets.
-        :param config: The run configuration.
-        :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names.
-        :return: Tuple with the training, validation, and test datasets and the vocabulary.
+        Create or load the datasets based on the configuration.
+
+        :param config: Run configuration dictionary or wandb Config.
+        :param date: Date string for dataset versioning.
+        :return: Tuple containing training, validation, testing datasets and the vocabulary.
         """
         img_dir = os.path.join(ROOT, self.img_dir)
         if self.create_ds:
@@ -185,9 +201,8 @@ class Runner:
         test_dataset = CaptionDataset(img_dir, test_df, vocab, transform=TRANSFORM)
 
         if self.save_ds and tokenizer == "word":
-            # save datasets to disk
+            # Save datasets and vocabulary to disk.
             self.save_datasets(None, train_dataset, val_dataset, test_dataset, date, config)
-            # save vocab to disk
             vocab_dict = {
                 "str_to_idx": vocab.stoi_dict,
                 "idx_to_str": vocab.itos_dict,
@@ -203,6 +218,7 @@ class Runner:
     def get_dataframes(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Get the dataframes from the dataset splits based on the file extension
+
         :return: Tuple with the training, validation, and test dataframes
         """
         match os.path.splitext(self.ds_splits[0])[1]:
@@ -224,11 +240,12 @@ class Runner:
 
     def get_model(self, config: dict | Config, vocab: Vocabulary, pad_idx: int) -> nn.Module:
         """
-        Get the model based on the configuration
-        :param config: The run configuration
-        :param vocab: Vocabulary of the dataset
-        :param pad_idx: Index of the padding token
-        :return:
+        Build and return the image captioning model based on the configuration.
+
+        :param config: Run configuration dictionary or wandb Config.
+        :param vocab: Vocabulary object for tokenized captions.
+        :param pad_idx: Padding token index.
+        :return: Configured image captioning model.
         """
         embed_dim = config["embed_size"]
         fine_tune = config["fine_tune_encoder"]
@@ -280,7 +297,6 @@ class Runner:
         :param test_df: Test dataframe to be saved
         :param train_df: Training dataframe to be saved
         :param val_df: Validation dataframe to be saved
-        :return:
         """
         dataset_splits = config['dataset']['split']
         train_df.to_csv(os.path.join(ROOT, self.ds_dir, f"train_{date}_{dataset_splits['train']}.csv"), header=["image_id", "caption"], index=False)
@@ -297,7 +313,6 @@ class Runner:
         :param val_dataset: Validation dataset
         :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
         :param config: Run configuration
-        :return:
         """
         if full_dataset is not None:
             torch.save(full_dataset, os.path.join(ROOT, f"{self.ds_dir}/full_dataset_{date}.pt"))
@@ -308,10 +323,10 @@ class Runner:
 
     def log_datasets(self, date: str, has_full_ds: bool):
         """
-        Log datasets to wandb
+        Log datasets to wandb.
+
         :param has_full_ds:
         :param date: Date string in the format "YYYY-MM-DD" to be appended to the dataset file names
-        :return:
         """
         config = wandb.config
         dataset_name = config["dataset"]["name"]
@@ -339,6 +354,7 @@ class Runner:
     def log_dataset(artifact: wandb.Artifact, dataset_path: str):
         """
         Log dataset to wandb.
+
         :param artifact: Wandb artifact.
         :param dataset_path: Path to the dataset.
         """
@@ -347,7 +363,8 @@ class Runner:
 
     def max_seq_len(self, vocab: Vocabulary):
         """
-        Calculate the maximum sequence length in the dataset
+        Calculate the maximum sequence length in the dataset.
+
         :param vocab:
         :return: Maximum sequence length
         """
@@ -360,11 +377,12 @@ class Runner:
 
 def get_scheduler(config: dict | Config, optim: torch.optim, encoder_lr: float) -> Optional[SchedulerWrapper]:
     """
-    Get the scheduler based on the configuration
+    Get the scheduler based on the configuration.
+
     :param config: The run configuration
     :param optim: The optimizer to be used in training
     :param encoder_lr: The initial learning rate for the encoder
-    :return:
+    :return: The scheduler to be used in training
     """
     scheduler = config["scheduler"]
     if scheduler is not None:
@@ -376,6 +394,7 @@ def get_scheduler(config: dict | Config, optim: torch.optim, encoder_lr: float) 
 def get_optimizer(config: dict | Config, model: nn.Module) -> torch.optim:
     """
     Get the optimizer based on the configuration.
+
     :param config: The run configuration
     :param model: The model to be trained
     :return:
